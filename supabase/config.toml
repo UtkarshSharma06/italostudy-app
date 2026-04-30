@@ -1,0 +1,4 @@
+project_id = "jyjhpqtqbwtxxgijxetq"
+
+[functions.seat-scraper]
+verify_jwt = false

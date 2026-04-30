@@ -1,0 +1,830 @@
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as Sonner } from "@/components/ui/sonner";
+import { toast } from "sonner";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
+import { SpeedInsights as VercelSpeedInsights } from "@vercel/speed-insights/react";
+import { Capacitor } from '@capacitor/core';
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { BrowserRouter, HashRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { AuthProvider } from "@/lib/auth";
+import { ThemeProvider, useTheme } from "next-themes";
+import { lazy, Suspense, useEffect, useState } from "react";
+import { LiveEditProvider } from "@/contexts/LiveEditContext";
+import SecurityEnforcer from "@/components/SecurityEnforcer";
+import PencilLoader from '@/components/PencilLoader';
+import { Helmet } from "react-helmet-async";
+import { useTranslation } from "react-i18next";
+
+import { ExamProvider } from "@/context/ExamContext";
+import { AIProvider } from "@/context/AIContext";
+import { isPublicRoute as checkPublicRoute } from "@/lib/routes";
+
+
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/lib/auth";
+import NetworkStatus from "@/components/NetworkStatus";
+import CookieConsent from "@/components/CookieConsent";
+import AdminRoute from "@/components/auth/AdminRoute";
+import ProtectedRoute from "@/components/auth/ProtectedRoute";
+import { Device } from '@capacitor/device';
+import { StatusBar, Style } from '@capacitor/status-bar';
+import { App as CapApp } from '@capacitor/app';
+import { Preferences } from '@capacitor/preferences';
+import { APKOnboarding } from "@/mobile/components/APKOnboarding";
+import { PricingProvider, usePricing } from "@/context/PricingContext";
+import { usePlanAccess } from "@/hooks/usePlanAccess";
+import { SubscriptionLockout } from "@/components/SubscriptionLockout";
+// Delayed Import for better TTI
+const PricingModal = lazy(() => import("@/components/PricingModal"));
+
+// Lazy Load Pages
+const Index = lazy(() => import("./pages/Index"));
+const Auth = lazy(() => import("./pages/Auth"));
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Subjects = lazy(() => import("./pages/Subjects"));
+const Practice = lazy(() => import("./pages/Practice"));
+const MockExams = lazy(() => import("./pages/MockExams"));
+const Analytics = lazy(() => import("./pages/Analytics"));
+const Labs = lazy(() => import("./pages/Labs"));
+const Test = lazy(() => import("./pages/Test"));
+const Results = lazy(() => import("./pages/Results"));
+const History = lazy(() => import("./pages/History"));
+const ResetPassword = lazy(() => import("./pages/ResetPassword"));
+const Bookmarks = lazy(() => import("./pages/Bookmarks"));
+const Admin = lazy(() => import("./pages/Admin"));
+const InternationalMockWaitingRoom = lazy(() => import("./pages/InternationalMockWaitingRoom"));
+const NotFound = lazy(() => import("./pages/NotFound"));
+const Privacy = lazy(() => import("./pages/Privacy"));
+const Terms = lazy(() => import("./pages/Terms"));
+const Contact = lazy(() => import("./pages/Contact"));
+const Refund = lazy(() => import("./pages/Refund"));
+const About = lazy(() => import("./pages/About"));
+const Pricing = lazy(() => import("./pages/Pricing"));
+const ExamIMAT = lazy(() => import("./pages/ExamIMAT"));
+const ExamCENTS = lazy(() => import("./pages/ExamCENTS"));
+const Method = lazy(() => import("./pages/Method"));
+const Learning = lazy(() => import("./pages/Learning"));
+const StartTest = lazy(() => import("./pages/StartTest"));
+const SpeakingLobby = lazy(() => import("./pages/speaking/SpeakingLobby"));
+const SpeakingSession = lazy(() => import("./pages/speaking/SpeakingSession"));
+const ReadingTest = lazy(() => import("./pages/reading/ReadingTest"));
+const ReadingResult = lazy(() => import("./pages/reading/ReadingResult"));
+const ListeningTest = lazy(() => import("./pages/listening/ListeningTest"));
+const ListeningResult = lazy(() => import("./pages/listening/ListeningResult"));
+const WritingTest = lazy(() => import("./pages/writing/WritingTest"));
+const WritingHistory = lazy(() => import("@/pages/writing/WritingHistory"));
+const SpeakingHistory = lazy(() => import("@/pages/speaking/SpeakingHistory"));
+const ReadingHistory = lazy(() => import("@/pages/reading/ReadingHistory"));
+const ListeningHistory = lazy(() => import("@/pages/listening/ListeningHistory"));
+const Settings = lazy(() => import("./pages/Settings"));
+const IELTSFlow = lazy(() => import("./pages/IELTSFlow"));
+const MockExamResults = lazy(() => import("./pages/MockExamResults"));
+const MockGuidelines = lazy(() => import("./pages/MockGuidelines"));
+const Community = lazy(() => import("./pages/Community"));
+const Institutional = lazy(() => import("./pages/Institutional"));
+const Syllabus = lazy(() => import("./pages/Syllabus"));
+const SyllabusDetail = lazy(() => import("./pages/SyllabusDetail"));
+const Onboarding = lazy(() => import("./pages/Onboarding"));
+const Concierge = lazy(() => import("./pages/Concierge"));
+const ConsultantDashboard = lazy(() => import("./pages/ConsultantDashboard"));
+const ConsultantActivation = lazy(() => import("./pages/ConsultantActivation"));
+const ConsultantApply = lazy(() => import("./pages/ConsultantApply"));
+const ConciergeApply = lazy(() => import("./pages/ConciergeApply"));
+const ConciergeUpgrade = lazy(() => import("./pages/ConciergeUpgrade"));
+const CommunityUpgrade = lazy(() => import("./pages/CommunityUpgrade"));
+const ApplicationDetail = lazy(() => import("./pages/ApplicationDetail"));
+const StudentApplicationStatus = lazy(() => import("./pages/StudentApplicationStatus"));
+const GetAdmission = lazy(() => import("./pages/GetAdmission"));
+const ConsultantApplicationReview = lazy(() => import("./pages/ConsultantApplicationReview"));
+const ConsultantApplicationChat = lazy(() => import("./pages/ConsultantApplicationChat"));
+const ConsultantApplicationOffer = lazy(() => import("./pages/ConsultantApplicationOffer"));
+const StudentProfile = lazy(() => import("./pages/StudentProfile"));
+const DownloadApp = lazy(() => import("./pages/DownloadApp"));
+const Billing = lazy(() => import("./pages/Billing"));
+const DetailedAnalysis = lazy(() => import("./pages/DetailedAnalysis"));
+const StudyPlanner = lazy(() => import("./pages/StudyPlanner"));
+const PaymentCallback = lazy(() => import("./pages/PaymentCallback"));
+
+const MobileBilling = lazy(() => import("@/mobile/pages/MobileBilling"));
+const MobileDetailedAnalysis = lazy(() => import("@/mobile/pages/MobileDetailedAnalysis"));
+const Resources = lazy(() => import("./pages/Resources"));
+const Blog = lazy(() => import("./pages/Blog"));
+const BlogPost = lazy(() => import("./pages/BlogPost"));
+const QAList = lazy(() => import("@/pages/qa/QAList"));
+const QADetail = lazy(() => import("@/pages/qa/QADetail"));
+const AskQuestion = lazy(() => import("@/pages/qa/AskQuestion"));
+
+// CENT-S Authority Cluster
+const CentsUltimateGuide = lazy(() => import("./pages/exams/cents-authority/CentsUltimateGuide"));
+const CentsDetailedSyllabus = lazy(() => import("./pages/exams/cents-authority/CentsDetailedSyllabus"));
+const CentsPatternGuide = lazy(() => import("./pages/exams/cents-authority/CentsPatternGuide"));
+const CentsCutoffTrends = lazy(() => import("./pages/exams/cents-authority/CentsCutoffTrends"));
+const CentsFreeMockTest = lazy(() => import("./pages/exams/cents-authority/CentsFreeMockTest"));
+const CentsPreviousPapers = lazy(() => import("./pages/exams/cents-authority/CentsPreviousPapers"));
+const CentsPrepStrategy = lazy(() => import("./pages/exams/cents-authority/CentsPrepStrategy"));
+const CentsBooks = lazy(() => import("./pages/exams/cents-authority/CentsBooks"));
+const CentsEligibility = lazy(() => import("./pages/exams/cents-authority/CentsEligibility"));
+const CentsRegistration = lazy(() => import("./pages/exams/cents-authority/CentsRegistration"));
+const CentsDates = lazy(() => import('./pages/exams/cents-authority/CentsDates'));
+const CentsDifficultyAnalysis = lazy(() => import('./pages/exams/cents-authority/CentsDifficultyAnalysis'));
+const CentsPassingScore = lazy(() => import('./pages/exams/cents-authority/CentsPassingScore'));
+const CentsMockLanding = lazy(() => import('@/pages/exams/cents-authority/CentsMockLanding'));
+
+
+// IMAT Authority Cluster
+const ImatUltimateGuide = lazy(() => import('@/pages/exams/imat-authority/ImatUltimateGuide'));
+const ImatDetailedSyllabus = lazy(() => import('@/pages/exams/imat-authority/ImatDetailedSyllabus'));
+const ImatExamDates = lazy(() => import('@/pages/exams/imat-authority/ImatExamDates'));
+const ImatRegistration = lazy(() => import('@/pages/exams/imat-authority/ImatRegistration'));
+const ImatPrepStrategy = lazy(() => import('@/pages/exams/imat-authority/ImatPrepStrategy'));
+const ImatVsCents = lazy(() => import('@/pages/exams/imat-authority/ImatVsCents'));
+const ImatBooks = lazy(() => import('@/pages/exams/imat-authority/ImatBooks'));
+const ImatCutoffTrends = lazy(() => import('@/pages/exams/imat-authority/ImatCutoffTrends'));
+const ImatDifficultyAnalysis = lazy(() => import('@/pages/exams/imat-authority/ImatDifficultyAnalysis'));
+const ImatEligibility = lazy(() => import('@/pages/exams/imat-authority/ImatEligibility'));
+const ImatMockTest = lazy(() => import('@/pages/exams/imat-authority/ImatMockTest'));
+const ImatPassingScore = lazy(() => import('@/pages/exams/imat-authority/ImatPassingScore'));
+const ImatPatternGuide = lazy(() => import('@/pages/exams/imat-authority/ImatPatternGuide'));
+const ImatPreviousPapers = lazy(() => import('@/pages/exams/imat-authority/ImatPreviousPapers'));
+
+// TOLC/TIL-I Authority Cluster
+const TolcUltimateGuide = lazy(() => import('@/pages/exams/tolc-authority/TolcUltimateGuide'));
+const TiliUltimateGuide = lazy(() => import('@/pages/exams/tili-authority/TiliUltimateGuide'));
+
+// Study in Italy Authority Cluster
+const StudyItalyGuide = lazy(() => import('@/pages/study-in-italy/StudyItalyGuide'));
+const StudyItalyUniversities = lazy(() => import('@/pages/study-in-italy/StudyItalyUniversities'));
+const StudyItalyWithoutIelts = lazy(() => import('@/pages/study-in-italy/StudyItalyWithoutIelts'));
+const StudyItalyTuition = lazy(() => import('@/pages/study-in-italy/StudyItalyTuition'));
+const StudyItalyApply = lazy(() => import('@/pages/study-in-italy/StudyItalyApply'));
+
+
+const AnnouncementBar = lazy(() => import("./components/AnnouncementBar"));
+
+const MobileAuth = lazy(() => import("./mobile/pages/MobileAuth"));
+const MobileDashboard = lazy(() => import("./mobile/pages/MobileDashboard"));
+const MobilePractice = lazy(() => import("./mobile/pages/MobilePractice"));
+
+const MobileResults = lazy(() => import("./mobile/pages/MobileResults"));
+const MobileStartTest = lazy(() => import("./mobile/pages/MobileStartTest"));
+const MobileOnboarding = lazy(() => import("./mobile/pages/MobileOnboarding"));
+const MobilePricing = lazy(() => import("./mobile/pages/MobilePricing"));
+const MobileSubjects = lazy(() => import("./mobile/pages/MobileSubjects"));
+const MobileLearning = lazy(() => import("./mobile/pages/MobileLearning"));
+const MobileCommunity = lazy(() => import("./mobile/pages/MobileCommunity"));
+const MobileCommunityUpgrade = lazy(() => import("./mobile/pages/MobileCommunityUpgrade"));
+const MobileSettings = lazy(() => import("./mobile/pages/MobileSettings"));
+const MobileTest = lazy(() => import("./mobile/pages/MobileTest"));
+const MobileHistory = lazy(() => import("./mobile/pages/MobileHistory"));
+const MobileMockExams = lazy(() => import("./mobile/pages/MobileMockExams"));
+const MobileLabs = lazy(() => import("./mobile/pages/MobileLabs"));
+const MobileConcierge = lazy(() => import("./mobile/pages/MobileConcierge"));
+const MobileConciergeApply = lazy(() => import("./mobile/pages/MobileConciergeApply"));
+const MobileConciergeUpgrade = lazy(() => import("./mobile/pages/MobileConciergeUpgrade"));
+const MobileStudentApplicationStatus = lazy(() => import("./mobile/pages/MobileStudentApplicationStatus"));
+const MobileContact = lazy(() => import("./mobile/pages/MobileContact"));
+const MobileMockWaitingRoom = lazy(() => import("./mobile/pages/MobileMockWaitingRoom"));
+const MobileSectionedTest = lazy(() => import("./mobile/pages/MobileSectionedTest"));
+const MobileStudentProfile = lazy(() => import("./mobile/pages/MobileStudentProfile"));
+const MobileNotifications = lazy(() => import("./mobile/pages/MobileNotifications"));
+const MobileResources = lazy(() => import("./mobile/pages/MobileResources"));
+const MobileMockGuidelines = lazy(() => import("./mobile/pages/MobileMockGuidelines"));
+const ResourceDetail = lazy(() => import("./pages/ResourceDetail"));
+const PublicSolutions = lazy(() => import("./pages/PublicSolutions"));
+const MobileResourceDetail = lazy(() => import("./mobile/pages/MobileResourceDetail"));
+const MobileBookmarks = lazy(() => import("./mobile/pages/MobileBookmarks"));
+const MobileLayout = lazy(() => import("./mobile/components/MobileLayout"));
+const MobileIELTSPlayer = lazy(() => import("./mobile/pages/MobileIELTSPlayer"));
+const MobileSpeakingLobby = lazy(() => import("./mobile/pages/MobileSpeakingLobby"));
+const MobileSpeakingSession = lazy(() => import("./mobile/pages/MobileSpeakingSession"));
+import { AppUpdateChecker } from "./mobile/components/AppUpdateChecker";
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60 * 5,   // 5 min — override per-query with staleTime:0 for real-time data
+      gcTime: 1000 * 60 * 10,     // 10 min garbage collection
+      retry: 1,
+    },
+  },
+});
+
+// Premium Loading Fallback
+const PageLoader = () => {
+  return null;
+};
+
+
+const WebRouter = () => (
+  <Routes>
+    <Route path="/" element={<Index />} />
+    <Route path="/it" element={<Index />} />
+    <Route path="/tr" element={<Index />} />
+    <Route path="/auth" element={<Auth />} />
+    
+    {/* Public Q&A — SEO-optimized /answers routes */}
+    <Route path="/answers" element={<QAList />} />
+    <Route path="/answers/:slug" element={<QADetail />} />
+    {/* Legacy /qa redirects — keeps old links working */}
+    <Route path="/qa" element={<Navigate to="/answers" replace />} />
+    <Route path="/qa/ask" element={<Navigate to="/answers" replace />} />
+    <Route path="/qa/:slug" element={<QADetail />} />
+
+    {/* Protected Routes */}
+    <Route path="/onboarding" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Onboarding /></ProtectedRoute>} />
+    <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin']}><Dashboard /></ProtectedRoute>} />
+    <Route path="/community" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Community /></ProtectedRoute>} />
+    <Route path="/community/upgrade" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><CommunityUpgrade /></ProtectedRoute>} />
+    <Route path="/subjects" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Subjects /></ProtectedRoute>} />
+    <Route path="/practice" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Practice /></ProtectedRoute>} />
+    <Route path="/mock-exams" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MockExams /></ProtectedRoute>} />
+    <Route path="/analytics" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Analytics /></ProtectedRoute>} />
+    <Route path="/admin" element={
+      <AdminRoute>
+        <Admin />
+      </AdminRoute>
+    } />
+    <Route path="/test/:testId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Test /></ProtectedRoute>} />
+    <Route path="/results/:testId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Results /></ProtectedRoute>} />
+    <Route path="/history" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><History /></ProtectedRoute>} />
+    <Route path="/settings" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Settings /></ProtectedRoute>} />
+    <Route path="/billing" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Billing /></ProtectedRoute>} />
+
+    <Route path="/bookmarks" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Bookmarks /></ProtectedRoute>} />
+    <Route path="/resources" element={<Resources />} />
+    <Route path="/resources/:slug" element={<ResourceDetail />} />
+    <Route path="/pricing" element={<Pricing />} />
+    <Route path="/payment/callback" element={<PaymentCallback />} />
+
+    {/* Public Pages */}
+    <Route path="/institutional" element={<Institutional />} />
+    <Route path="/syllabus" element={<Syllabus />} />
+    <Route path="/syllabus/:examId" element={<SyllabusDetail />} />
+    {/* Standalone HTML Page handles /method */}
+    {/* <Route path="/method" element={<Method />} /> */}
+    <Route path="/get-admission" element={<GetAdmission />} />
+    {/* Standalone HTML Page handles /exams */}
+    {/* <Route path="/exams" element={<Syllabus />} /> */}
+    <Route path="/waiting-room/:sessionId" element={<InternationalMockWaitingRoom />} />
+    <Route path="/solutions/:sessionId" element={<PublicSolutions />} />
+
+    {/* Study Modules */}
+    {/* Standalone HTML Pages handle these /exams subpaths */}
+    {/* <Route path="/exams/imat" element={<ExamIMAT />} /> */}
+    {/* <Route path="/exams/cent-s" element={<Navigate to="/cent-s-exam-ultimate-guide" replace />} /> */}
+    <Route path="/learning" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Learning /></ProtectedRoute>} />
+    <Route path="/reading/:testId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><ReadingTest /></ProtectedRoute>} />
+    <Route path="/reading/history" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><ReadingHistory /></ProtectedRoute>} />
+    <Route path="/reading/results/:submissionId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><ReadingResult /></ProtectedRoute>} />
+    <Route path="/listening/:testId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><ListeningTest /></ProtectedRoute>} />
+    <Route path="/listening/history" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><ListeningHistory /></ProtectedRoute>} />
+    <Route path="/listening/results/:submissionId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><ListeningResult /></ProtectedRoute>} />
+    <Route path="/writing/:taskId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><WritingTest /></ProtectedRoute>} />
+    <Route path="/writing/history" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><WritingHistory /></ProtectedRoute>} />
+    <Route path="/writing/results/:submissionId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><WritingTest /></ProtectedRoute>} />
+    <Route path="/speaking" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><SpeakingLobby /></ProtectedRoute>} />
+    <Route path="/speaking/history" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><SpeakingHistory /></ProtectedRoute>} />
+    <Route path="/speaking/:sessionId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><SpeakingSession /></ProtectedRoute>} />
+    <Route path="/ielts-flow/:sessionId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><IELTSFlow /></ProtectedRoute>} />
+    <Route path="/mock-results/:id" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MockExamResults /></ProtectedRoute>} />
+    <Route path="/detailed-analysis/:testId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><DetailedAnalysis /></ProtectedRoute>} />
+    <Route path="/start-test" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><StartTest /></ProtectedRoute>} />
+    <Route path="/study-planner" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><StudyPlanner /></ProtectedRoute>} />
+    <Route path="/mock-guidelines" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MockGuidelines /></ProtectedRoute>} />
+    <Route path="/labs" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Labs /></ProtectedRoute>} />
+
+    {/* Apply University Upgrade Page */}
+    <Route path="/apply-university/upgrade" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><ConciergeUpgrade /></ProtectedRoute>} />
+
+    <Route path="/apply-university" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Concierge /></ProtectedRoute>} />
+    <Route path="/consultant/activate" element={<ConsultantActivation />} />
+    <Route path="/consultant/apply" element={<ConsultantApply />} />
+    <Route path="/consultant/dashboard" element={<ProtectedRoute allowedRoles={['consultant', 'admin', 'sub_admin']}><ConsultantDashboard /></ProtectedRoute>} />
+
+    {/* Student Application Wizard */}
+    <Route path="/apply-university/status/:id" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><StudentApplicationStatus /></ProtectedRoute>} />
+    <Route path="/apply-university/apply" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><ConciergeApply /></ProtectedRoute>} />
+    <Route path="/apply-university/apply/:id" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><ConciergeApply /></ProtectedRoute>} />
+    <Route path="/apply-university/application/:id" element={<ProtectedRoute allowedRoles={['consultant', 'admin', 'sub_admin', 'user']}><ApplicationDetail /></ProtectedRoute>} />
+
+    {/* Consultant Specific Application Pages */}
+    <Route path="/consultant/application/:id" element={<ProtectedRoute allowedRoles={['consultant', 'admin', 'sub_admin']}><ConsultantApplicationReview /></ProtectedRoute>} />
+    <Route path="/consultant/application/:id/chat" element={<ProtectedRoute allowedRoles={['consultant', 'admin', 'sub_admin']}><ConsultantApplicationChat /></ProtectedRoute>} />
+    <Route path="/consultant/application/:id/offer" element={<ProtectedRoute allowedRoles={['consultant', 'admin', 'sub_admin']}><ConsultantApplicationOffer /></ProtectedRoute>} />
+
+    <Route path="/student/:id" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><StudentProfile /></ProtectedRoute>} />
+    <Route path="/u/:username" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><StudentProfile /></ProtectedRoute>} />
+    <Route path="/download-app" element={<DownloadApp />} />
+    <Route path="/blog" element={<Blog />} />
+    <Route path="/blog/:slug" element={<BlogPost />} />
+    <Route path="/reset-password" element={<ResetPassword />} />
+    <Route path="/privacy" element={<Privacy />} />
+    <Route path="/terms" element={<Terms />} />
+    {/* Standalone HTML Page handles /contact */}
+    {/* <Route path="/contact" element={<Contact />} /> */}
+    <Route path="/refund" element={<Refund />} />
+    <Route path="/about" element={<About />} />
+
+    {/* CENT-S Authority Cluster (Converted to Static HTML) */}
+    <Route path="/cent-s-exam-ultimate-guide" element={<CentsUltimateGuide />} />
+    <Route path="/cent-s-syllabus-2026" element={<CentsDetailedSyllabus />} />
+    <Route path="/cent-s-exam-pattern-2026" element={<CentsPatternGuide />} />
+    <Route path="/cent-s-cutoff-2026" element={<CentsCutoffTrends />} />
+    <Route path="/cent-s-mock-test-free-2026" element={<CentsFreeMockTest />} />
+    <Route path="/cent-s-previous-year-papers-pdf" element={<CentsPreviousPapers />} />
+    <Route path="/cent-s-preparation-strategy-2026" element={<CentsPrepStrategy />} />
+    <Route path="/best-books-for-cent-s-2026" element={<CentsBooks />} />
+    <Route path="/cent-s-eligibility-criteria" element={<CentsEligibility />} />
+    <Route path="/cent-s-registration-process-2026" element={<CentsRegistration />} />
+    <Route path="/cent-s-important-dates-2026" element={<CentsDates />} />
+    <Route path="/cent-s-difficulty-level-analysis" element={<CentsDifficultyAnalysis />} />
+    <Route path="/cent-s-passing-score-explained" element={<CentsPassingScore />} />
+    <Route path="/cent-s-mock" element={<CentsMockLanding />} />
+
+
+    {/* IMAT Authority Cluster (Converted to Static HTML) */}
+    <Route path="/imat-exam-ultimate-guide-2026" element={<ImatUltimateGuide />} />
+    <Route path="/imat-syllabus-2026" element={<ImatDetailedSyllabus />} />
+    <Route path="/imat-exam-dates-2026" element={<ImatExamDates />} />
+    <Route path="/imat-registration-2026" element={<ImatRegistration />} />
+    <Route path="/imat-preparation-strategy-2026" element={<ImatPrepStrategy />} />
+    <Route path="/imat-vs-cents-2026" element={<ImatVsCents />} />
+    <Route path="/imat-best-books-2026" element={<ImatBooks />} />
+    <Route path="/imat-cutoff-trends-2026" element={<ImatCutoffTrends />} />
+    <Route path="/imat-difficulty-analysis-2026" element={<ImatDifficultyAnalysis />} />
+    <Route path="/imat-eligibility-criteria-2026" element={<ImatEligibility />} />
+    <Route path="/imat-mock-test-free-2026" element={<ImatMockTest />} />
+    <Route path="/imat-passing-score-explained-2026" element={<ImatPassingScore />} />
+    <Route path="/imat-exam-pattern-2026" element={<ImatPatternGuide />} />
+    <Route path="/imat-previous-year-papers-pdf" element={<ImatPreviousPapers />} />
+
+    {/* TOLC/TIL-I Authority Cluster */}
+    <Route path="/tolc-exam-ultimate-guide-2026" element={<TolcUltimateGuide />} />
+    <Route path="/til-i-exam-guide-2026" element={<TiliUltimateGuide />} />
+
+    {/* Study in Italy Authority Cluster */}
+    <Route path="/study-in-italy-guide-2026" element={<StudyItalyGuide />} />
+    <Route path="/study-in-italy/universities-2026" element={<StudyItalyUniversities />} />
+    <Route path="/study-in-italy/without-ielts" element={<StudyItalyWithoutIelts />} />
+    <Route path="/study-in-italy/tuition-fees-2026" element={<StudyItalyTuition />} />
+    <Route path="/study-in-italy/how-to-apply" element={<StudyItalyApply />} />
+
+    {/* Legacy Redirects for Study in Italy */}
+    <Route path="/study-in-italy/guide-2026" element={<Navigate to="/study-in-italy-guide-2026" replace />} />
+    <Route path="/study-in-italy/universities-for-international-students" element={<Navigate to="/study-in-italy/universities-2026" replace />} />
+
+    <Route path="*" element={<NotFound />} />
+  </Routes>
+);
+
+const MobileRouter = ({ user, isNative }: { user: any, isNative: boolean }) => {
+  const isPublicRoute = checkPublicRoute(window.location.pathname);
+
+  return (
+    <AppUpdateChecker>
+      <Routes>
+        <Route path="/" element={
+          user ? <Navigate to="/mobile/dashboard" replace /> :
+            (isNative && !isPublicRoute ? <Navigate to="/auth" replace /> : <Index />)
+        } />
+        <Route path="/auth" element={<MobileAuth />} />
+        <Route path="/mobile/auth" element={<MobileAuth />} />
+
+        <Route element={<MobileLayout />}>
+          {/* Premium Custom Mobile Pages */}
+          <Route path="/mobile/dashboard" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin']}><MobileDashboard /></ProtectedRoute>} />
+          <Route path="/mobile/practice" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobilePractice /></ProtectedRoute>} />
+          <Route path="/mobile/analytics" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Analytics /></ProtectedRoute>} />
+          <Route path="/mobile/settings" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileSettings /></ProtectedRoute>} />
+          <Route path="/mobile/billing" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileBilling /></ProtectedRoute>} />
+          <Route path="/mobile/notifications" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileNotifications /></ProtectedRoute>} />
+          <Route path="/settings" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileSettings /></ProtectedRoute>} />
+
+          {/* Coverage for all other features */}
+          <Route path="/pricing" element={<MobilePricing />} />
+          {/* Resources is now public below */}
+          <Route path="/community" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileCommunity /></ProtectedRoute>} />
+          <Route path="/community/upgrade" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileCommunityUpgrade /></ProtectedRoute>} />
+          <Route path="/subjects" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileSubjects /></ProtectedRoute>} />
+          <Route path="/reset-password" element={<ResetPassword />} />
+          <Route path="/learning" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileLearning /></ProtectedRoute>} />
+          <Route path="/mock-exams" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileMockExams /></ProtectedRoute>} />
+          <Route path="/history" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileHistory /></ProtectedRoute>} />
+          <Route path="/bookmarks" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileBookmarks /></ProtectedRoute>} />
+
+          {/* History Synced to Mobile History */}
+          <Route path="/reading/history" element={<ProtectedRoute allowedRoles={['user', 'admin', 'consultant']}><MobileHistory /></ProtectedRoute>} />
+          <Route path="/listening/history" element={<ProtectedRoute allowedRoles={['user', 'admin', 'consultant']}><MobileHistory /></ProtectedRoute>} />
+          <Route path="/writing/history" element={<ProtectedRoute allowedRoles={['user', 'admin', 'consultant']}><MobileHistory /></ProtectedRoute>} />
+
+          {/* Consultant & University (Mobile Native) */}
+          <Route path="/apply-university" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileConcierge /></ProtectedRoute>} />
+          <Route path="/apply-university/status/:id" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileStudentApplicationStatus /></ProtectedRoute>} />
+
+          <Route path="/get-admission" element={<GetAdmission />} />
+          <Route path="/consultant/dashboard" element={<ProtectedRoute allowedRoles={['consultant', 'admin', 'sub_admin']}><ConsultantDashboard /></ProtectedRoute>} />
+          <Route path="/apply-university/upgrade" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileConciergeUpgrade /></ProtectedRoute>} />
+          
+          {/* Redirects */}
+          <Route path="/dashboard" element={<Navigate to="/mobile/dashboard" replace />} />
+          <Route path="/practice" element={<Navigate to="/mobile/practice" replace />} />
+          <Route path="/analytics" element={<Navigate to="/mobile/analytics" replace />} />
+          <Route path="/qa" element={<Navigate to="/answers" replace />} />
+        </Route>
+
+        <Route path="/answers" element={<QAList />} />
+        <Route path="/answers/:slug" element={<QADetail />} />
+
+        <Route path="/admin" element={<AdminRoute><Admin /></AdminRoute>} />
+
+        {/* Immersive Mobile Experiences (Outside shared layout) */}
+        <Route path="/labs" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileLabs /></ProtectedRoute>} />
+        <Route path="/test/:testId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileTest /></ProtectedRoute>} />
+        <Route path="/mobile/test/:testId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileTest /></ProtectedRoute>} />
+        <Route path="/sectioned-test/:id" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileSectionedTest /></ProtectedRoute>} />
+        <Route path="/mobile/sectioned-test/:id" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileSectionedTest /></ProtectedRoute>} />
+        <Route path="/results/:testId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileResults /></ProtectedRoute>} />
+        <Route path="/mobile/results/:testId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileResults /></ProtectedRoute>} />
+        <Route path="/mock-results/:id" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileResults /></ProtectedRoute>} />
+        <Route path="/mobile/mock-results/:id" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileResults /></ProtectedRoute>} />
+        <Route path="/mobile/student/:id" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileStudentProfile /></ProtectedRoute>} />
+        <Route path="/detailed-analysis/:testId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileDetailedAnalysis /></ProtectedRoute>} />
+        <Route path="/mobile/detailed-analysis/:testId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileDetailedAnalysis /></ProtectedRoute>} />
+        <Route path="/waiting-room/:sessionId" element={<MobileMockWaitingRoom />} />
+        <Route path="/solutions/:sessionId" element={<PublicSolutions />} />
+        <Route path="/mobile/waiting-room/:sessionId" element={<MobileMockWaitingRoom />} />
+        <Route path="/mobile/mock-guidelines" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileMockGuidelines /></ProtectedRoute>} />
+        <Route path="/start-test" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileStartTest /></ProtectedRoute>} />
+        <Route path="/study-planner" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><StudyPlanner /></ProtectedRoute>} />
+        <Route path="/mock-guidelines" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MockGuidelines /></ProtectedRoute>} />
+        <Route path="/mobile/start-test" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileStartTest /></ProtectedRoute>} />
+        <Route path="/writing/results/:id" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileResults /></ProtectedRoute>} />
+        <Route path="/mobile/writing/results/:id" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileResults /></ProtectedRoute>} />
+        <Route path="/speaking/results/:id" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileResults /></ProtectedRoute>} />
+        <Route path="/mobile/speaking/results/:id" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileResults /></ProtectedRoute>} />
+        <Route path="/reading/results/:id" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileResults /></ProtectedRoute>} />
+        <Route path="/mobile/reading/results/:id" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileResults /></ProtectedRoute>} />
+        <Route path="/listening/results/:id" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileResults /></ProtectedRoute>} />
+        <Route path="/mobile/listening/results/:id" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileResults /></ProtectedRoute>} />
+        <Route path="/reading/:id" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileIELTSPlayer /></ProtectedRoute>} />
+        <Route path="/listening/:id" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileIELTSPlayer /></ProtectedRoute>} />
+        <Route path="/writing/:taskId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileIELTSPlayer /></ProtectedRoute>} />
+        <Route path="/speaking" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileSpeakingLobby /></ProtectedRoute>} />
+        <Route path="/speaking/history" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileHistory /></ProtectedRoute>} />
+        <Route path="/speaking/:sessionId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileSpeakingSession /></ProtectedRoute>} />
+        <Route path="/ielts-flow/:sessionId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><IELTSFlow /></ProtectedRoute>} />
+        <Route path="/apply-university/apply" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileConciergeApply /></ProtectedRoute>} />
+        <Route path="/apply-university/apply/:id" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileConciergeApply /></ProtectedRoute>} />
+        <Route path="/onboarding" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileOnboarding /></ProtectedRoute>} />
+        <Route path="/pricing" element={<MobilePricing />} />
+
+        <Route path="/institutional" element={<Institutional />} />
+        <Route path="/syllabus" element={<Syllabus />} />
+        <Route path="/syllabus/:examId" element={<SyllabusDetail />} />
+        {/* <Route path="/method" element={<Method />} /> */}
+        <Route path="/reset-password" element={<ResetPassword />} />
+        <Route path="/privacy" element={<Privacy />} />
+        <Route path="/terms" element={<Terms />} />
+        <Route path="/refund" element={<Refund />} />
+        <Route path="/about" element={<About />} />
+        {/* <Route path="/contact" element={<MobileContact />} /> */}
+
+        {/* CENT-S Authority Cluster (Mobile) */}
+        <Route path="/cent-s-exam-ultimate-guide" element={<CentsUltimateGuide />} />
+        <Route path="/cent-s-syllabus-2026" element={<CentsDetailedSyllabus />} />
+        <Route path="/cent-s-exam-pattern-2026" element={<CentsPatternGuide />} />
+        <Route path="/cent-s-cutoff-2026" element={<CentsCutoffTrends />} />
+        <Route path="/cent-s-mock-test-free-2026" element={<CentsFreeMockTest />} />
+        <Route path="/cent-s-previous-year-papers-pdf" element={<CentsPreviousPapers />} />
+        <Route path="/cent-s-preparation-strategy-2026" element={<CentsPrepStrategy />} />
+        <Route path="/best-books-for-cent-s-2026" element={<CentsBooks />} />
+        <Route path="/cent-s-eligibility-criteria" element={<CentsEligibility />} />
+
+        {/* IMAT Authority Cluster (Mobile) */}
+        <Route path="/imat-exam-ultimate-guide-2026" element={<ImatUltimateGuide />} />
+        <Route path="/imat-syllabus-2026" element={<ImatDetailedSyllabus />} />
+        <Route path="/imat-exam-dates-2026" element={<ImatExamDates />} />
+        <Route path="/imat-registration-2026" element={<ImatRegistration />} />
+        <Route path="/imat-preparation-strategy-2026" element={<ImatPrepStrategy />} />
+        <Route path="/imat-vs-cents-2026" element={<ImatVsCents />} />
+        <Route path="/imat-best-books-2026" element={<ImatBooks />} />
+        <Route path="/imat-cutoff-trends-2026" element={<ImatCutoffTrends />} />
+        <Route path="/imat-difficulty-analysis-2026" element={<ImatDifficultyAnalysis />} />
+        <Route path="/imat-eligibility-criteria-2026" element={<ImatEligibility />} />
+        <Route path="/imat-mock-test-free-2026" element={<ImatMockTest />} />
+        <Route path="/imat-passing-score-explained-2026" element={<ImatPassingScore />} />
+        <Route path="/imat-exam-pattern-2026" element={<ImatPatternGuide />} />
+        <Route path="/imat-previous-year-papers-pdf" element={<ImatPreviousPapers />} />
+
+        {/* TOLC/TIL-I Authority Cluster (Mobile) */}
+        <Route path="/tolc-exam-ultimate-guide-2026" element={<TolcUltimateGuide />} />
+        <Route path="/til-i-exam-guide-2026" element={<TiliUltimateGuide />} />
+
+        {/* Study in Italy Authority Cluster (Mobile) */}
+        <Route path="/study-in-italy-guide-2026" element={<StudyItalyGuide />} />
+        <Route path="/study-in-italy/guide-2026" element={<Navigate to="/study-in-italy-guide-2026" replace />} />
+        <Route path="/study-in-italy/universities-2026" element={<StudyItalyUniversities />} />
+        <Route path="/study-in-italy/universities-for-international-students" element={<Navigate to="/study-in-italy/universities-2026" replace />} />
+        <Route path="/study-in-italy/without-ielts" element={<StudyItalyWithoutIelts />} />
+        <Route path="/study-in-italy/tuition-fees-2026" element={<StudyItalyTuition />} />
+        <Route path="/study-in-italy/how-to-apply" element={<StudyItalyApply />} />
+
+        <Route path="/cent-s-registration-process-2026" element={<CentsRegistration />} />
+        <Route path="/cent-s-important-dates-2026" element={<CentsDates />} />
+        <Route path="/cent-s-difficulty-level-analysis" element={<CentsDifficultyAnalysis />} />
+        <Route path="/cent-s-passing-score-explained" element={<CentsPassingScore />} />
+        <Route path="/cent-s-mock" element={<CentsMockLanding />} />
+
+        <Route path="/imat-vs-cents-2026" element={<ImatVsCents />} />
+
+
+        {/* Consultant & Application Parity */}
+        <Route path="/apply-university/application/:id" element={<ProtectedRoute allowedRoles={['consultant', 'admin', 'sub_admin', 'user']}><ApplicationDetail /></ProtectedRoute>} />
+        <Route path="/consultant/application/:id" element={<ProtectedRoute allowedRoles={['consultant', 'admin', 'sub_admin']}><ConsultantApplicationReview /></ProtectedRoute>} />
+        <Route path="/consultant/application/:id/chat" element={<ProtectedRoute allowedRoles={['consultant', 'admin', 'sub_admin']}><ConsultantApplicationChat /></ProtectedRoute>} />
+        <Route path="/consultant/application/:id/offer" element={<ProtectedRoute allowedRoles={['consultant', 'admin', 'sub_admin']}><ConsultantApplicationOffer /></ProtectedRoute>} />
+        <Route path="/consultant/activate" element={<ConsultantActivation />} />
+        <Route path="/consultant/apply" element={<ConsultantApply />} />
+
+        <Route path="/resources" element={<MobileResources />} />
+        <Route path="/resources/:slug" element={<MobileResourceDetail />} />
+        <Route path="/blog" element={<Blog />} />
+        <Route path="/blog/:slug" element={<BlogPost />} />
+        {/* <Route path="/exams/imat" element={<ExamIMAT />} /> */}
+        {/* <Route path="/exams/cent-s" element={<ExamCENTS />} /> */}
+        <Route path="/download-app" element={<DownloadApp />} />
+
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </AppUpdateChecker>
+  );
+};
+
+const App = () => {
+  const [isMobile, setIsMobile] = useState<boolean | null>(() => window.innerWidth <= 768);
+  const [isNative, setIsNative] = useState(() => Capacitor.isNativePlatform());
+  const [onboardingCompleted, setOnboardingCompleted] = useState<boolean | null>(true);
+  const { setTheme } = useTheme();
+
+  useEffect(() => {
+    let mounted = true;
+
+    const checkPlatform = async () => {
+      // Safety Timeout: Force load if platform check hangs
+      const timeoutId = setTimeout(() => {
+        if (mounted) {
+          setIsMobile(prev => prev ?? (window.innerWidth <= 768));
+          setOnboardingCompleted(prev => prev ?? true);
+          setIsNative(prev => prev || false);
+        }
+      }, 1000);
+
+      try {
+        const info = await Device.getInfo();
+        const native = info.platform === 'android' || info.platform === 'ios';
+
+        if (mounted) {
+          setIsNative(native);
+          setIsMobile(native || window.innerWidth <= 768);
+
+          if (native) {
+            const { value } = await Preferences.get({ key: 'onboarding_completed' });
+            setOnboardingCompleted(value === 'true');
+            setTheme('dark');
+            // Hide status bar and set overlay
+            await StatusBar.hide();
+            await StatusBar.setOverlaysWebView({ overlay: true });
+            await StatusBar.setStyle({ style: Style.Dark });
+          } else {
+            setOnboardingCompleted(true);
+            setTheme('light');
+          }
+        }
+        clearTimeout(timeoutId);
+      } catch (e) {
+        setIsMobile(window.innerWidth < 768);
+      }
+    };
+
+    const handleResize = () => {
+      if (mounted) {
+        setIsMobile(window.innerWidth <= 768);
+      }
+    };
+
+    checkPlatform();
+    window.addEventListener('resize', handleResize);
+    return () => {
+      mounted = false;
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
+
+  // Performance: Prefetch Pricing components to prevent flickering/white screen
+  useEffect(() => {
+    const prefetchPricing = async () => {
+      try {
+        const prefetch = [
+          import("@/components/PricingModal"),
+          import("./pages/Pricing"),
+          import("./mobile/pages/MobileMockExams")
+        ];
+        await Promise.all(prefetch);
+      } catch (e) {
+        // silent fail
+      }
+    };
+
+    // Delay to allow critical rendering to complete first
+    const t = setTimeout(prefetchPricing, 8000);
+    return () => clearTimeout(t);
+  }, []);
+
+
+
+
+  if (isMobile === null) return null;
+
+  return (
+    <AppProviders>
+      <AuthBridge
+        isNative={isNative}
+        onboardingCompleted={onboardingCompleted}
+        setOnboardingCompleted={setOnboardingCompleted}
+        isMobile={isMobile}
+      />
+    </AppProviders>
+  );
+};
+
+const AppProviders = ({ children }: { children: React.ReactNode }) => {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false}>
+        <AuthProvider>
+          <PricingProvider>
+            <ExamProvider>
+              <AIProvider>
+                <TooltipProvider>
+                  <LiveEditProvider>
+                    {children}
+                  </LiveEditProvider>
+                </TooltipProvider>
+              </AIProvider>
+            </ExamProvider>
+          </PricingProvider>
+        </AuthProvider>
+      </ThemeProvider>
+    </QueryClientProvider>
+  );
+};
+
+// Internal component to handle auth-sensitive routing
+const AuthBridge = ({ isNative, onboardingCompleted, setOnboardingCompleted, isMobile }: any) => {
+  const { user, profile, loading: authLoading, refreshProfile } = useAuth();
+  const { isPricingModalOpen, isCheckoutOpen } = usePricing();
+  const { shouldBlockAccess, refreshLimit, isGlobal, isElite, isAdmin, plan, tier } = usePlanAccess();
+
+  useEffect(() => {
+    if (shouldBlockAccess && user?.id) {
+      const autoDowngrade = async () => {
+        try {
+          console.log("Auto-downgrading expired subscription for user:", user.id);
+          const { error } = await supabase
+            .from('profiles')
+            .update({
+              selected_plan: 'explorer',
+              subscription_tier: 'free'
+            })
+            .eq('id', user.id);
+
+          if (!error) {
+            await refreshProfile();
+            await refreshLimit();
+          }
+        } catch (e) {
+          console.error("Auto-downgrade failed:", e);
+        }
+      };
+      autoDowngrade();
+    }
+  }, [shouldBlockAccess, user?.id, refreshProfile, refreshLimit]);
+
+  if (authLoading) {
+    const currentPath = isNative ? window.location.hash.replace(/^#/, '') : window.location.pathname;
+    const isPublicRoute = checkPublicRoute(currentPath);
+
+    if (currentPath !== '/' && !isPublicRoute) {
+      return <PencilLoader />;
+    }
+  }
+
+  return (
+    <>
+
+
+      <Suspense fallback={isMobile ? <PencilLoader /> : null}>
+        {isMobile ? (
+          // Use HashRouter ONLY for Native APK, BrowserRouter for Mobile Web
+          isNative ? (
+            <HashRouter>
+              <ToasterProvider />
+              <SecurityEnforcer />
+              <DeepLinkHandler />
+              <MobileRouter user={user} isNative={isNative} />
+              {(isPricingModalOpen || isCheckoutOpen) && (
+                <Suspense fallback={null}>
+                  <PricingModal />
+                </Suspense>
+              )}
+            </HashRouter>
+          ) : (
+            <BrowserRouter>
+              <ToasterProvider />
+              <SecurityEnforcer />
+              <MobileRouter user={user} isNative={isNative} />
+              {(isPricingModalOpen || isCheckoutOpen) && (
+                <Suspense fallback={null}>
+                  <PricingModal />
+                </Suspense>
+              )}
+            </BrowserRouter>
+          )
+        ) : (
+          <BrowserRouter>
+            <ToasterProvider />
+            <SecurityEnforcer />
+            <WebRouter />
+            {(isPricingModalOpen || isCheckoutOpen) && (
+              <Suspense fallback={null}>
+                <PricingModal />
+              </Suspense>
+            )}
+          </BrowserRouter>
+        )}
+      </Suspense>
+      <VercelAnalytics />
+      <VercelSpeedInsights />
+      <NetworkStatus />
+      <CookieConsent />
+    </>
+  );
+};
+
+const ToasterProvider = () => {
+  return (
+    <>
+      <Toaster />
+      <Sonner />
+    </>
+  );
+};
+
+// Component to handle native deep links and auth redirects
+const DeepLinkHandler = () => {
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    // Store the listener handle so we only remove THIS specific listener on cleanup
+    let listenerHandle: { remove: () => Promise<void> } | null = null;
+
+    const setup = async () => {
+      listenerHandle = await CapApp.addListener('appUrlOpen', async (data: { url: string }) => {
+        const url = new URL(data.url);
+        const hash = url.hash.substring(1);
+        const params = new URLSearchParams(hash);
+
+        const accessToken = params.get('access_token');
+        const refreshToken = params.get('refresh_token');
+
+        if (accessToken && refreshToken) {
+          const { error } = await supabase.auth.setSession({
+            access_token: accessToken,
+            refresh_token: refreshToken
+          });
+
+          if (!error) {
+            // Clear the token hash from the URL so tokens don't persist
+            // in browser history or the address bar
+            window.history.replaceState({}, '', window.location.pathname);
+            navigate('/mobile/dashboard');
+          } else {
+            console.error('DeepLink Error:', error.message);
+          }
+        }
+      });
+    };
+
+    setup();
+
+    // Only remove THIS listener — not all Capacitor App listeners globally
+    return () => {
+      listenerHandle?.remove();
+    };
+  }, [navigate]);
+
+  return null;
+};
+
+export default App;

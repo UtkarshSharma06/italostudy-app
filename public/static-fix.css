@@ -1,0 +1,73 @@
+/* 
+  Static Restoration CSS 
+  Overrides Framer Motion "initial" states that might keep sections hidden.
+  Carefully scoped to avoid resurrecting ghost cookie modals.
+*/
+
+/* Force lazy-loaded SECTIONS to be visible — but NOT fixed overlays */
+section[style*="opacity: 0"],
+section[style*="opacity:0"],
+main [style*="opacity: 0"],
+main [style*="opacity:0"],
+.motion-safe\:opacity-0 {
+    opacity: 1 !important;
+    transform: none !important;
+    visibility: visible !important;
+}
+
+/* Nuclear kill: hide ALL React cookie consent ghosts */
+.CookieConsent,
+[class*="CookieConsent"],
+[data-sonner-toaster],
+[data-cookie-ghost] {
+    display: none !important;
+}
+
+/* Any fixed-position div containing cookie text that isn't ours */
+div.fixed:not(#static-cookie-banner) {
+    /* This is intentionally left as a marker — JS handles removal */
+}
+
+/* Functional Mobile Menu (Static) */
+.static-mobile-menu-active {
+    display: flex !important;
+    opacity: 1 !important;
+    transform: none !important;
+}
+
+/* Fix for HomeSEOHub grid if it's hidden */
+section.py-24.bg-slate-50 {
+    display: block !important;
+    opacity: 1 !important;
+}
+
+/* Header Scroll Animation (Static) */
+header.fixed {
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+header.fixed.scrolled {
+    background-color: rgba(255, 255, 255, 0.9);
+    backdrop-filter: blur(12px) saturate(180%);
+    -webkit-backdrop-filter: blur(12px) saturate(180%);
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    padding-top: 0.75rem !important;
+    padding-bottom: 0.75rem !important;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+header.fixed.scrolled nav {
+    background-color: rgba(255, 255, 255, 0.5) !important;
+    box-shadow: none !important;
+    border-color: rgba(0, 0, 0, 0.05) !important;
+}
+
+header.fixed.scrolled img {
+    height: 2rem !important;
+}
+
+@media (min-width: 768px) {
+    header.fixed.scrolled img {
+        height: 2.25rem !important;
+    }
+}

@@ -260,7 +260,7 @@ export default function MobileMockExams() {
             // Tertiary sort: Newest to oldest
             return new Date(b.start_time).getTime() - new Date(a.start_time).getTime();
         });
-    }, [sessions, activeTab, hasPremiumAccess]);
+    }, [sessions, activeTab, selectedSeries, hasPremiumAccess]);
 
     // Pre-calculate counts for tabs to avoid multiple filters in the render body
     const counts = useMemo(() => ({

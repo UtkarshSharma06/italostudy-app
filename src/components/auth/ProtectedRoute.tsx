@@ -62,11 +62,20 @@ export default function ProtectedRoute({ children, allowedRoles, allowedPlans }:
     }
 
     // Page Visibility Enforcement - Checked first so guests also see "Under Development"
+    const displayPath = location.pathname.startsWith('/mobile/') 
+        ? (location.pathname.slice(7) || '/') 
+        : (location.pathname === '/mobile' ? '/' : location.pathname);
+
     if (!isPageEnabled(location.pathname) && !isBypassed) {
+        const readablePageName = displayPath.split('/')[1]
+            ?.split('-')
+            .map(s => s.charAt(0).toUpperCase() + s.slice(1))
+            .join(' ') || 'Home';
+
         return (
             <MaintenanceOverlay 
                 message={getMaintenanceMessage(location.pathname)} 
-                pageName={location.pathname.split('/')[1]?.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join(' ')} 
+                pageName={readablePageName} 
                 showAdminBypass={isAdmin}
                 onBypass={() => setIsBypassed(true)}
             />

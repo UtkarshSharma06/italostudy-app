@@ -63,17 +63,28 @@ export const usePageVisibility = () => {
         };
     }, []);
 
+    const normalizePath = (path: string): string => {
+        if (path.startsWith('/mobile/')) {
+            return path.slice(7) || '/';
+        }
+        if (path === '/mobile') return '/';
+        return path;
+    };
+
     const isPageEnabled = (path: string): boolean => {
+        const normalized = normalizePath(path);
+        
         // [OVERRIDE] Store is always enabled as per user request
-        if (path.startsWith('/store')) return true;
+        if (normalized.startsWith('/store')) return true;
 
         // Handle exact matches or prefix matches for settings
-        const config = configs[path] || (path.startsWith('/settings') ? configs['/settings'] : null);
+        const config = configs[normalized] || (normalized.startsWith('/settings') ? configs['/settings'] : null);
         return config ? config.enabled : true; // Default to enabled if no config found
     };
 
     const getMaintenanceMessage = (path: string): string => {
-        const config = configs[path] || (path.startsWith('/settings') ? configs['/settings'] : null);
+        const normalized = normalizePath(path);
+        const config = configs[normalized] || (normalized.startsWith('/settings') ? configs['/settings'] : null);
         return config?.message || "This page is currently under development. Please check back later.";
     };
 

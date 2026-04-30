@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useExam } from '@/context/ExamContext';
@@ -189,28 +189,7 @@ export default function AnnouncementBar({ previewData }: AnnouncementBarProps) {
         return () => window.removeEventListener('resize', check);
     }, []);
 
-    useEffect(() => {
-        if (previewData) {
-            setAnnouncements([previewData as Announcement]);
-            setIsLoading(false);
-            return;
-        }
-
-        fetchAnnouncements();
-        
-        const channel = supabase
-            .channel('public:site_announcements')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'site_announcements' }, () => {
-                fetchAnnouncements();
-            })
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, [location.pathname, previewData, activeExam?.id]);
-
-    const fetchAnnouncements = async () => {
+    const fetchAnnouncements = useCallback(async () => {
         try {
             const path = location.pathname;
             
@@ -267,7 +246,39 @@ export default function AnnouncementBar({ previewData }: AnnouncementBarProps) {
         } finally {
             setIsLoading(false);
         }
-    };
+    }, [location.pathname, previewData, activeExam?.id, dismissedIds]);
+
+    const fetchRef = useRef(fetchAnnouncements);
+    useEffect(() => {
+        fetchRef.current = fetchAnnouncements;
+    }, [fetchAnnouncements]);
+
+    useEffect(() => {
+        if (previewData) {
+            setAnnouncements([previewData as Announcement]);
+            setIsLoading(false);
+            return;
+        }
+
+        fetchAnnouncements();
+    }, [location.pathname, previewData, activeExam?.id, fetchAnnouncements]);
+
+    useEffect(() => {
+        if (previewData) return;
+
+        // Use a unique channel name per-subscription to avoid collisions and "already subscribed" errors
+        const channelId = `site_announcements_${Math.random().toString(36).substring(2, 9)}`;
+        const channel = supabase
+            .channel(channelId)
+            .on('postgres_changes', { event: '*', schema: 'public', table: 'site_announcements' }, () => {
+                fetchRef.current();
+            })
+            .subscribe();
+
+        return () => {
+            supabase.removeChannel(channel);
+        };
+    }, [previewData]);
 
     const handleDismiss = (id: string) => {
         // Find and clear the specific banner content to prevent scripts from finding elements

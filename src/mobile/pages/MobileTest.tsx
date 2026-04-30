@@ -68,18 +68,19 @@ export default function MobileTest() {
     const fetchTestData = async () => {
         setIsLoading(true);
         try {
-            const { data: testData, error: testError } = await supabase
-                .from('tests')
-                .select('*')
-                .eq('id', testId)
-                .maybeSingle();
+            // 1. Parallel fetch Test and Questions (Core roundtrip)
+            const [testRes, questionsRes] = await Promise.all([
+                supabase.from('tests').select('*').eq('id', testId).maybeSingle(),
+                supabase.from('questions').select('*').eq('test_id', testId).order('question_number')
+            ]);
 
-            if (testError || !testData) {
+            if (testRes.error || !testRes.data) {
                 toast({ title: 'Test not found', variant: 'destructive' });
                 navigate('/mobile/dashboard');
                 return;
             }
 
+            const testData = testRes.data;
             if (testData.status === 'completed') {
                 navigate(`/results/${testId}`);
                 return;
@@ -94,7 +95,6 @@ export default function MobileTest() {
                 const startTime = new Date(testData.started_at).getTime();
                 const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
                 
-                // If elapsed time is very small (e.g., < 60s) or we are in proctoring setup, assume full time
                 if ((testData as any).is_proctored && elapsedSeconds < 120) {
                     setTimeRemaining(testData.time_limit_minutes * 60);
                 } else {
@@ -111,197 +111,140 @@ export default function MobileTest() {
                 setCurrentSectionIndex(testData.current_section_index);
             }
 
-            const { data: qData } = await supabase
-                .from('questions')
-                .select('*')
-                .eq('test_id', testId)
-                .order('question_number');
+            const qData = questionsRes.data || [];
 
-            if (qData) {
+            if (qData.length > 0) {
+                // 2. Parallel fetch secondary data (Bookmarks, Reports, Master Order)
+                const masterIds = qData.map((q: any) => q.master_question_id).filter(Boolean);
+                const questionIds = qData.map((q: any) => q.id);
+
+                const [masterOrderRes, bookmarksRes, reportsRes] = await Promise.all([
+                    masterIds.length > 0 
+                        ? supabase.from('session_questions').select('id, order_index').in('id', masterIds)
+                        : Promise.resolve({ data: [] }),
+                    user?.id && questionIds.length > 0
+                        ? supabase.from('bookmarked_questions').select('question_id, is_reported_by_user').eq('user_id', user.id).in('question_id', questionIds)
+                        : Promise.resolve({ data: [] }),
+                    user?.id && masterIds.length > 0
+                        ? supabase.from('question_reports').select('master_question_id').eq('user_id', user.id).in('master_question_id', masterIds)
+                        : Promise.resolve({ data: [] })
+                ]);
+
+                // Process Master Order
                 let sortedData = [...qData];
-
-                // RE-ORDER BY ADMIN SEQUENCE: Re-sort by the original order_index from
-                // session_questions using master_question_id. Fixes ALL existing mocks.
-                const masterIds = sortedData
-                    .map((q: any) => q.master_question_id)
-                    .filter(Boolean);
-
-                if (masterIds.length > 0) {
-                    const { data: masterOrderData } = await supabase
-                        .from('session_questions')
-                        .select('id, order_index')
-                        .in('id', masterIds);
-
-                    if (masterOrderData && masterOrderData.length > 0) {
-                        const orderMap = new Map<string, number>(
-                            masterOrderData.map((m: any) => [m.id, m.order_index ?? 9999])
-                        );
-                        sortedData = sortedData.sort((a: any, b: any) => {
-                            const oa = orderMap.get(a.master_question_id) ?? 9999;
-                            const ob = orderMap.get(b.master_question_id) ?? 9999;
-                            return oa - ob;
-                        });
-                    }
+                if (masterOrderRes.data && masterOrderRes.data.length > 0) {
+                    const orderMap = new Map<string, number>(
+                        masterOrderRes.data.map((m: any) => [m.id, m.order_index ?? 9999] as [string, number])
+                    );
+                    sortedData = sortedData.sort((a: any, b: any) => {
+                        const oa = orderMap.get(a.master_question_id) ?? 9999;
+                        const ob = orderMap.get(b.master_question_id) ?? 9999;
+                        return oa - ob;
+                    });
                 }
 
-                // Fetch bookmarks separately for these questions
-                const questionIds = sortedData.map((q: any) => q.id);
-                let bookmarkMap = new Map<string, any>();
+                // Process Bookmarks and Reports
+                const bookmarkMap = new Map<string, any>(
+                    (bookmarksRes.data?.map(b => [b.question_id, b as any]) || []) as [string, any][]
+                );
+                const reportedMasterIds = new Set(reportsRes.data?.map((r: any) => r.master_question_id));
 
-                if (user?.id && questionIds.length > 0) {
-                    const { data: bData } = await supabase
-                        .from('bookmarked_questions')
-                        .select('question_id, is_reported_by_user')
-                        .eq('user_id', user.id)
-                        .in('question_id', questionIds);
-
-                    bookmarkMap = new Map(bData?.map(b => [b.question_id, b as any]) || []);
-                }
-
-                setQuestions(sortedData.map((q: any) => ({
+                const processedQuestions = sortedData.map((q: any) => ({
                     ...q,
                     passage: q.passage,
-                    media: q.media as unknown as MediaContent | null, // Explicitly map media
+                    media: q.media as unknown as MediaContent | null,
                     options: q.options as string[],
                     diagram: q.diagram as any,
                     is_saved: bookmarkMap.has(q.id),
-                    is_reported_by_user: (bookmarkMap.get(q.id) as any)?.is_reported_by_user || false
-                })));
+                    is_reported_by_user: (bookmarkMap.get(q.id) as any)?.is_reported_by_user || reportedMasterIds.has(q.master_question_id || q.id)
+                }));
 
-                if (qData.length === 0 && testData.total_questions > 0) {
-                    // Fallback: If DB says there should be questions but we found none, try one quick retry after a delay
-                    setTimeout(async () => {
-                        const { data: retryData } = await supabase
-                            .from('questions')
-                            .select('*')
-                            .eq('test_id', testId)
-                            .order('question_number');
-                        if (retryData && retryData.length > 0) {
-                            setQuestions(retryData.map((rq: any) => ({
-                                ...rq,
-                                passage: rq.passage,
-                                media: rq.media as unknown as MediaContent | null,
-                                options: rq.options as string[],
-                                diagram: rq.diagram as any,
-                                is_saved: false,
-                                is_reported_by_user: false
-                            })));
-                        }
-                    }, 2000);
-                }
+                setQuestions(processedQuestions);
+                setIsLoading(false); // INTERACTIVE ASAP
 
-                // RUNTIME FALLBACK: Fetch missing passages from master tables
-                const missingPassageIds = qData
+                // 3. BACKGROUND FALLBACKS (Passages/Media)
+                // We run this AFTER setting the main questions so the UI unblocks
+                const missingPassageIds = processedQuestions
                     .filter((q: any) => !q.passage && (q.master_question_id || q.practice_question_id || q.session_question_id))
                     .map((q: any) => q.master_question_id || q.practice_question_id || q.session_question_id);
 
                 if (missingPassageIds.length > 0) {
-
-                    // Fetch from all three master tables in parallel
-                    const [practiceRes, sessionRes, learningRes] = await Promise.all([
+                    Promise.all([
                         supabase.from('practice_questions').select('id, passage').in('id', missingPassageIds),
                         supabase.from('session_questions').select('id, passage').in('id', missingPassageIds),
                         supabase.from('learning_quiz_questions').select('id, passage').in('id', missingPassageIds)
-                    ]);
-
-                    const passageMap = new Map();
-                    practiceRes.data?.forEach((m: any) => { if (m.passage) passageMap.set(m.id, m.passage); });
-                    sessionRes.data?.forEach((m: any) => { if (m.passage) passageMap.set(m.id, m.passage); });
-                    learningRes.data?.forEach((m: any) => { if (m.passage) passageMap.set(m.id, m.passage); });
-
-                    if (passageMap.size > 0) {
-                        setQuestions(prev => prev.map(q => {
-                            const mid = q.master_question_id || q.practice_question_id || q.session_question_id;
-                            if (!q.passage && mid && passageMap.has(mid)) {
-                                return { ...q, passage: passageMap.get(mid) };
-                            }
-                            return q;
-                        }));
-                    } else {
-                        console.warn('❌ No passages found in any master table for IDs:', missingPassageIds);
-                    }
+                    ]).then(([pRes, sRes, lRes]) => {
+                        const passageMap = new Map();
+                        pRes.data?.forEach((m: any) => { if (m.passage) passageMap.set(m.id, m.passage); });
+                        sRes.data?.forEach((m: any) => { if (m.passage) passageMap.set(m.id, m.passage); });
+                        lRes.data?.forEach((m: any) => { if (m.passage) passageMap.set(m.id, m.passage); });
+                        
+                        if (passageMap.size > 0) {
+                            setQuestions(prev => prev.map(q => {
+                                const mid = q.master_question_id || q.practice_question_id || q.session_question_id;
+                                if (!q.passage && mid && passageMap.has(mid)) return { ...q, passage: passageMap.get(mid) };
+                                return q;
+                            }));
+                        }
+                    });
                 }
 
-                // RUNTIME FALLBACK: Fetch missing or shallow media from master tables
-                const missingMediaIds = qData
+                const missingMediaIds = processedQuestions
                     .filter((q: any) => {
                         const m = q.media as any;
-                        const hasCompleteMedia = m && (
-                            m.url ||
-                            m.imageUrl ||
-                            m.image_url ||
-                            m.image?.url ||
-                            (m.table?.rows?.length) ||
-                            (m.content?.rows?.length) ||
-                            (m.chart?.data?.length) ||
-                            (m.pie?.data?.length) ||
-                            (m.graph?.data?.length) ||
-                            (m.data?.length)
-                        );
-                        return !hasCompleteMedia && (q.master_question_id || q.practice_question_id || q.session_question_id);
+                        const hasMedia = m && (m.url || m.imageUrl || m.image_url || m.image?.url || m.table || m.data);
+                        return !hasMedia && (q.master_question_id || q.practice_question_id || q.session_question_id);
                     })
                     .map((q: any) => q.master_question_id || q.practice_question_id || q.session_question_id);
 
                 if (missingMediaIds.length > 0) {
-                    const [practiceRes, sessionRes] = await Promise.all([
+                    Promise.all([
                         supabase.from('practice_questions').select('id, media').in('id', missingMediaIds),
                         supabase.from('session_questions').select('id, media').in('id', missingMediaIds)
-                    ]);
-
-                    const mediaMap = new Map();
-                    practiceRes.data?.forEach((m: any) => { if (m.media) mediaMap.set(m.id, m.media); });
-                    sessionRes.data?.forEach((m: any) => { if (m.media) mediaMap.set(m.id, m.media); });
-
-                        setQuestions(prev => prev.map(q => {
-                            const mid = q.master_question_id || q.practice_question_id || q.session_question_id;
-                            const m = q.media as any;
-                            const hasCompleteMedia = m && (
-                                m.url ||
-                                m.imageUrl ||
-                                m.image_url ||
-                                m.image?.url ||
-                                (m.table?.rows?.length) ||
-                                (m.content?.rows?.length) ||
-                                (m.chart?.data?.length) ||
-                                (m.pie?.data?.length) ||
-                                (m.graph?.data?.length) ||
-                                (m.data?.length)
-                            );
-                            
-                            if (!hasCompleteMedia && mid && mediaMap.has(mid)) {
-                                return { ...q, media: mediaMap.get(mid) };
-                            }
-                            return q;
-                        }));
+                    ]).then(([pRes, sRes]) => {
+                        const mediaMap = new Map();
+                        pRes.data?.forEach((m: any) => { if (m.media) mediaMap.set(m.id, m.media); });
+                        sRes.data?.forEach((m: any) => { if (m.media) mediaMap.set(m.id, m.media); });
+                        
+                        if (mediaMap.size > 0) {
+                            setQuestions(prev => prev.map(q => {
+                                const mid = q.master_question_id || q.practice_question_id || q.session_question_id;
+                                if (!q.media && mid && mediaMap.has(mid)) return { ...q, media: mediaMap.get(mid) };
+                                return q;
+                            }));
+                        }
+                    });
                 }
-
-                // Fetch user's reports for these questions to enforce "report once"
-                const reportMasterIds = qData
-                    .map(q => q.master_question_id || q.id)
-                    .filter(Boolean);
-
-                if (reportMasterIds.length > 0) {
-                    const { data: reportsData } = await supabase
-                        .from('question_reports')
-                        .select('master_question_id')
-                        .eq('user_id', user.id)
-                        .in('master_question_id', reportMasterIds);
-
-                    if (reportsData) {
-                        const reportedMasterIds = new Set(reportsData.map((r: any) => r.master_question_id));
-                        setQuestions(prev => prev.map(q => ({
-                            ...q,
-                            is_reported_by_user: q.is_reported_by_user || reportedMasterIds.has(q.master_question_id || q.id)
+                setIsLoading(false); // FINISH LOADING
+            } else if (testData.total_questions > 0) {
+                // Quick retry if questions are missing (likely consistency lag)
+                setTimeout(async () => {
+                    const { data: retryData } = await supabase
+                        .from('questions')
+                        .select('*')
+                        .eq('test_id', testId)
+                        .order('question_number');
+                    if (retryData && retryData.length > 0) {
+                        setQuestions(retryData.map((rq: any) => ({
+                            ...rq,
+                            passage: rq.passage,
+                            media: rq.media as unknown as MediaContent | null,
+                            options: rq.options as string[],
+                            diagram: rq.diagram as any,
+                            is_saved: false,
+                            is_reported_by_user: false
                         })));
                     }
-                }
+                    setIsLoading(false);
+                }, 1000);
+            } else {
+                setIsLoading(false);
             }
         } catch (error: any) {
             console.error('Error fetching test data:', error);
             toast({ title: 'Error loading test', description: error.message, variant: 'destructive' });
-            navigate('/mobile/dashboard');
-        } finally {
             setIsLoading(false);
+            navigate('/mobile/dashboard');
         }
     };
 
@@ -388,7 +331,8 @@ export default function MobileTest() {
         Haptics.impact({ style: ImpactStyle.Medium }).catch(() => { });
         const newMarked = !question.is_marked_for_review;
         setQuestions(prev => prev.map((q, i) => i === currentIndex ? { ...q, is_marked_for_review: newMarked } : q));
-        await supabase.from('questions').update({ is_marked_for_review: newMarked }).eq('id', question.id);
+        // Note: is_marked_for_review is local-only as it doesn't exist in the questions table schema
+        // If permanent persistence is needed, consider adding the column or using a different one.
     };
 
     const handleBookmark = async () => {
@@ -571,13 +515,15 @@ export default function MobileTest() {
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     };
 
-    if (isLoading || (questions.length === 0 && (test?.total_questions || 0) > 0)) {
+    if (isLoading) {
         return (
-            <div className="flex flex-col items-center justify-center min-h-screen bg-slate-950 text-center uppercase tracking-tight p-8">
-                <Loader2 className="w-12 h-12 text-indigo-500 animate-spin mb-6" />
-                <h2 className="text-lg font-black text-white mb-2">Synchronising Mission Data...</h2>
-                <p className="text-[10px] font-black text-slate-500 tracking-[0.2em] max-w-xs leading-relaxed">
-                    Connecting to the secure mission database and downloading your question set. Please do not exit.
+            <div className="flex flex-col items-center justify-center min-h-screen bg-slate-50 dark:bg-slate-950 text-center p-8">
+                <div className="w-16 h-16 bg-white dark:bg-slate-900 rounded-2xl flex items-center justify-center shadow-sm border border-slate-200 dark:border-slate-800 mb-6">
+                    <Loader2 className="w-8 h-8 text-slate-600 dark:text-slate-400 animate-spin" />
+                </div>
+                <h2 className="text-xl font-bold text-slate-900 dark:text-white mb-2 tracking-tight">Preparing Assessment</h2>
+                <p className="text-sm font-medium text-slate-500 dark:text-slate-400 max-w-[260px] leading-relaxed">
+                    Loading your exam environment and securing the session. Please wait.
                 </p>
             </div>
         );

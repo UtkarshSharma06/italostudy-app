@@ -172,12 +172,12 @@ export default function Layout({
     };
 
     const handleNavClick = (path: string) => {
-        if (path.startsWith('http') || path === '/store' || path === '/blog' || path === '/resources' || path === '/syllabus') {
+        if (path.startsWith('http') || path === '/store' || path === '/blog' || path === '/resources' || path === '/exams') {
             let url = path;
             if (path === '/store') url = 'https://store.italostudy.com';
             else if (path === '/blog') url = 'https://italostudy.com/blog';
             else if (path === '/resources') url = 'https://italostudy.com/resources';
-            else if (path === '/syllabus') url = 'https://italostudy.com/syllabus';
+            else if (path === '/exams') url = 'https://italostudy.com/exams';
             
             window.open(url, '_blank', 'noopener,noreferrer');
         } else {

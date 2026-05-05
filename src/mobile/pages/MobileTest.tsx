@@ -385,10 +385,12 @@ export default function MobileTest() {
         }
     };
 
-    const handleReport = async (reason: string) => {
+    const handleReport = async (reason: string, details?: string) => {
         if (!user || !currentQuestion || !reason) return;
 
         Haptics.impact({ style: ImpactStyle.Heavy }).catch(() => { });
+
+        const fullReason = details ? `${reason}: ${details}` : reason;
 
         const { error } = await (supabase as any).from('question_reports').insert({
             user_id: user.id,
@@ -396,7 +398,7 @@ export default function MobileTest() {
             master_question_id: currentQuestion.master_question_id || currentQuestion.practice_question_id,
             source_table: test?.test_type === 'practice' ? 'practice_questions' : 'session_questions',
             reason: reason,
-            details: reason.includes(':') ? reason.split(':').slice(1).join(':') : undefined,
+            details: details,
             status: 'pending'
         });
 
@@ -416,6 +418,9 @@ export default function MobileTest() {
             }, { onConflict: 'user_id,question_id' });
 
             toast({ title: "Report Submitted", description: "Question has been bookmarked for tracking." });
+        } else {
+            console.error("Report Error:", error);
+            toast({ title: "Report Failed", description: error.message, variant: "destructive" });
         }
     };
 
@@ -629,6 +634,21 @@ export default function MobileTest() {
                             </span>
                         </div>
                         <div className="flex gap-2">
+                            {currentQuestion?.is_reported_by_user ? (
+                                <div className="flex items-center gap-1.5 px-3 py-1 bg-rose-50 border border-rose-100 rounded-xl text-rose-600 h-8">
+                                    <AlertTriangle size={12} />
+                                    <span className="text-[8px] font-black uppercase tracking-widest">Reported</span>
+                                </div>
+                            ) : (
+                                <ReportQuestionDialog
+                                    onReport={handleReport}
+                                    trigger={
+                                        <Button variant="ghost" size="sm" className="rounded-xl px-2 h-8 text-muted-foreground hover:text-rose-500">
+                                            <AlertTriangle className="w-3.5 h-3.5" />
+                                        </Button>
+                                    }
+                                />
+                            )}
                             <Button variant="ghost" size="sm" onClick={handleMarkForReview} className={`rounded-xl px-2 h-8 ${currentQuestion?.is_marked_for_review ? 'bg-orange-500/10 text-orange-500' : 'text-muted-foreground'}`}>
                                 <Flag className={`w-3.5 h-3.5 ${currentQuestion?.is_marked_for_review ? 'fill-current' : ''}`} />
                             </Button>

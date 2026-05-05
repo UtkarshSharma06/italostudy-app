@@ -419,6 +419,27 @@ const MobileRouter = ({ user, isNative, authLoading }: { user: any, isNative: bo
         <Route path="/mock-exams" element={<Navigate to="/mobile/mock-exams" replace />} />
         <Route path="/history" element={<Navigate to="/mobile/history" replace />} />
         <Route path="/bookmarks" element={<Navigate to="/mobile/bookmarks" replace />} />
+        <Route path="/study-planner" element={<Navigate to="/mobile/study-planner" replace />} />
+        <Route path="/practice" element={<Navigate to="/mobile/practice" replace />} />
+        <Route path="/analytics" element={<Navigate to="/mobile/analytics" replace />} />
+        <Route path="/settings" element={<Navigate to="/mobile/settings" replace />} />
+        <Route path="/billing" element={<Navigate to="/mobile/billing" replace />} />
+        <Route path="/pricing" element={<Navigate to="/mobile/pricing" replace />} />
+        <Route path="/onboarding" element={<Navigate to="/mobile/onboarding" replace />} />
+        <Route path="/labs" element={<Navigate to="/mobile/labs" replace />} />
+        <Route path="/apply-university" element={<Navigate to="/mobile/apply-university" replace />} />
+        <Route path="/apply-university/status/:id" element={<Navigate to="/mobile/apply-university/status/:id" replace />} />
+        <Route path="/apply-university/upgrade" element={<Navigate to="/mobile/apply-university/upgrade" replace />} />
+        <Route path="/community/upgrade" element={<Navigate to="/mobile/community/upgrade" replace />} />
+        <Route path="/detailed-analysis/:testId" element={<Navigate to="/mobile/detailed-analysis/:testId" replace />} />
+        <Route path="/mock-guidelines" element={<Navigate to="/mobile/mock-guidelines" replace />} />
+        <Route path="/reading/:testId" element={<Navigate to="/mobile/reading/:testId" replace />} />
+        <Route path="/listening/:testId" element={<Navigate to="/mobile/listening/:testId" replace />} />
+        <Route path="/writing/:taskId" element={<Navigate to="/mobile/writing/:taskId" replace />} />
+        <Route path="/speaking" element={<Navigate to="/mobile/speaking" replace />} />
+        <Route path="/speaking/:sessionId" element={<Navigate to="/mobile/speaking/:sessionId" replace />} />
+        <Route path="/student/:id" element={<Navigate to="/mobile/student/:id" replace />} />
+        <Route path="/u/:username" element={<Navigate to="/mobile/u/:username" replace />} />
         <Route path="/test/:testId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileTest /></ProtectedRoute>} />
         <Route path="/results/:testId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileResults /></ProtectedRoute>} />
         <Route path="/waiting-room/:sessionId" element={<MobileMockWaitingRoom />} />

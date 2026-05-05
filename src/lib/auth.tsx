@@ -230,9 +230,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               window.location.href = `/auth?${redirectParams}`;
             });
           } else {
-            setProfile(payload.new);
+            // Guard against store-side writes wiping the subscription plan.
+            // The store's syncCart() writes to profiles.cart which triggers this
+            // listener. We must not let a cart update overwrite subscription fields.
+            const newData = payload.new;
+            const SUBSCRIPTION_FIELDS = [
+              'selected_plan', 'subscription_tier', 'subscription_expiry_date', 'is_banned', 'role'
+            ];
+            const subscriptionChanged = SUBSCRIPTION_FIELDS.some(
+              (f) => newData[f] !== profile?.[f]
+            );
+
+            if (subscriptionChanged) {
+              // Full replace — a real subscription change happened
+              setProfile(newData);
+            } else {
+              // Selective merge — only safe non-subscription fields changed (e.g., cart)
+              setProfile((prev: any) => prev ? { ...prev, ...newData } : newData);
+            }
+
             // Refresh permissions if role changed
-            if (payload.new.role === 'sub_admin' || payload.new.role === 'admin') {
+            if (newData.role === 'sub_admin' || newData.role === 'admin') {
               const { data: permData } = await supabase
                 .from('admin_permissions')
                 .select('allowed_tabs, permissions')

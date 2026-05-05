@@ -15,6 +15,7 @@ import { Slider } from "@/components/ui/slider";
 import { MultipleChoiceQuestion, TrueFalseQuestion, GapFillQuestion, MultiSelectQuestion } from "@/components/reading/QuestionTypes";
 import { Textarea } from "@/components/ui/textarea";
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
+import { ReportQuestionDialog } from '@/components/ReportQuestionDialog';
 
 type IELTSResourceType = 'reading' | 'listening' | 'writing';
 
@@ -57,6 +58,8 @@ export default function MobileIELTSPlayer({
     const [activeTab, setActiveTab] = useState("resource");
     const [submissionId, setSubmissionId] = useState<string | null>(null);
     const [feedback, setFeedback] = useState<any>(null);
+    const [showReportDialog, setShowReportDialog] = useState(false);
+    const [reportingQuestion, setReportingQuestion] = useState<any>(null);
 
     // Timer
     const [timeLeft, setTimeLeft] = useState(type === 'writing' ? 60 * 60 : 60 * 60); // Default 60 mins
@@ -220,9 +223,9 @@ export default function MobileIELTSPlayer({
                     console.warn(`Schema mismatch in ${tableName}: 'status' missing. Retrying...`);
                     delete payload.status;
                     const { data: retryData } = await supabase.from(tableName as any).insert(payload).select().single();
-                    if (retryData) setSubmissionId(retryData.id);
+                    if (retryData) setSubmissionId((retryData as any).id);
                 } else if (subData) {
-                    setSubmissionId(subData.id);
+                    setSubmissionId((subData as any).id);
                 }
             }
         } catch (error) {
@@ -270,40 +273,47 @@ export default function MobileIELTSPlayer({
         }
     };
 
-    const handleReport = async (q: any) => {
-        if (!user || !q) return;
-
-        const reason = window.prompt("Reason for reporting this question:");
-        if (!reason) return;
+    const handleReport = async (reason: string, details?: string) => {
+        if (!user || !reportingQuestion) return;
 
         Haptics.impact({ style: ImpactStyle.Heavy }).catch(() => { });
 
         const { error } = await (supabase as any).from('question_reports').insert({
             user_id: user.id,
-            question_id: q.id,
-            master_question_id: q.master_id || q.id,
+            question_id: reportingQuestion.id,
+            master_question_id: reportingQuestion.master_id || reportingQuestion.id,
             source_table: type === 'reading' ? 'reading_questions' : 'listening_questions',
             reason: reason,
+            details: details,
             status: 'pending'
         });
 
         if (!error) {
             // Automatically bookmark if reported
             setQuestions(prev => prev.map(item =>
-                item.id === q.id ? { ...item, is_reported_by_user: true, is_saved: true } : item
+                item.id === reportingQuestion.id ? { ...item, is_reported_by_user: true, is_saved: true } : item
             ));
 
             await (supabase as any).from('bookmarked_questions').upsert({
                 user_id: user.id,
-                question_id: q.id,
-                master_question_id: q.master_id || q.id,
+                question_id: reportingQuestion.id,
+                master_question_id: reportingQuestion.master_id || reportingQuestion.id,
                 source_table: type === 'reading' ? 'reading_questions' : 'listening_questions',
                 exam_type: 'ielts',
                 is_reported_by_user: true
             }, { onConflict: 'user_id,question_id' });
 
             toast({ title: "Report Submitted", description: "Question has been bookmarked for tracking." });
+            setShowReportDialog(false);
+        } else {
+            console.error("Report Error:", error);
+            toast({ title: "Report Failed", variant: "destructive" });
         }
+    };
+
+    const handleOpenReport = (q: any) => {
+        setReportingQuestion(q);
+        setShowReportDialog(true);
     };
 
     const handleSubmit = async () => {
@@ -386,10 +396,10 @@ export default function MobileIELTSPlayer({
                     console.warn(`Schema mismatch in ${tableName}: 'status' missing. Retrying...`);
                     const { data: retryData } = await supabase.from(tableName as any).update(payload).eq('id', submissionId).select().single();
                     if (onComplete) onComplete();
-                    else if (retryData) navigate(`/mobile/results/${retryData.id}`);
+                    else if (retryData) navigate(`/mobile/results/${(retryData as any).id}`);
                 } else if (data) {
                     if (onComplete) onComplete();
-                    else navigate(`/mobile/results/${data.id}`);
+                    else navigate(`/mobile/results/${(data as any).id}`);
                 }
             }
         } catch (error) {
@@ -577,14 +587,21 @@ export default function MobileIELTSPlayer({
                                                         <Bookmark className={`w-3.5 h-3.5 ${q.is_saved ? 'fill-current' : ''}`} />
                                                     )}
                                                 </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() => handleReport(q)}
-                                                    className="rounded-xl px-2 h-8 text-muted-foreground hover:text-red-500"
-                                                >
-                                                    <AlertTriangle className="w-3.5 h-3.5" />
-                                                </Button>
+                                                {q.is_reported_by_user ? (
+                                                    <div className="flex items-center gap-1.5 px-3 py-1 bg-rose-50 border border-rose-100 rounded-xl text-rose-600 h-8">
+                                                        <AlertTriangle size={12} />
+                                                        <span className="text-[8px] font-black uppercase tracking-widest">Reported</span>
+                                                    </div>
+                                                ) : (
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        onClick={() => handleOpenReport(q)}
+                                                        className="rounded-xl px-2 h-8 text-muted-foreground hover:text-rose-500"
+                                                    >
+                                                        <AlertTriangle className="w-3.5 h-3.5" />
+                                                    </Button>
+                                                )}
                                             </div>
                                         </div>
                                         {q.question_type === 'mcq' && <MultipleChoiceQuestion question={q} value={answers[q.id] || ''} onChange={(v) => handleAnswerChange(q.id, v)} />}
@@ -669,6 +686,11 @@ export default function MobileIELTSPlayer({
                     </div>
                 )}
             </div>
+            <ReportQuestionDialog
+                isOpen={showReportDialog}
+                onOpenChange={setShowReportDialog}
+                onReport={handleReport}
+            />
         </div>
     );
 }

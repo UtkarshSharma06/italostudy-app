@@ -36,12 +36,12 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onOpenChange }) =
     const [isExamSwitcherOpen, setIsExamSwitcherOpen] = useState(false);
 
     const handleNav = (path: string) => {
-        if (path.startsWith('http') || path === '/store' || path === '/blog' || path === '/resources' || path === '/syllabus') {
+        if (path.startsWith('http') || path === '/store' || path === '/blog' || path === '/resources' || path === '/exams') {
             let url = path;
             if (path === '/store') url = 'https://store.italostudy.com';
             else if (path === '/blog') url = 'https://italostudy.com/blog';
             else if (path === '/resources') url = 'https://italostudy.com/resources';
-            else if (path === '/syllabus') url = 'https://italostudy.com/syllabus';
+            else if (path === '/exams') url = 'https://italostudy.com/exams';
             
             window.open(url, '_blank', 'noopener,noreferrer');
         } else {
@@ -65,7 +65,7 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onOpenChange }) =
 
     const secondActions = [
         { icon: BookOpen, label: 'Subjects', path: '/mobile/subjects' },
-        { icon: ClipboardList, label: 'Syllabus', path: '/mobile/syllabus' },
+        { icon: ClipboardList, label: 'Exams', path: '/exams' },
         { icon: History, label: t('menu.history'), path: '/mobile/history' },
         { icon: Bookmark, label: t('menu.bookmarks'), path: '/mobile/bookmarks' },
     ];

@@ -1066,12 +1066,21 @@ export default function MobileSectionedTest() {
                                     <Bookmark className={`w-3.5 h-3.5 ${currentQuestion.is_saved ? 'fill-current' : ''}`} />
                                 )}
                             </Button>
-                            <button
-                                onClick={handleOpenReport}
-                                className="p-3 bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl text-slate-400 active:scale-95 transition-all"
-                            >
-                                <AlertTriangle size={18} />
-                            </button>
+                            {currentQuestion.is_reported_by_user ? (
+                                <div className="flex items-center gap-1.5 px-3 py-1 bg-rose-50 border border-rose-100 rounded-xl text-rose-600 h-8">
+                                    <AlertTriangle size={12} />
+                                    <span className="text-[8px] font-black uppercase tracking-widest">Reported</span>
+                                </div>
+                            ) : (
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={handleOpenReport}
+                                    className="rounded-xl px-2 h-8 text-muted-foreground hover:text-rose-500"
+                                >
+                                    <AlertTriangle size={14} />
+                                </Button>
+                            )}
                         </div>
                     </div>
 

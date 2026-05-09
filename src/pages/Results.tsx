@@ -615,8 +615,9 @@ export default function Results({ hideLayout = false }: { hideLayout?: boolean }
             <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3 relative z-10">
               <div>
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
-                  <button onClick={() => navigate(-1)} className="p-1.5 rounded-lg hover:bg-slate-100 transition-colors">
-                    <ArrowLeft className="w-4 h-4 text-slate-500" />
+                  <button onClick={() => navigate(window.innerWidth <= 1024 ? '/mobile/dashboard' : '/dashboard')} className="flex items-center gap-1.5 p-1.5 pr-3 rounded-lg hover:bg-slate-100 transition-colors text-slate-500 hover:text-slate-700">
+                    <ArrowLeft className="w-4 h-4" />
+                    <span className="text-xs font-bold uppercase tracking-widest hidden sm:inline-block">Dashboard</span>
                   </button>
                   <h1 className="text-base sm:text-xl font-black text-slate-900 dark:text-white">
                     {sessionTitle || test.subject || test.exam_type?.toUpperCase() || 'Test'}
@@ -1096,9 +1097,9 @@ export default function Results({ hideLayout = false }: { hideLayout?: boolean }
         feature="Deep Logic Explanations"
       />
       <TrustpilotReviewModal
-        open={showReviewModal}
+        isOpen={showReviewModal}
         onClose={() => { setShowReviewModal(false); localStorage.setItem('trustpilot_last_prompt', Date.now().toString()); }}
-        trigger="test_completion"
+        onSuccess={() => setShowReviewModal(false)}
       />
       </>
     );

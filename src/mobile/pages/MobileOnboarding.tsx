@@ -392,16 +392,18 @@ export default function MobileOnboarding() {
 
                                 {step === 4 && (
                                     <div className="space-y-4">
-                                        <div className="relative">
-                                            <Input
-                                                value={username}
-                                                onChange={(e) => setUsername(e.target.value.replace(/\s+/g, ''))}
-                                                placeholder="Username"
-                                                className={cn(
-                                                    "h-14 bg-[#F8FAFC] border-0 rounded-xl font-bold text-[#1E293B] pr-12",
-                                                    usernameError ? "ring-1 ring-red-400" : (isUsernameAvailable ? "ring-1 ring-green-400" : "")
-                                                )}
-                                            />
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest ml-1">Username <span className="text-[#E67E22]">*</span></label>
+                                            <div className="relative">
+                                                <Input
+                                                    value={username}
+                                                    onChange={(e) => setUsername(e.target.value.replace(/\s+/g, ''))}
+                                                    placeholder="Username"
+                                                    className={cn(
+                                                        "h-14 bg-[#F8FAFC] border-0 rounded-xl font-bold text-[#1E293B] pr-12",
+                                                        usernameError ? "ring-1 ring-red-400" : (isUsernameAvailable ? "ring-1 ring-green-400" : "")
+                                                    )}
+                                                />
                                             <div className="absolute right-4 top-1/2 -translate-y-1/2">
                                                 {isCheckingUsername ? (
                                                     <Loader2 className="w-4 h-4 text-[#94A3B8] animate-spin" />
@@ -412,13 +414,22 @@ export default function MobileOnboarding() {
                                                     </>
                                                 )}
                                             </div>
+                                            </div>
                                             {usernameError && <p className="text-[9px] font-bold text-red-500 mt-1 ml-2 uppercase">{usernameError}</p>}
                                         </div>
 
-                                        <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First Name" className="h-14 bg-[#F8FAFC] border-0 rounded-xl font-bold text-[#1E293B]" />
-                                        <Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last Name" className="h-14 bg-[#F8FAFC] border-0 rounded-xl font-bold text-[#1E293B]" />
-                                        <div className="flex flex-col gap-2">
-                                            <div className="flex items-center bg-[#F8FAFC] rounded-xl px-4 h-14 border border-transparent focus-within:border-[#E67E22] focus-within:ring-2 focus-within:ring-[#E67E22]/10 transition-all overflow-hidden">
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest ml-1">First Name <span className="text-[#E67E22]">*</span></label>
+                                            <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First Name" className="h-14 bg-[#F8FAFC] border-0 rounded-xl font-bold text-[#1E293B]" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest ml-1">Last Name <span className="text-[#E67E22]">*</span></label>
+                                            <Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last Name" className="h-14 bg-[#F8FAFC] border-0 rounded-xl font-bold text-[#1E293B]" />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest ml-1">Phone Number <span className="text-[#E67E22]">*</span></label>
+                                            <div className="flex flex-col gap-2">
+                                                <div className="flex items-center bg-[#F8FAFC] rounded-xl px-4 h-14 border border-transparent focus-within:border-[#E67E22] focus-within:ring-2 focus-within:ring-[#E67E22]/10 transition-all overflow-hidden">
                                                 <Popover open={openCountryPopup} onOpenChange={setOpenCountryPopup}>
                                                     <PopoverTrigger asChild>
                                                         <button className="flex items-center gap-1.5 pr-2 border-r border-[#CBD5E1] shrink-0">
@@ -468,10 +479,11 @@ export default function MobileOnboarding() {
                                                     className="flex-1 bg-transparent border-0 h-full font-bold text-[#1E293B] p-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none rounded-none ml-2 text-sm"
                                                 />
                                             </div >
-                                            <p className="text-[9px] font-bold text-[#94A3B8] italic ml-1 uppercase tracking-tighter">
-                                                Don't worry, we are not gonna spam you! 😉
-                                            </p>
-                                        </div >
+                                                <p className="text-[9px] font-bold text-[#94A3B8] italic ml-1 uppercase tracking-tighter">
+                                                    Don't worry, we are not gonna spam you! 😉
+                                                </p>
+                                            </div>
+                                        </div>
                                     </div >
                                 )}
 

@@ -1,9 +1,10 @@
-import { createContext, useContext, useEffect, useState, ReactNode } from 'react';
+import { createContext, useContext, useEffect, useState, useRef, ReactNode } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
 import { invalidateDashboardCache } from '@/hooks/useDashboardPrefetch';
+import { getCachedUTMParams, updateLastSignIn, clearUTMParams } from '@/utils/telemetry';
 
 interface AuthContextType {
   user: User | null;
@@ -50,6 +51,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     can_export: false
   });
 
+  // ─── Guard: prevent double fetchProfile ──────────────────────────────────────
+  // Both getSession() and onAuthStateChange fire on mount. Without this flag,
+  // fetchProfile() runs twice in parallel causing 2 unnecessary re-renders.
+  const profileFetchInFlight = useRef<string | null>(null);
+
   // ─── Profile Caching Logic ──────────────────────────────────────────────────
   // Cache the profile in localStorage to allow instant UI hydration on revisit.
   const PROFILE_CACHE_KEY = 'italostudy_auth_profile_v1';
@@ -84,9 +90,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (session?.user) {
-          fetchProfile(session.user.id);
+          // FIX #1: Skip if getSession() already started a fetch for this user.
+          // onAuthStateChange fires INITIAL_SESSION right after getSession resolves,
+          // which would trigger a duplicate fetchProfile. We guard against this.
+          if (profileFetchInFlight.current !== session.user.id) {
+            fetchProfile(session.user.id);
+          }
           updateAALStatus();
+          if (event === 'SIGNED_IN') updateLastSignIn(session.user.id);
         } else {
+          profileFetchInFlight.current = null;
           setProfile(null);
           setAllowedTabs([]);
           setPermissions({ can_edit: false, can_delete: false, can_export: false });
@@ -104,6 +117,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(initialUser);
 
       if (initialUser) {
+        // Mark that getSession() has claimed the fetch for this user.
+        // onAuthStateChange (INITIAL_SESSION) will see this and skip its own fetch.
+        profileFetchInFlight.current = initialUser.id;
+
         const cached = readProfileCache();
 
         if (cached && cached.id === initialUser.id) {
@@ -122,6 +139,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             fetchProfile(initialUser.id),
             updateAALStatus(),
           ]);
+          updateLastSignIn(initialUser.id);
           setLoading(false);
         }
       } else {
@@ -136,7 +154,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     try {
       const { data, error } = await supabase
         .from('profiles')
-        .select('id, display_name, first_name, last_name, username, email, avatar_url, selected_exam, subscription_tier, selected_plan, is_banned, created_at, role, phone_number, study_hours, target_score, telegram_verification_token, telegram_chat_id, subscription_expiry_date')
+        .select('id, display_name, first_name, last_name, username, email, avatar_url, selected_exam, subscription_tier, selected_plan, is_banned, created_at, role, phone_number, study_hours, target_score, telegram_verification_token, telegram_chat_id, subscription_expiry_date, cart')
         .eq('id', userId)
         .single();
 
@@ -174,18 +192,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           }
         }
 
-        // Auto-sync Google avatar if missing
-        const { data: { user: authUser } } = await supabase.auth.getUser();
-
-        // Auto-generate Telegram verification token if missing
+        // FIX #3: Telegram token generation is non-blocking — fire-and-forget.
+        // Previously this was an awaited write in the hot login path (+200ms).
         if (!data.telegram_verification_token) {
           const newToken = Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-          await supabase.from('profiles').update({ telegram_verification_token: newToken }).eq('id', userId);
-          data.telegram_verification_token = newToken;
+          data.telegram_verification_token = newToken; // Update local data immediately
+          // Write to DB in the background — does NOT block profile rendering
+          Promise.resolve(
+            supabase.from('profiles').update({ telegram_verification_token: newToken }).eq('id', userId)
+          ).then(() => { /* silent */ }).catch(() => { /* silent */ });
         }
 
-        // Sync Cart from Cloud to Local on login/refresh
-        await syncCart((data as any).cart || []);
+        // FIX #7: Use cart already fetched in the SELECT above.
+        // Previously syncCart() did an EXTRA supabase.from('profiles').select('cart')
+        // which was a completely redundant round-trip.
+        syncCartFromCloud((data as any).cart || []);
 
         setProfile(data);
       } else {
@@ -200,6 +221,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
     } catch (error) {
       console.error("Error fetching profile:", error);
+    } finally {
+      // Always clear the in-flight lock so future explicit refreshes work
+      profileFetchInFlight.current = null;
     }
   };
 
@@ -274,30 +298,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [user]);
 
-  const syncCart = async (newCart?: any[]) => {
+  // ─── FIX #7: Cart sync split into two functions ──────────────────────────────
+  // syncCartFromCloud: called on login with already-fetched cloudCart data.
+  //   Merges with localStorage without doing an extra Supabase SELECT.
+  // syncCart: the original public API for components to push cart changes to cloud.
+  const syncCartFromCloud = (cloudCart: any[]) => {
     try {
-      if (!user) return;
-      
       const CART_KEY = 'italostudy_cart';
-      
-      if (newCart) {
-        // Direct update: set both local and cloud to this specific cart
-        console.log("🛒 Syncing local changes to cloud...");
-        localStorage.setItem(CART_KEY, JSON.stringify(newCart));
-        await (supabase as any).from('profiles').update({ cart: newCart }).eq('id', user.id);
+      const localCartRaw = localStorage.getItem(CART_KEY);
+      const localCart = localCartRaw ? JSON.parse(localCartRaw) : [];
+
+      if (!Array.isArray(localCart)) {
+        localStorage.setItem(CART_KEY, JSON.stringify(cloudCart));
         window.dispatchEvent(new Event('cart-updated'));
         return;
       }
-
-      // Merge Logic (when no newCart is passed, e.g. on login)
-      const localCartRaw = localStorage.getItem(CART_KEY);
-      const localCart = localCartRaw ? JSON.parse(localCartRaw) : [];
-      
-      // Get latest cloud cart if not provided in refreshProfile
-      const { data: profileData } = await (supabase as any).from('profiles').select('cart').eq('id', user.id).single();
-      const cloudCart = (profileData as any)?.cart || [];
-
-      if (!Array.isArray(localCart)) return;
 
       // Merge local cart into cloud cart
       let mergedCart = [...cloudCart];
@@ -316,8 +331,59 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       });
 
+      localStorage.setItem(CART_KEY, JSON.stringify(mergedCart));
+      window.dispatchEvent(new Event('cart-updated'));
+
+      // Push merge result to cloud only if something changed — fire-and-forget
+      if (hasChanges && user) {
+        (supabase as any).from('profiles').update({ cart: mergedCart }).eq('id', user.id)
+          .then(() => { /* silent */ }).catch(() => { /* silent */ });
+      }
+    } catch (err) {
+      console.error("Cart Sync Error:", err);
+    }
+  };
+
+  const syncCart = async (newCart?: any[]) => {
+    try {
+      if (!user) return;
+
+      const CART_KEY = 'italostudy_cart';
+
+      if (newCart) {
+        // Direct update: set both local and cloud to this specific cart
+        localStorage.setItem(CART_KEY, JSON.stringify(newCart));
+        await (supabase as any).from('profiles').update({ cart: newCart }).eq('id', user.id);
+        window.dispatchEvent(new Event('cart-updated'));
+        return;
+      }
+
+      // Merge Logic (manual call with no cart passed — fetch fresh cloud data)
+      const localCartRaw = localStorage.getItem(CART_KEY);
+      const localCart = localCartRaw ? JSON.parse(localCartRaw) : [];
+
+      const { data: profileData } = await (supabase as any).from('profiles').select('cart').eq('id', user.id).single();
+      const cloudCart = (profileData as any)?.cart || [];
+
+      if (!Array.isArray(localCart)) return;
+
+      let mergedCart = [...cloudCart];
+      let hasChanges = false;
+
+      localCart.forEach((localItem: any) => {
+        const existingIdx = mergedCart.findIndex((cloudItem: any) => cloudItem.id === localItem.id);
+        if (existingIdx > -1) {
+          if (localItem.quantity > mergedCart[existingIdx].quantity) {
+            mergedCart[existingIdx].quantity = localItem.quantity;
+            hasChanges = true;
+          }
+        } else {
+          mergedCart.push(localItem);
+          hasChanges = true;
+        }
+      });
+
       if (hasChanges) {
-        console.log("🛒 Merging guest cart into cloud account...");
         await (supabase as any).from('profiles').update({ cart: mergedCart }).eq('id', user.id);
       }
 
@@ -338,6 +404,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signUp = async (email: string, password: string, displayName?: string) => {
     const redirectUrl = `${window.location.origin}/`;
+    const utm = getCachedUTMParams();
 
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -346,9 +413,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         emailRedirectTo: redirectUrl,
         data: {
           display_name: displayName,
+          utm_source: utm?.source,
+          utm_medium: utm?.medium,
+          utm_campaign: utm?.campaign,
         },
       },
     });
+
+    if (!error) clearUTMParams();
 
     return { data, error: error as Error | null };
   };

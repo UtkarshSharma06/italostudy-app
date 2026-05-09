@@ -683,6 +683,43 @@ export default function MobileTest() {
                         ))}
                     </div>
                 </div>
+
+                {/* Question Palette */}
+                <div className="bg-secondary/5 border border-border/30 rounded-3xl p-5 mt-6">
+                    <h3 className="text-[10px] font-black uppercase tracking-widest text-muted-foreground mb-4 flex items-center justify-between">
+                        <span>Question Palette</span>
+                        <span className="text-[8px] bg-background px-2 py-1 rounded-lg border border-border/50">
+                            {questions.filter(q => q.user_answer !== null).length} / {questions.length} Answered
+                        </span>
+                    </h3>
+                    <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-2">
+                        {questions.map((q, idx) => {
+                            const isAnswered = q.user_answer !== undefined && q.user_answer !== null;
+                            const isFlagged = q.is_marked_for_review;
+                            const isActive = idx === currentIndex;
+
+                            return (
+                                <button
+                                    key={q.id || idx}
+                                    onClick={() => {
+                                        setCurrentIndex(idx);
+                                        Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
+                                    }}
+                                    className={`aspect-square rounded-xl text-[10px] font-black border-2 transition-all active:scale-95 flex items-center justify-center ${isActive
+                                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+                                            : isFlagged
+                                                ? 'bg-orange-500 border-orange-500 text-white shadow-sm'
+                                                : isAnswered
+                                                    ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm'
+                                                    : 'bg-slate-50 dark:bg-muted/30 border-slate-100 dark:border-border text-slate-400'
+                                        }`}
+                                >
+                                    {idx + 1}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
             </main>
 
             {/* Navigation Footer */}

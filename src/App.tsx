@@ -12,7 +12,6 @@ import { ThemeProvider, useTheme } from "next-themes";
 import { lazy, Suspense, useEffect, useState } from "react";
 import { LiveEditProvider } from "@/contexts/LiveEditContext";
 import { useRef } from "react";
-import SecurityEnforcer from "@/components/SecurityEnforcer";
 import { getSkeletonForPath, LayoutSkeleton } from '@/lib/skeletons';
 import { Helmet } from "react-helmet-async";
 import { useTranslation } from "react-i18next";
@@ -41,6 +40,7 @@ const readProfileCache = () => {
   } catch { return null; }
 };
 
+import { captureUTMParams } from '@/utils/telemetry';
 import { APKOnboarding } from "@/mobile/components/APKOnboarding";
 import { PricingProvider, usePricing } from "@/context/PricingContext";
 import { usePlanAccess } from "@/hooks/usePlanAccess";
@@ -154,8 +154,8 @@ const MobileLayout = lazy(() => import("./mobile/components/MobileLayout"));
 const MobileIELTSPlayer = lazy(() => import("./mobile/pages/MobileIELTSPlayer"));
 const MobileSpeakingLobby = lazy(() => import("./mobile/pages/MobileSpeakingLobby"));
 const MobileSpeakingSession = lazy(() => import("./mobile/pages/MobileSpeakingSession"));
-import { AppUpdateChecker } from "./mobile/components/AppUpdateChecker";
-
+const SecurityEnforcer = lazy(() => import("@/components/SecurityEnforcer"));
+const AppUpdateChecker = lazy(() => import("./mobile/components/AppUpdateChecker").then(m => ({ default: m.AppUpdateChecker })));
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: {
@@ -467,6 +467,7 @@ const App = () => {
   const { setTheme } = useTheme();
 
   useEffect(() => {
+    captureUTMParams();
     const checkPlatform = () => {
       const mobile = window.innerWidth <= 1024;
       setIsMobile(mobile);
@@ -626,7 +627,7 @@ const App = () => {
 const AppProviders = ({ children }: { children: React.ReactNode }) => {
   return (
     <QueryClientProvider client={queryClient}>
-      <ThemeProvider attribute="class" defaultTheme="system" enableSystem={true} disableTransitionOnChange>
+      <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
         <GlobalErrorBoundary>
           <AuthProvider>
             <PricingProvider>
@@ -675,7 +676,7 @@ const AuthBridge = ({ isNative, onboardingCompleted, setOnboardingCompleted, isM
           isNative ? (
             <HashRouter>
               <ToasterProvider />
-              <SecurityEnforcer />
+              <Suspense fallback={null}><SecurityEnforcer /></Suspense>
               <DeepLinkHandler />
               <MobileRouter user={user} isNative={isNative} authLoading={authLoading} />
               {(isPricingModalOpen || isCheckoutOpen) && (
@@ -687,7 +688,7 @@ const AuthBridge = ({ isNative, onboardingCompleted, setOnboardingCompleted, isM
           ) : (
             <BrowserRouter>
               <ToasterProvider />
-              <SecurityEnforcer />
+              <Suspense fallback={null}><SecurityEnforcer /></Suspense>
               <MobileRouter user={user} isNative={isNative} authLoading={authLoading} />
               {(isPricingModalOpen || isCheckoutOpen) && (
                 <Suspense fallback={null}>
@@ -699,7 +700,7 @@ const AuthBridge = ({ isNative, onboardingCompleted, setOnboardingCompleted, isM
         ) : (
           <BrowserRouter>
             <ToasterProvider />
-            <SecurityEnforcer />
+            <Suspense fallback={null}><SecurityEnforcer /></Suspense>
             <WebRouter user={user} authLoading={authLoading} />
             {(isPricingModalOpen || isCheckoutOpen) && (
               <Suspense fallback={null}>

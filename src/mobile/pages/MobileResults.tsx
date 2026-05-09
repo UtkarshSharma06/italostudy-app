@@ -14,11 +14,11 @@ const MobileResults = () => {
                     <div className="flex items-center gap-2 sm:gap-3">
                         <Button
                             variant="ghost"
-                            size="icon"
-                            onClick={() => navigate(-1)}
-                            className="rounded-full hover:bg-secondary active:scale-90 transition-transform h-10 w-10"
+                            onClick={() => navigate('/mobile/dashboard')}
+                            className="rounded-full hover:bg-secondary active:scale-90 transition-transform h-10 px-3 flex items-center gap-2"
                         >
                             <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
+                            <span className="text-xs font-bold uppercase tracking-widest">Dashboard</span>
                         </Button>
                         <div className="flex flex-col">
                             <h1 className="text-sm font-black tracking-tight uppercase leading-none truncate max-w-[150px] sm:max-w-[200px]">

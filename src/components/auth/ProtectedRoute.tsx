@@ -24,7 +24,11 @@ export default function ProtectedRoute({ children, allowedRoles, allowedPlans }:
     const isConsultant = profile?.is_consultant;
     const isAdmin = userRole === 'admin' || userRole === 'sub_admin';
 
-    const isAuthLoading = loading || visibilityLoading || (user && !profile);
+    // FIX #4: visibilityLoading is removed from the auth-blocking guard.
+    // Previously this caused every page to wait for an extra DB query even when
+    // auth was already resolved from cache. The maintenance overlay is still shown
+    // below — it just renders as an overlay after page load, not as a blocker before.
+    const isAuthLoading = loading || (!!user && !profile);
     
     // Guess if user is logged in before async auth check resolves
     const hasAuthHint = () => {
@@ -87,7 +91,7 @@ export default function ProtectedRoute({ children, allowedRoles, allowedPlans }:
     }
 
     // Onboarding Enforcement: Ensure non-admin users have selected an exam, plan, study hours, and provided a phone number
-    const isOnboardingPage = location.pathname === '/onboarding';
+    const isOnboardingPage = location.pathname === '/onboarding' || location.pathname === '/mobile/onboarding';
     const hasOnboarded = isAdmin || (
         profile?.selected_exam && 
         profile?.selected_plan && 

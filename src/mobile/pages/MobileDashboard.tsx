@@ -26,6 +26,9 @@ import { lazy, Suspense } from 'react';
 
 const UpgradeModal = lazy(() => import('@/components/UpgradeModal').then(mod => ({ default: mod.UpgradeModal })));
 const SeatTrackerModal = lazy(() => import('@/components/SeatTrackerModal').then(mod => ({ default: mod.SeatTrackerModal })));
+const LatestNotificationPopup = lazy(() => import('@/components/LatestNotificationPopup'));
+const FeedbackDialog = lazy(() => import('@/components/FeedbackDialog').then(m => ({ default: m.FeedbackDialog })));
+const TrustpilotReviewModal = lazy(() => import('@/components/TrustpilotReviewModal'));
 import { getOptimizedImageUrl } from '@/lib/image-optimizer';
 // import { NotificationPrompt } from '@/components/NotificationPrompt';
 import { DashboardSkeleton } from '@/mobile/components/DashboardSkeleton';
@@ -101,6 +104,7 @@ const MobileDashboard: React.FC = () => {
     const { isExplorer, isGlobal } = usePlanAccess();
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const [isTrackerModalOpen, setIsTrackerModalOpen] = useState(false);
+    const [showReviewModal, setShowReviewModal] = useState(false);
     const [isTestNotificationDismissed, setIsTestNotificationDismissed] = useState(false);
     const { toast } = useToast();
 
@@ -111,6 +115,62 @@ const MobileDashboard: React.FC = () => {
             navigate('/onboarding');
         }
     }, [user, loading, profile, navigate]);
+
+    const getGreeting = () => {
+        const hour = new Date().getHours();
+        if (hour < 12) return 'Good Morning';
+        if (hour < 17) return 'Good Afternoon';
+        if (hour < 21) return 'Good Evening';
+        return 'Good Night';
+    };
+
+    const checkReviewEligibility = async () => {
+        if (!user || !profile) return;
+
+        const thirtyDaysInMs = 30 * 24 * 60 * 60 * 1000;
+        const now = new Date().getTime();
+
+        try {
+            const createdAt = new Date(profile.created_at).getTime();
+            const twoDaysInMs = 2 * 24 * 60 * 60 * 1000;
+
+            if (now - createdAt < twoDaysInMs) return;
+
+            const { data: tracking } = await (supabase as any)
+                .from('user_review_tracking')
+                .select('*')
+                .eq('user_id', user.id)
+                .maybeSingle();
+
+            if (tracking) {
+                const lastPrompt = tracking.last_review_prompt_at ? new Date(tracking.last_review_prompt_at).getTime() : 0;
+                const lastSubmitted = tracking.last_review_submitted_at ? new Date(tracking.last_review_submitted_at).getTime() : 0;
+                const dashboardShown = tracking.dashboard_popup_shown;
+
+                if (dashboardShown && (now - lastPrompt < thirtyDaysInMs)) return;
+                if (lastSubmitted && (now - lastSubmitted < thirtyDaysInMs)) return;
+            }
+
+            // Only show Review Modal if no global LatestNotification is open (we delay its visibility)
+            // But we will handle "one by one" inside the modal orchestrator or simple state check below.
+            setShowReviewModal(true);
+
+            await (supabase as any)
+                .from('user_review_tracking')
+                .upsert({
+                    user_id: user.id,
+                    dashboard_popup_shown: true,
+                    last_review_prompt_at: new Date().toISOString()
+                }, { onConflict: 'user_id' });
+
+        } catch (error) {
+            console.error('Error checking dashboard review eligibility:', error);
+            const lastPrompt = localStorage.getItem('trustpilot_last_prompt_dashboard');
+            if (!lastPrompt || (now - parseInt(lastPrompt) > thirtyDaysInMs)) {
+                setShowReviewModal(true);
+            }
+        }
+    };
 
     const getSubjectIcon = (subject: string) => {
         const s = subject.toLowerCase();
@@ -803,11 +863,13 @@ const MobileDashboard: React.FC = () => {
                 animate={{ opacity: 1 }}
                 className="relative w-full bg-[#FBFCFF] dark:bg-background px-6 pt-10 pb-4 overflow-hidden transition-colors duration-500"
             >
-                <div className="max-w-lg mx-auto relative">
-                    {/* Greeting & Character Row */}
-                    <div className="flex justify-between items-start mb-8">
+                <div className="max-w-lg mx-auto relative md:max-w-none md:mx-0 lg:px-6">
+                    <div className="md:grid md:grid-cols-[1fr_minmax(auto,350px)] lg:grid-cols-[1fr_minmax(auto,450px)] md:gap-8 lg:gap-12 md:items-end">
+                        <div className="flex flex-col relative w-full">
+                            {/* Greeting & Character Row */}
+                    <div className="flex justify-between items-start mb-8 relative">
                         <div className="space-y-1 relative z-10">
-                            <p className="text-slate-400 dark:text-slate-500 text-base font-medium">Good morning,</p>
+                            <p className="text-slate-400 dark:text-slate-500 text-base font-medium">{getGreeting()},</p>
                             <h1 className="text-5xl font-extrabold text-[#1A1F36] dark:text-white flex items-center gap-2 tracking-tight">
                                 {firstName.split(' ')[0]} 
                                 <motion.span 
@@ -821,7 +883,7 @@ const MobileDashboard: React.FC = () => {
                         </div>
                         
                         {/* 3D Character Image */}
-                        <div className="absolute -right-4 -top-4 w-48 h-48 pointer-events-none">
+                        <div className="absolute -right-4 md:-right-6 lg:-right-4 -top-4 md:-top-8 lg:-top-4 w-48 h-48 md:w-36 md:h-36 lg:w-52 lg:h-52 pointer-events-none opacity-90 md:opacity-100 z-0">
                             <img 
                                 src="/kid-with-laptop.webp" 
                                 alt="Student"
@@ -835,7 +897,7 @@ const MobileDashboard: React.FC = () => {
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: 0.1 }}
-                        className="mb-6"
+                        className="mb-6 md:mb-0"
                     >
                         <button
                             onClick={() => toast({
@@ -861,9 +923,10 @@ const MobileDashboard: React.FC = () => {
                             </div>
                         </button>
                     </motion.div>
+                        </div>
 
                     {/* Bottom Two Cards */}
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-4 mt-6 md:mt-0">
                         {/* Daily Goal Card */}
                         <motion.button
                             initial={{ opacity: 0, y: 20 }}
@@ -938,12 +1001,13 @@ const MobileDashboard: React.FC = () => {
                             </div>
                         </motion.button>
                     </div>
+                    </div>
                 </div>
             </motion.header>
 
             {/* Quick Stats Row - Softened design */}
-            <div className="px-5 mt-4 relative z-30 space-y-6">
-                <div className="flex items-center justify-between gap-2">
+            <div className="px-5 mt-4 relative z-30 space-y-6 md:grid md:grid-cols-2 md:gap-6 md:space-y-0 lg:px-12">
+                <div className="flex items-center justify-between gap-2 md:col-span-2 lg:max-w-4xl lg:mx-auto lg:w-full">
                     <MiniStat icon={Target} val={`${stats.accuracy}%`} label="Acc" color="text-emerald-500" />
                     <MiniStat icon={Zap} val={`${stats.streak}d`} label="Streak" color="text-amber-500" />
                     <MiniStat icon={Play} val={stats.solved} label="Solved" color="text-indigo-500" />
@@ -1043,7 +1107,7 @@ const MobileDashboard: React.FC = () => {
 
                 {/* Upcoming Exam Card - Refined */}
                 {upcomingSession && (
-                    <div className="bg-white rounded-[2.5rem] p-6 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden">
+                    <div className="bg-white rounded-[2.5rem] p-6 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden md:col-span-2">
                         <div className="absolute top-0 right-0 p-6 opacity-5 rotate-12">
                             <Bell size={80} className="text-indigo-600" />
                         </div>
@@ -1367,6 +1431,13 @@ const MobileDashboard: React.FC = () => {
                     description="Your current access level is Explorer. Upgrade to PRO to access full performance analysis and unlimited practice sessions."
                     feature="Full Platform Access"
                 />
+                <SeatTrackerModal isOpen={isTrackerModalOpen} onClose={() => setIsTrackerModalOpen(false)} isGlobal={isGlobal} />
+                <TrustpilotReviewModal
+                    isOpen={showReviewModal}
+                    onClose={() => setShowReviewModal(false)}
+                    onSuccess={() => setShowReviewModal(false)}
+                />
+                <LatestNotificationPopup />
             </Suspense>
             </div>
             <PWAPrompt />

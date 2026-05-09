@@ -66,8 +66,8 @@ export default function OnboardingPricingHover({ isOpen, onClose }: OnboardingPr
 
                         {/* Comparison Table */}
                         <div className="flex-1 overflow-y-auto p-6 md:p-8 custom-scrollbar bg-slate-50/30">
-                            <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm">
-                                <table className="w-full text-left border-collapse">
+                            <div className="bg-white rounded-3xl border border-slate-200 overflow-hidden shadow-sm overflow-x-auto">
+                                <table className="w-full text-left border-collapse min-w-[600px]">
                                     <thead>
                                         <tr className="border-b border-slate-100 bg-slate-50/50">
                                             <th className="py-4 px-6 text-xs font-black text-slate-400 uppercase tracking-widest w-1/3">Features</th>

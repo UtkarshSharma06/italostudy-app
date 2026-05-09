@@ -31,12 +31,12 @@ export const getSkeletonForPath = (path: string) => {
     const normalizedPath = path.replace(/\/$/, '') || '/';
     
     // Mobile Dashboard specifically
-    if (normalizedPath === '/mobile/dashboard' || (normalizedPath === '/' && window.innerWidth < 1024)) {
+    if (normalizedPath === '/mobile/dashboard' || normalizedPath === '/mobile/onboarding' || (normalizedPath === '/' && window.innerWidth < 1024)) {
         return <MobileDashboardSkeleton />;
     }
 
     // Dashboard or Root (logged in users landing on / get redirected to dashboard)
-    if (normalizedPath === '/' || normalizedPath === '/dashboard') {
+    if (normalizedPath === '/' || normalizedPath === '/dashboard' || normalizedPath === '/onboarding') {
         return <DesktopDashboardSkeleton />;
     }
 

@@ -36,25 +36,34 @@ export const PWAPrompt = () => {
       setDeferredPrompt(e);
       (window as any).deferredPWAData = e;
       
-      // If the event fires, we can show it even sooner
+      // If the event fires, we can show it even sooner, but check for other modals
       setTimeout(() => {
-        setIsVisible(true);
-      }, 1000);
+        const hasOpenModal = document.querySelector('[role="dialog"]') || document.querySelector('[data-state="open"]');
+        if (!hasOpenModal) {
+            setIsVisible(true);
+        }
+      }, 2000);
     };
 
     window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
 
-    // Fallback: Show the prompt anyway after 3 seconds to "introduce" the feature
-    // if it's not already visible.
-    const fallbackTimer = setTimeout(() => {
+    // Fallback: Show the prompt anyway after 4 seconds to "introduce" the feature
+    // if it's not already visible and no other modals are open.
+    const fallbackTimer = setInterval(() => {
       if (!isVisible) {
-        setIsVisible(true);
+        const hasOpenModal = document.querySelector('[role="dialog"]') || document.querySelector('[data-state="open"]');
+        if (!hasOpenModal) {
+            setIsVisible(true);
+            clearInterval(fallbackTimer);
+        }
+      } else {
+          clearInterval(fallbackTimer);
       }
-    }, 3000);
+    }, 4000);
 
     return () => {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
-      clearTimeout(fallbackTimer);
+      clearInterval(fallbackTimer);
     };
   }, [isVisible]);
 

@@ -135,8 +135,14 @@ export default defineConfig(({ mode }) => ({
           if (id.includes('framer-motion')) return 'chunk-motion';
           if (id.includes('recharts')) return 'chunk-charts';
 
+          // ─── UI Primitives ─────────────────────────────────────────────────
+          if (id.includes('@radix-ui')) return 'chunk-radix';
+
+          // ─── Internationalisation ─────────────────────────────────────────
+          if (id.includes('i18next') || id.includes('react-i18next')) return 'chunk-i18n';
+
           // ─── Vendor Catch-all ─────────────────────────────────────────────
-          // Let Three.js, Radix, and React stay together in vendor to avoid 
+          // Let Three.js and React stay together in vendor to avoid
           // complex circular dependency chains and initialization errors.
           return 'vendor';
         },

@@ -85,28 +85,42 @@ export const ExamProvider: React.FC<{ children: React.ReactNode }> = ({ children
         }
     };
 
-    // Initial Sync from Profile or LocalStorage
+    // FIX #2: Fetch exams immediately on mount — independent of auth.
+    // Exam data (sections, scoring) doesn't need the user profile to start loading.
+    // We read localStorage cache first (zero network), then revalidate from DB silently.
     useEffect(() => {
         const init = async () => {
             const examsMap = await fetchAllExams();
-
-            if (!authLoading) {
+            // If auth already resolved by the time exams load (cache hit path),
+            // set the active exam right away instead of waiting for the second effect.
+            if (!authLoading && Object.keys(examsMap).length > 0) {
                 const savedExamId = localStorage.getItem('activeExamId');
                 const profileExamId = profile?.selected_exam;
-
-                // Priority: Profile > LocalStorage > Default
                 const targetExamId = profileExamId || savedExamId || 'cent-s-prep';
-
-                if (examsMap[targetExamId]) {
-                    setActiveExamState(examsMap[targetExamId]);
-                } else if (Object.keys(examsMap).length > 0) {
-                    setActiveExamState(Object.values(examsMap)[0]);
-                }
+                setActiveExamState(examsMap[targetExamId] || Object.values(examsMap)[0]);
                 setIsLoading(false);
             }
         };
         init();
-    }, [authLoading, profile?.selected_exam]);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []); // Run once on mount — independent of auth
+
+    // Resolve active exam once both exam data AND auth profile are both ready.
+    // This handles the slower path where auth resolves after exams are already loaded.
+    useEffect(() => {
+        if (authLoading || Object.keys(allExams).length === 0) return;
+
+        const savedExamId = localStorage.getItem('activeExamId');
+        const profileExamId = profile?.selected_exam;
+        const targetExamId = profileExamId || savedExamId || 'cent-s-prep';
+
+        if (allExams[targetExamId]) {
+            setActiveExamState(allExams[targetExamId]);
+        } else if (Object.keys(allExams).length > 0) {
+            setActiveExamState(Object.values(allExams)[0]);
+        }
+        setIsLoading(false);
+    }, [authLoading, profile?.selected_exam, allExams]);
 
     const setActiveExam = async (examId: string) => {
         if (allExams[examId]) {

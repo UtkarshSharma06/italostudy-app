@@ -15,8 +15,9 @@ export default function LatestNotificationPopup() {
             checkLatestNotification();
 
             // Real-time subscription for newly added notifications
+            const channelName = `site_notifications_popup_${Date.now()}_${Math.random().toString(36).substring(7)}`;
             const subscription = supabase
-                .channel('public:site_notifications_popup')
+                .channel(channelName)
                 .on('postgres_changes',
                     { event: 'INSERT', schema: 'public', table: 'site_notifications' },
                     (payload) => {
@@ -40,7 +41,7 @@ export default function LatestNotificationPopup() {
                 .subscribe();
 
             return () => {
-                subscription.unsubscribe();
+                supabase.removeChannel(subscription);
             };
         }
     }, [user, activeExam?.id, profile?.role]);
@@ -80,30 +81,45 @@ export default function LatestNotificationPopup() {
 
             if (filtered.length === 0) return;
 
-            const latest = filtered[0];
-
-            // 2. Strict Logic: Check if we've already shown THIS specific notification in this session
-            // This prevents annoying the user if they navigate between pages, 
-            // but ensures they see EVERY new notification at least once after it is issued.
-            const sessionShownKey = `shown_notif_${latest.id}`;
-            const sessionShown = sessionStorage.getItem(sessionShownKey);
-            if (sessionShown) return;
-
-            // 3. Persistent Logic: Check if the user has EVER read this specific notification in the DB
-            const { data: readStatus } = await supabase
+            // 2. Find the first unread notification in the filtered list
+            const notifIds = filtered.map(n => n.id);
+            const { data: readStatuses } = await supabase
                 .from('user_notifications_read')
-                .select('*')
+                .select('notification_id')
                 .eq('user_id', user.id)
-                .eq('notification_id', latest.id)
-                .maybeSingle();
+                .in('notification_id', notifIds);
 
-            if (!readStatus) {
-                // Not read yet! Show the popup
-                setLatestNotification(latest);
-                setIsVisible(true);
-                // Mark as shown in this session ONLY for this specific ID
-                sessionStorage.setItem(sessionShownKey, 'true');
+            const readIds = new Set(readStatuses?.map(r => r.notification_id) || []);
+
+            let firstUnread = null;
+            for (const notif of filtered) {
+                const sessionShownKey = `shown_notif_${user.id}_${notif.id}`;
+                if (!readIds.has(notif.id) && !sessionStorage.getItem(sessionShownKey)) {
+                    firstUnread = notif;
+                    break;
+                }
             }
+
+            if (!firstUnread) return;
+
+            const sessionShownKey = `shown_notif_${user.id}_${firstUnread.id}`;
+
+            // Show the popup
+            setLatestNotification(firstUnread);
+            setIsVisible(true);
+            // Mark as shown in this session
+            sessionStorage.setItem(sessionShownKey, 'true');
+
+            // Mark as read in DB immediately so it NEVER shows again even if they don't click X
+            const markAsRead = async () => {
+                const { error } = await supabase.from('user_notifications_read').upsert({
+                    user_id: user.id,
+                    notification_id: firstUnread.id
+                });
+                if (error) console.error('Error marking as read:', error);
+            };
+            markAsRead();
+
         } catch (err) {
             console.error('Error checking latest notification:', err);
         }
@@ -112,19 +128,11 @@ export default function LatestNotificationPopup() {
     const handleClose = async () => {
         setIsVisible(false);
 
-        // Mark as read when dismissed to persist across sessions/devices
-        if (latestNotification && user) {
-            try {
-                const { error } = await supabase.from('user_notifications_read').upsert({
-                    user_id: user.id,
-                    notification_id: latestNotification.id
-                });
-
-                if (error) throw error;
-            } catch (err) {
-                console.error('Error marking notification as read:', err);
-            }
-        }
+        // After closing, wait a moment and check for the next unread notification
+        // (It is already marked as read in the DB when it was shown)
+        setTimeout(() => {
+            checkLatestNotification();
+        }, 600);
     };
 
     if (!latestNotification) return null;

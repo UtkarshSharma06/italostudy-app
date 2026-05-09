@@ -358,6 +358,8 @@ const MobileRouter = ({ user, isNative, authLoading }: { user: any, isNative: bo
         } />
         <Route path="/auth" element={<MobileAuth />} />
         <Route path="/mobile/auth" element={<MobileAuth />} />
+        {/* FIX: Redirect bare /dashboard to /mobile/dashboard to prevent double-redirect */}
+        <Route path="/dashboard" element={<Navigate to="/mobile/dashboard" replace />} />
 
         {/* Premium Custom Mobile Pages */}
         <Route path="/mobile/dashboard" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin']}><MobileDashboard /></ProtectedRoute>} />
@@ -468,14 +470,18 @@ const App = () => {
 
   useEffect(() => {
     captureUTMParams();
-    const checkPlatform = () => {
-      const mobile = window.innerWidth <= 1024;
-      setIsMobile(mobile);
+    // FIX: Do NOT call immediately — useState() already computed the correct value
+    // synchronously. Calling again here causes an unnecessary re-render that swaps
+    // the router and produces flicker #1. Just set up the resize listener.
+    const handleResize = () => {
+      const isSmall = window.innerWidth <= 1024;
+      const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
+      const newVal = Capacitor.isNativePlatform() || isMobileUA || (isSmall && isTouch);
+      setIsMobile(prev => prev === newVal ? prev : newVal);
     };
-    
-    checkPlatform();
-    window.addEventListener('resize', checkPlatform);
-    return () => window.removeEventListener('resize', checkPlatform);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
   }, []);
 
   useEffect(() => {
@@ -488,9 +494,10 @@ const App = () => {
 
         if (mounted) {
           setIsNative(native);
-          const isSmall = window.innerWidth <= 1024;
-          const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-          setIsMobile(native || isMobileUA || isSmall);
+          // FIX: Only update isMobile if the value actually changes — prevents
+          // an unnecessary re-render (and router swap) when Capacitor resolves.
+          const newIsMobile = native || /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 1024;
+          setIsMobile(prev => prev === newIsMobile ? prev : newIsMobile);
 
           if (native) {
             const { value } = await Preferences.get({ key: 'onboarding_completed' });
@@ -506,20 +513,13 @@ const App = () => {
         }
       } catch (e) {
         if (mounted) {
-          const isSmall = window.innerWidth <= 1024;
-          const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-          setIsMobile(isMobileUA || isSmall);
+          const newIsMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || window.innerWidth <= 1024;
+          setIsMobile(prev => prev === newIsMobile ? prev : newIsMobile);
         }
       }
     };
 
-    const handleResize = () => {
-      if (mounted) {
-        const isSmall = window.innerWidth <= 1024;
-        const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-        setIsMobile(Capacitor.isNativePlatform() || isMobileUA || isSmall);
-      }
-    };
+    // NOTE: Resize is handled by the first useEffect only. No duplicate listener here.
 
     const handleGlobalError = async (event: ErrorEvent | PromiseRejectionEvent) => {
       const error = 'error' in event ? event.error : event.reason;
@@ -546,10 +546,8 @@ const App = () => {
     window.addEventListener('unhandledrejection', handleGlobalError);
 
     checkPlatform();
-    window.addEventListener('resize', handleResize);
     return () => {
       mounted = false;
-      window.removeEventListener('resize', handleResize);
       window.removeEventListener('error', handleGlobalError);
       window.removeEventListener('unhandledrejection', handleGlobalError);
     };

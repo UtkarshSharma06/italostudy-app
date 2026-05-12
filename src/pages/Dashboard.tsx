@@ -387,6 +387,8 @@ export default function Dashboard() {
         if (user && activeExam?.id && profile) {
             // Prevent double fetching if user/exam hasn't changed
             if (dataLoadedRef.current.userId === user.id && dataLoadedRef.current.examId === activeExam.id) {
+                // ✅ FIX: Guard fired but skeleton might still be visible — always clear it
+                setIsDashboardLoading(false);
                 return;
             }
 
@@ -399,9 +401,16 @@ export default function Dashboard() {
             // Update ref to current state
             dataLoadedRef.current = { userId: user.id, examId: activeExam.id };
 
-            loadAllDashboardData(abortControllerRef.current.signal);
+            // ✅ FIX: Chain .finally at the call site so skeleton ALWAYS clears
+            // regardless of how loadAllDashboardData exits (early return, throw, success)
+            loadAllDashboardData(abortControllerRef.current.signal)
+                .catch(() => {})
+                .finally(() => setIsDashboardLoading(false));
             checkReviewEligibility();
-            fetchResolvedReports(); // Moved here to be part of the main data fetch
+            fetchResolvedReports();
+        } else if (!user && !profile) {
+            // User is logged out — clear any stuck skeleton
+            setIsDashboardLoading(false);
         }
 
         return () => {
@@ -409,7 +418,7 @@ export default function Dashboard() {
                 abortControllerRef.current.abort();
             }
         };
-    }, [user?.id, activeExam?.id]); // Tightened dependencies to prevent re-fetches on minor profile changes
+    }, [user?.id, activeExam?.id, profile?.id]);
 
     const checkReviewEligibility = async () => {
         if (!user || !profile) return;
@@ -545,7 +554,11 @@ export default function Dashboard() {
     };
 
     const loadAllDashboardData = async (signal?: AbortSignal) => {
-        if (!user || !activeExam?.id) return;
+        // ✅ FIX: always clear loading on any early exit so the skeleton never gets stuck
+        if (!user || !activeExam?.id) {
+            setIsDashboardLoading(false);
+            return;
+        }
 
         // ── Read from prefetch cache first (instant load for returning users) ──
         const cached = readDashboardCache(user.id, activeExam.id);
@@ -711,10 +724,12 @@ export default function Dashboard() {
         } catch (error) {
             console.error("Dashboard Sync Error:", error);
         } finally {
-            await refreshActiveTest();
+            // ✅ FIX: Clear loading FIRST so the skeleton always resolves,
+            // even if refreshActiveTest stalls or throws on reload.
             setIsDashboardLoading(false);
-            // Invalidate the prefetch cache so the next visit triggers a fresh prefetch
             invalidateDashboardCache();
+            // Fire-and-forget — cannot be allowed to block the loading state
+            refreshActiveTest().catch(() => { /* silent */ });
         }
     };
 

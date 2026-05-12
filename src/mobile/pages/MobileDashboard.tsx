@@ -647,10 +647,6 @@ const MobileDashboard: React.FC = () => {
                 cachedAt: Date.now(),
             });
 
-            // Hide skeleton as late as possible to prevent flicker
-            setIsLoading(false);
-            await refreshActiveTest();
-
             // Stage 2: Parallel Fetch for non-critical data
             const [
                 progressData,
@@ -697,7 +693,10 @@ const MobileDashboard: React.FC = () => {
             }
         } catch (e) {
             console.error("Dashboard Sync Error:", e);
+        } finally {
+            // ✅ FIX: Always clear skeleton — refreshActiveTest cannot block this
             setIsLoading(false);
+            refreshActiveTest().catch(() => { /* silent */ });
         }
     };
 

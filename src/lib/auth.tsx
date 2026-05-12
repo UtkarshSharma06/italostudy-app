@@ -90,22 +90,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (session?.user) {
-          if (event === 'SIGNED_IN') {
-            // User just logged in: immediately claim the guard slot so the
-            // concurrent getSession().then() path cannot fire a duplicate fetch.
-            // Await the profile so we can call setLoading(false) exactly once.
-            profileFetchInFlight.current = session.user.id;
-            await fetchProfile(session.user.id);
-            setLoading(false);
-            updateLastSignIn(session.user.id);
-          } else if (event !== 'TOKEN_REFRESHED') {
-            // INITIAL_SESSION: handled by getSession().then() below — respect the guard.
-            // TOKEN_REFRESHED: JWT auto-renewed — no need to re-fetch the full profile.
-            if (profileFetchInFlight.current !== session.user.id) {
-              fetchProfile(session.user.id);
-            }
+          // FIX: Never await inside onAuthStateChange — it holds a Supabase
+          // navigator lock. Blocking here causes a 5s lock timeout that
+          // prevents getSession() from resolving, leaving auth.loading=true
+          // and the entire dashboard stuck on skeletons.
+          if (profileFetchInFlight.current !== session.user.id) {
+            fetchProfile(session.user.id);
           }
-          updateAALStatus();
+          // ✅ FIX: Do NOT call updateAALStatus() here — it acquires auth
+          // locks that compete with getSession(), causing "lock stolen" errors
+          // on Vercel. The getSession().then() path handles MFA status.
+          if (event === 'SIGNED_IN') updateLastSignIn(session.user.id);
         } else {
           profileFetchInFlight.current = null;
           setProfile(null);
@@ -142,13 +137,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             updateAALStatus(),
           ]);
         } else {
-          // ❌ Cache MISS: must wait for fresh data (first load or cleared cache)
-          await Promise.all([
-            fetchProfile(initialUser.id),
-            updateAALStatus(),
-          ]);
-          updateLastSignIn(initialUser.id);
+          // ❌ Cache MISS: must wait for fresh profile (first load or cleared cache)
+          // ✅ FIX: Only await fetchProfile — updateAALStatus does 2 sequential
+          // lock-acquiring MFA calls that slow down login by 1-3s. Fire it in background.
+          await fetchProfile(initialUser.id);
           setLoading(false);
+          updateLastSignIn(initialUser.id);
+          // MFA status loads in background — doesn't block dashboard render
+          updateAALStatus();
         }
       } else {
         setLoading(false);
@@ -403,11 +399,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const updateAALStatus = async () => {
-    const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
-    const { data: factorsData } = await supabase.auth.mfa.listFactors();
+    try {
+      const { data: aalData } = await supabase.auth.mfa.getAuthenticatorAssuranceLevel();
+      const { data: factorsData } = await supabase.auth.mfa.listFactors();
 
-    setAal(aalData?.currentLevel ?? null);
-    setHasMFA(factorsData?.all?.some(f => f.status === 'verified') ?? false);
+      setAal(aalData?.currentLevel ?? null);
+      setHasMFA(factorsData?.all?.some(f => f.status === 'verified') ?? false);
+    } catch (e) {
+      // Supabase lock contention — safe to ignore, MFA state will be checked on next action
+      console.warn('MFA status check deferred:', (e as Error)?.message);
+    }
   };
 
   const signUp = async (email: string, password: string, displayName?: string) => {

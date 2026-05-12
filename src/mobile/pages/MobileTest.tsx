@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useMemo, useCallback } from 'react';
+import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,6 +17,7 @@ import { ActionSheet } from '@capacitor/action-sheet';
 import QuestionMedia from '@/components/QuestionMedia';
 import { MediaContent } from '@/types/test';
 import { ReportQuestionDialog } from '@/components/ReportQuestionDialog';
+import { ExpandablePassage } from '@/mobile/components/ExpandablePassage';
 
 interface Question {
     id: string;
@@ -41,6 +42,40 @@ interface Question {
     difficulty?: string;
 }
 
+const formatTime = (seconds: number) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+};
+
+const SimpleMobileTimer = memo(({ targetTimeRef, onTimeUp }: { targetTimeRef: React.MutableRefObject<number | null>, onTimeUp: () => void }) => {
+    const [timeRemaining, setTimeRemaining] = useState(
+        targetTimeRef.current ? Math.max(0, Math.floor((targetTimeRef.current - Date.now()) / 1000)) : 0
+    );
+
+    useEffect(() => {
+        const interval = setInterval(() => {
+            if (!targetTimeRef.current) return;
+            const remaining = Math.max(0, Math.floor((targetTimeRef.current - Date.now()) / 1000));
+            setTimeRemaining(remaining);
+            if (remaining <= 0) {
+                clearInterval(interval);
+                onTimeUp();
+            }
+        }, 1000);
+        return () => clearInterval(interval);
+    }, [targetTimeRef, onTimeUp]);
+
+    return (
+        <div className="flex flex-col items-center">
+            <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Time Remaining</span>
+            <span className={`font-mono text-lg font-black ${timeRemaining < 300 ? 'text-destructive animate-pulse' : 'text-primary'}`}>
+                {formatTime(timeRemaining)}
+            </span>
+        </div>
+    );
+});
+
 export default function MobileTest() {
     const { testId } = useParams<{ testId: string }>();
     const { user } = useAuth();
@@ -51,7 +86,7 @@ export default function MobileTest() {
     const [test, setTest] = useState<any>(null);
     const [questions, setQuestions] = useState<Question[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
-    const [timeRemaining, setTimeRemaining] = useState(0);
+    const targetTotalTimeRef = useRef<number | null>(null);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [currentSectionIndex, setCurrentSectionIndex] = useState(0);
@@ -88,19 +123,14 @@ export default function MobileTest() {
 
             setTest(testData);
 
-            // Timer calculation (same as web)
-            if (testData.time_remaining_seconds !== null && testData.time_remaining_seconds !== undefined) {
-                setTimeRemaining(testData.time_remaining_seconds);
+            // Timer calculation
+            const restoredTime = testData.time_remaining_seconds;
+            if (restoredTime !== null && restoredTime !== undefined) {
+                targetTotalTimeRef.current = Date.now() + (restoredTime * 1000);
             } else {
                 const startTime = new Date(testData.started_at).getTime();
-                const elapsedSeconds = Math.floor((Date.now() - startTime) / 1000);
-                
-                if ((testData as any).is_proctored && elapsedSeconds < 120) {
-                    setTimeRemaining(testData.time_limit_minutes * 60);
-                } else {
-                    const endTime = startTime + testData.time_limit_minutes * 60 * 1000;
-                    setTimeRemaining(Math.max(0, Math.floor((endTime - Date.now()) / 1000)));
-                }
+                const endTime = startTime + testData.time_limit_minutes * 60 * 1000;
+                targetTotalTimeRef.current = Date.now() + Math.max(0, endTime - Date.now());
             }
 
             if (testData.current_question_index !== null && testData.current_question_index !== undefined) {
@@ -253,6 +283,7 @@ export default function MobileTest() {
         if (!testId || !test || test.status !== 'in_progress') return;
 
         try {
+            const timeRemaining = targetTotalTimeRef.current ? Math.max(0, Math.floor((targetTotalTimeRef.current - Date.now()) / 1000)) : 0;
             await supabase
                 .from('tests')
                 .update({
@@ -264,7 +295,7 @@ export default function MobileTest() {
         } catch (error) {
             console.error('Failed to save progress:', error);
         }
-    }, [testId, test, currentIndex, timeRemaining, currentSectionIndex]);
+    }, [testId, test, currentIndex, currentSectionIndex]);
 
     // Auto-save progress every 5 seconds (only for non-ranked tests)
     useEffect(() => {
@@ -284,16 +315,7 @@ export default function MobileTest() {
         }
     }, [currentIndex, test, saveProgress]);
 
-    useEffect(() => {
-        if (!test) return;
-        // If there was a showProctoringSetup here it would be checked, but there isn't.
-        if (timeRemaining <= 0) {
-            submitTest('time_up');
-            return;
-        }
-        const timer = setInterval(() => setTimeRemaining(p => Math.max(0, p - 1)), 1000);
-        return () => clearInterval(timer);
-    }, [timeRemaining, test]);
+    // Timer logic extracted to SimpleMobileTimer
 
     const handleSelectAnswer = async (optionIndex: number) => {
         const question = questions[currentIndex];
@@ -563,12 +585,10 @@ export default function MobileTest() {
                 <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-full">
                     <ChevronLeft className="w-6 h-6" />
                 </Button>
-                <div className="flex flex-col items-center">
-                    <span className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">Time Remaining</span>
-                    <span className={`font-mono text-lg font-black ${timeRemaining < 300 ? 'text-destructive animate-pulse' : 'text-primary'}`}>
-                        {formatTime(timeRemaining)}
-                    </span>
-                </div>
+                <SimpleMobileTimer 
+                    targetTimeRef={targetTotalTimeRef} 
+                    onTimeUp={() => submitTest('time_up')} 
+                />
                 <Button variant="outline" size="sm" onClick={() => submitTest()} className="rounded-full text-[10px] font-black uppercase tracking-widest border-primary/30">
                     Finish
                 </Button>
@@ -583,17 +603,7 @@ export default function MobileTest() {
             <main className="flex-1 overflow-y-auto px-6 py-8 space-y-6">
                 {/* Passage Area (Full Width Top) */}
                 {currentQuestion?.passage && (
-                    <div className="space-y-4 mb-6">
-                        <div className="p-6 bg-indigo-50/50 dark:bg-indigo-900/10 border-2 border-indigo-100 dark:border-indigo-500/20 rounded-[2.5rem] relative overflow-hidden pt-10 shadow-sm">
-                            <div className="absolute top-0 right-0 px-3 py-1 bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400 text-[7px] font-black uppercase tracking-widest rounded-bl-lg">
-                                Reading Passage
-                            </div>
-                            <MathText
-                                content={currentQuestion.passage}
-                                className="text-sm text-slate-700 dark:text-slate-300 leading-[1.7] font-medium prose dark:prose-invert max-w-none break-words overflow-x-auto max-w-full"
-                            />
-                        </div>
-                    </div>
+                    <ExpandablePassage content={currentQuestion.passage} />
                 )}
 
                 {/* Unified Question Card */}
@@ -692,33 +702,83 @@ export default function MobileTest() {
                             {questions.filter(q => q.user_answer !== null).length} / {questions.length} Answered
                         </span>
                     </h3>
-                    <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-2">
-                        {questions.map((q, idx) => {
-                            const isAnswered = q.user_answer !== undefined && q.user_answer !== null;
-                            const isFlagged = q.is_marked_for_review;
-                            const isActive = idx === currentIndex;
+                    {test?.exam_type?.toLowerCase().includes('iat') || test?.exam_type?.toLowerCase().includes('imat') ? (
+                        <div className="space-y-6">
+                            {[
+                                { title: "Logical Reasoning & General Knowledge", count: 9 },
+                                { title: "Biology", count: 23 },
+                                { title: "Chemistry", count: 15 },
+                                { title: "Physics & Mathematics", count: 13 }
+                            ].map((section, secIdx, arr) => {
+                                const startIdx = arr.slice(0, secIdx).reduce((acc, curr) => acc + curr.count, 0);
+                                const sectionQuestions = questions.slice(startIdx, startIdx + section.count);
+                                
+                                if (sectionQuestions.length === 0) return null;
 
-                            return (
-                                <button
-                                    key={q.id || idx}
-                                    onClick={() => {
-                                        setCurrentIndex(idx);
-                                        Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
-                                    }}
-                                    className={`aspect-square rounded-xl text-[10px] font-black border-2 transition-all active:scale-95 flex items-center justify-center ${isActive
-                                            ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-600/20'
-                                            : isFlagged
-                                                ? 'bg-orange-500 border-orange-500 text-white shadow-sm'
-                                                : isAnswered
-                                                    ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm'
-                                                    : 'bg-slate-50 dark:bg-muted/30 border-slate-100 dark:border-border text-slate-400'
-                                        }`}
-                                >
-                                    {idx + 1}
-                                </button>
-                            );
-                        })}
-                    </div>
+                                return (
+                                    <div key={section.title} className="space-y-3">
+                                        <h4 className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">{section.title}</h4>
+                                        <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-2">
+                                            {sectionQuestions.map((q, localIdx) => {
+                                                const idx = startIdx + localIdx;
+                                                const isAnswered = q.user_answer !== undefined && q.user_answer !== null;
+                                                const isFlagged = q.is_marked_for_review;
+                                                const isActive = idx === currentIndex;
+
+                                                return (
+                                                    <button
+                                                        key={q.id || idx}
+                                                        onClick={() => {
+                                                            setCurrentIndex(idx);
+                                                            Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
+                                                        }}
+                                                        className={`aspect-square rounded-xl text-[10px] font-black border-2 transition-all active:scale-95 flex items-center justify-center ${isActive
+                                                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+                                                                : isFlagged
+                                                                    ? 'bg-orange-500 border-orange-500 text-white shadow-sm'
+                                                                    : isAnswered
+                                                                        ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm'
+                                                                        : 'bg-slate-50 dark:bg-muted/30 border-slate-100 dark:border-border text-slate-400'
+                                                            }`}
+                                                    >
+                                                        {idx + 1}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
+                    ) : (
+                        <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-2">
+                            {questions.map((q, idx) => {
+                                const isAnswered = q.user_answer !== undefined && q.user_answer !== null;
+                                const isFlagged = q.is_marked_for_review;
+                                const isActive = idx === currentIndex;
+
+                                return (
+                                    <button
+                                        key={q.id || idx}
+                                        onClick={() => {
+                                            setCurrentIndex(idx);
+                                            Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
+                                        }}
+                                        className={`aspect-square rounded-xl text-[10px] font-black border-2 transition-all active:scale-95 flex items-center justify-center ${isActive
+                                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+                                                : isFlagged
+                                                    ? 'bg-orange-500 border-orange-500 text-white shadow-sm'
+                                                    : isAnswered
+                                                        ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm'
+                                                        : 'bg-slate-50 dark:bg-muted/30 border-slate-100 dark:border-border text-slate-400'
+                                            }`}
+                                    >
+                                        {idx + 1}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    )}
                 </div>
             </main>
 

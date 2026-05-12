@@ -36,7 +36,7 @@ export function SectionProgressTracker({
                 {sections.map((section) => {
                     const isCompleted = completedSections.includes(section.number);
                     const isCurrent = section.number === currentSection;
-                    const isLocked = section.number > currentSection;
+                    const isLocked = isSectionsLocked && section.number > currentSection;
 
                     return (
                         <div key={section.number} className="space-y-3">
@@ -46,13 +46,15 @@ export function SectionProgressTracker({
                                         onSectionClick(section.number);
                                     }
                                 }}
-                                className={`flex items-center gap-3 p-3.5 rounded-2xl transition-all ${
+                        className={`flex items-center gap-3 p-3.5 rounded-2xl transition-all ${
                                     !isSectionsLocked ? 'cursor-pointer hover:bg-primary/5' : ''
                                 } ${isCurrent
                                         ? 'bg-primary/10 border-2 border-primary/40 shadow-sm'
                                         : isCompleted
                                             ? 'bg-green-500/5 border border-green-500/20 opacity-80'
-                                            : 'bg-secondary/5 border border-border/10 opacity-40'
+                                            : (!isSectionsLocked || section.number === currentSection) 
+                                                ? 'bg-secondary/5 border border-border/10' 
+                                                : 'bg-secondary/5 border border-border/10 opacity-40'
                                     }`}
                             >
                                 <div className={`w-8 h-8 rounded-full flex items-center justify-center font-black text-xs ${isCurrent

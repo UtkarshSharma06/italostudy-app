@@ -31,6 +31,7 @@ import { useProctoring } from '@/hooks/useProctoring';
 const ProctoringSetup = lazy(() => import('@/components/ProctoringSetup'));
 const ProctoringSystem = lazy(() => import('@/components/ProctoringSystem'));
 import { ReportQuestionDialog } from '@/components/ReportQuestionDialog';
+import { ExpandablePassage } from '@/mobile/components/ExpandablePassage';
 
 interface Question {
     id: string;
@@ -83,10 +84,11 @@ export default function MobileSectionedTest() {
     const [infractions, setInfractions] = useState(0);
     const [showWarning, setShowWarning] = useState(false);
     const [isProctored, setIsProctored] = useState(false); // Default to false for safety
-    const [timeRemaining, setTimeRemaining] = useState(0);
-    const [sectionTimeRemaining, setSectionTimeRemaining] = useState(0);
     const [showProctoringSetup, setShowProctoringSetup] = useState(false);
     const [isDisqualified, setIsDisqualified] = useState(false);
+
+    const targetTotalTimeRef = useRef<number | null>(null);
+    const targetSectionTimeRef = useRef<number | null>(null);
 
     const [isLocked, setIsLocked] = useState(false);
     const [sessionId] = useState(() => {
@@ -215,6 +217,9 @@ export default function MobileSectionedTest() {
         }
 
         try {
+            const timeRemaining = targetTotalTimeRef.current ? Math.max(0, Math.floor((targetTotalTimeRef.current - Date.now()) / 1000)) : 0;
+            const sectionTimeRemaining = targetSectionTimeRef.current ? Math.max(0, Math.floor((targetSectionTimeRef.current - Date.now()) / 1000)) : 0;
+
             await (supabase as any)
                 .from('tests')
                 .update({
@@ -231,13 +236,9 @@ export default function MobileSectionedTest() {
         } catch (e) {
             console.error('Failed to auto-save progress:', e);
         }
-    }, [id, test, isSubmitting, currentQuestionIndex, sections, currentSection, timeRemaining, sectionTimeRemaining, completedSections, sessionId]);
+    }, [id, test, isSubmitting, currentQuestionIndex, sections, currentSection, completedSections, sessionId]);
 
-    // Timer logic — stable interval using refs, no teardown every tick
-    const timeRemainingRef = useRef(timeRemaining);
-    const sectionTimeRemainingRef = useRef(sectionTimeRemaining);
-    useEffect(() => { timeRemainingRef.current = timeRemaining; }, [timeRemaining]);
-    useEffect(() => { sectionTimeRemainingRef.current = sectionTimeRemaining; }, [sectionTimeRemaining]);
+    // Timer logic removed: Handled by SectionTimer internally via targetEndTimeRef
 
     // Auto-save periodically for Cross-device sync (Standard Mode)
     useEffect(() => {
@@ -270,6 +271,9 @@ export default function MobileSectionedTest() {
                 globalIdx = offset + currentQuestionIndex;
             }
 
+            const timeRemaining = targetTotalTimeRef.current ? Math.max(0, Math.floor((targetTotalTimeRef.current - Date.now()) / 1000)) : 0;
+            const sectionTimeRemaining = targetSectionTimeRef.current ? Math.max(0, Math.floor((targetSectionTimeRef.current - Date.now()) / 1000)) : 0;
+
             sessionStorage.setItem(`test_cache_${id}`, JSON.stringify({
                 timeRemaining,
                 sectionTimeRemaining,
@@ -280,31 +284,7 @@ export default function MobileSectionedTest() {
         }, 1500);
 
         return () => clearInterval(cacheInterval);
-    }, [test, id, timeRemaining, sectionTimeRemaining, currentSection, currentQuestionIndex, isDisqualified, isLoading, isProctored, sections]);
-
-    useEffect(() => {
-        if (!test || isLoading || isSubmitting || showProctoringSetup || isDisqualified) return;
-
-        const timer = setInterval(() => {
-            const newTime = Math.max(0, timeRemainingRef.current - 1);
-            setTimeRemaining(newTime);
-            if (newTime <= 0) {
-                clearInterval(timer);
-                finishTest();
-                return;
-            }
-            const newSectionTime = Math.max(0, sectionTimeRemainingRef.current - 1);
-            setSectionTimeRemaining(newSectionTime);
-            if (test.section_timing_mode !== 'total' && newSectionTime <= 0 && currentSectionInfo) {
-                clearInterval(timer);
-                // Force immediate transition
-                handleSectionTimeExpired();
-            }
-        }, 1000);
-
-        return () => clearInterval(timer);
-        // Restart on test, section, or setup visibility changes
-    }, [test, isLoading, isSubmitting, currentSection, showProctoringSetup]);
+    }, [test, id, currentSection, currentQuestionIndex, isDisqualified, isLoading, isProctored, sections]);
 
     const {
         cameraAllowed,
@@ -547,12 +527,14 @@ export default function MobileSectionedTest() {
                 }
 
                 // Timers
-                setTimeRemaining(restoredTime ?? (testData.time_limit_minutes * 60));
-                if (restoredSectionTime !== null) {
-                    setSectionTimeRemaining(restoredSectionTime);
+                targetTotalTimeRef.current = Date.now() + ((restoredTime ?? (testData.time_limit_minutes * 60)) * 1000);
+                if (restoredSectionTime !== null && restoredSectionTime !== undefined) {
+                    targetSectionTimeRef.current = Date.now() + (restoredSectionTime * 1000);
                 } else {
                     const currentSecConfig = dynamicSections.find(s => s.number === restoredSection);
-                    if (currentSecConfig && currentSecConfig.durationMinutes) setSectionTimeRemaining(currentSecConfig.durationMinutes * 60);
+                    if (currentSecConfig && currentSecConfig.durationMinutes) {
+                        targetSectionTimeRef.current = Date.now() + (currentSecConfig.durationMinutes * 60 * 1000);
+                    }
                 }
 
                 setIsLoading(false); // FINISH LOADING
@@ -767,6 +749,16 @@ export default function MobileSectionedTest() {
                 setCurrentSection(currentSection + 1);
                 setCurrentQuestionIndex(0);
                 setShowConfirmModal(false);
+                
+                // Set new target section time for the upcoming section
+                const nextSec = sections[currentSection];
+                if (nextSec && nextSec.durationMinutes) {
+                    targetSectionTimeRef.current = Date.now() + (nextSec.durationMinutes * 60 * 1000);
+                }
+                
+                setTimeout(() => {
+                    saveProgress();
+                }, 100);
             }
         } catch (e: any) {
             toast({ title: "Error", description: e.message, variant: "destructive" });
@@ -1006,7 +998,7 @@ export default function MobileSectionedTest() {
                     <SectionTimer
                         durationMinutes={(test.exam_type === 'imat-prep' || test.section_timing_mode === 'total') ? test.time_limit_minutes : currentSectionInfo.durationMinutes}
                         onTimeExpired={(test.exam_type === 'imat-prep' || test.section_timing_mode === 'total') ? finishTest : handleSectionTimeExpired}
-                        secondsLeft={(test.exam_type === 'imat-prep' || test.section_timing_mode === 'total') ? timeRemaining : sectionTimeRemaining}
+                        targetEndTimeRef={(test.exam_type === 'imat-prep' || test.section_timing_mode === 'total') ? targetTotalTimeRef : targetSectionTimeRef}
                         warningMinutes={5}
                         onWarning={() => toast({
                             title: "5 Minutes Remaining",
@@ -1086,17 +1078,7 @@ export default function MobileSectionedTest() {
 
                     {/* Passage Area (Full Width Top) */}
                     {currentQuestion.passage && (
-                        <div className="mb-6">
-                            <div className="p-6 bg-indigo-50/50 dark:bg-indigo-900/10 border-2 border-indigo-100 dark:border-indigo-500/20 rounded-[2.5rem] relative overflow-hidden pt-10 shadow-sm">
-                                <div className="absolute top-0 right-0 px-3 py-1 bg-indigo-100 dark:bg-indigo-900 text-indigo-600 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest rounded-bl-lg">
-                                    Reading Passage
-                                </div>
-                                <MathText
-                                    content={currentQuestion.passage}
-                                    className="text-sm text-slate-700 dark:text-slate-300 leading-[1.7] font-medium prose dark:prose-invert max-w-none break-words overflow-x-auto max-w-full"
-                                />
-                            </div>
-                        </div>
+                        <ExpandablePassage content={currentQuestion.passage} />
                     )}
 
                     {/* Question Card (Images, Charts, Diagrams, Text) */}
@@ -1180,7 +1162,7 @@ export default function MobileSectionedTest() {
                     }))}
                     currentQuestionIndex={currentQuestionIndex}
                     onNavigate={(idx) => setCurrentQuestionIndex(idx)}
-                    isSectionsLocked={test.exam_type === 'imat-prep' ? false : test.is_sections_locked}
+                    isSectionsLocked={test.exam_type?.toLowerCase().includes('imat') ? false : test.is_sections_locked}
                     onSectionClick={(sectionNum) => {
                         if (sectionNum === currentSection) return;
                         
@@ -1232,10 +1214,10 @@ export default function MobileSectionedTest() {
                         </Button>
                     ) : (
                         <Button
-                            onClick={test.exam_type === 'imat-prep' ? completeSection : requestSectionComplete}
+                            onClick={test.exam_type?.toLowerCase().includes('imat') ? completeSection : requestSectionComplete}
                             className="flex-1 h-14 rounded-2xl bg-green-600 hover:bg-green-700"
                         >
-                            {test.exam_type === 'imat-prep' ? 'Next Section' : 'Complete Section'}
+                            {test.exam_type?.toLowerCase().includes('imat') ? 'Next Section' : 'Complete Section'}
                             <ChevronRight className="w-5 h-5 ml-2" />
                         </Button>
                     )}

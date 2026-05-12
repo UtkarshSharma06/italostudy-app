@@ -471,13 +471,13 @@ const App = () => {
   useEffect(() => {
     captureUTMParams();
     // FIX: Do NOT call immediately — useState() already computed the correct value
-    // synchronously. Calling again here causes an unnecessary re-render that swaps
-    // the router and produces flicker #1. Just set up the resize listener.
+    // synchronously. Just set up the resize listener.
+    // For resize, use isSmall WITHOUT the touch check: a desktop user explicitly
+    // dragging their window below 1024px should switch to the mobile layout.
     const handleResize = () => {
       const isSmall = window.innerWidth <= 1024;
       const isMobileUA = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-      const isTouch = 'ontouchstart' in window || navigator.maxTouchPoints > 0;
-      const newVal = Capacitor.isNativePlatform() || isMobileUA || (isSmall && isTouch);
+      const newVal = Capacitor.isNativePlatform() || isMobileUA || isSmall;
       setIsMobile(prev => prev === newVal ? prev : newVal);
     };
     window.addEventListener('resize', handleResize);
@@ -646,11 +646,18 @@ const AppProviders = ({ children }: { children: React.ReactNode }) => {
   );
 };
 
+// Isolated component — usePlanAccess re-renders never propagate up to the router.
+// Previously this lived inside AuthBridge which caused the entire router tree
+// (and Dashboard) to re-render each time its 3 DB queries resolved.
+const PlanGuard = () => {
+  const { shouldBlockAccess } = usePlanAccess();
+  return shouldBlockAccess ? <SubscriptionLockout /> : null;
+};
+
 // Internal component to handle auth-sensitive routing
 const AuthBridge = ({ isNative, onboardingCompleted, setOnboardingCompleted, isMobile }: any) => {
   const { user, profile, loading: authLoading, refreshProfile } = useAuth();
   const { isPricingModalOpen, isCheckoutOpen } = usePricing();
-  const { shouldBlockAccess, refreshLimit, isGlobal, isElite, isAdmin, plan, tier } = usePlanAccess();
 
   // ── Pre-load Dashboard data immediately after auth resolves ───────────────
   // Fires 4 parallel queries in background so Dashboard has data ready on arrival
@@ -665,8 +672,8 @@ const AuthBridge = ({ isNative, onboardingCompleted, setOnboardingCompleted, isM
 
   return (
     <>
-      {/* SubscriptionLockout: shown as overlay when subscription expired */}
-      {shouldBlockAccess && <SubscriptionLockout />}
+      {/* SubscriptionLockout: isolated in PlanGuard to prevent router re-renders */}
+      <PlanGuard />
 
       <Suspense fallback={(isInitialPublic || !initialAuthHint) ? null : <PageLoader />}>
         {isMobile ? (

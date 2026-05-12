@@ -90,14 +90,22 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
 
         if (session?.user) {
-          // FIX #1: Skip if getSession() already started a fetch for this user.
-          // onAuthStateChange fires INITIAL_SESSION right after getSession resolves,
-          // which would trigger a duplicate fetchProfile. We guard against this.
-          if (profileFetchInFlight.current !== session.user.id) {
-            fetchProfile(session.user.id);
+          if (event === 'SIGNED_IN') {
+            // User just logged in: immediately claim the guard slot so the
+            // concurrent getSession().then() path cannot fire a duplicate fetch.
+            // Await the profile so we can call setLoading(false) exactly once.
+            profileFetchInFlight.current = session.user.id;
+            await fetchProfile(session.user.id);
+            setLoading(false);
+            updateLastSignIn(session.user.id);
+          } else if (event !== 'TOKEN_REFRESHED') {
+            // INITIAL_SESSION: handled by getSession().then() below — respect the guard.
+            // TOKEN_REFRESHED: JWT auto-renewed — no need to re-fetch the full profile.
+            if (profileFetchInFlight.current !== session.user.id) {
+              fetchProfile(session.user.id);
+            }
           }
           updateAALStatus();
-          if (event === 'SIGNED_IN') updateLastSignIn(session.user.id);
         } else {
           profileFetchInFlight.current = null;
           setProfile(null);

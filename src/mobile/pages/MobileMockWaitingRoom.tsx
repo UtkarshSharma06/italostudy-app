@@ -93,39 +93,60 @@ export default function MobileMockWaitingRoom() {
 
         setIsStarting(true);
         try {
-            // Check if attempt exists
-            const { data: existing } = await (supabase as any)
+            const isPast = new Date(session.end_time) < new Date();
+
+            // Fetch ALL tests to prevent .maybeSingle() crash and properly count
+            const { data: tests } = await (supabase as any)
                 .from('tests')
                 .select('id, status')
                 .eq('user_id', user.id)
-                .eq('session_id', session.id)
-                .maybeSingle();
+                .eq('session_id', session.id);
 
-            if (existing) {
-                if (existing.status === 'in_progress') {
-                    // Check local blacklist: if the client previously terminated this test but RLS
-                    // blocked the database update, we MUST NOT resume it.
+            const inProgressTest = tests?.find((t: any) => t.status === 'in_progress');
+
+            if (inProgressTest) {
+                if (!isPast) {
+                    // LIVE MOCK: No resuming allowed! 
+                    // Automatically mark it as abandoned/disqualified and force a new attempt.
+                    await (supabase as any)
+                        .from('tests')
+                        .update({ 
+                            status: 'abandoned',
+                            proctoring_status: 'disqualified' 
+                        })
+                        .eq('id', inProgressTest.id);
+                    
+                    toast({
+                        title: "Attempt Forfeited",
+                        description: "You left the live session. Your previous attempt was forfeited.",
+                    });
+                    
+                    inProgressTest.status = 'abandoned';
+                } else {
+                    // ARCHIVED MOCK: Resume allowed
+                    // Check local blacklist
                     let isBlacklisted = false;
                     try {
                         const blackList = JSON.parse(localStorage.getItem('terminated_tests') || '[]');
-                        if (blackList.includes(existing.id)) {
+                        if (blackList.includes(inProgressTest.id)) {
                             isBlacklisted = true;
                         }
                     } catch(e) {}
 
-                    // Ghost Test Prevention: verify the test actually has questions
+                    // Ghost Test Prevention
                     const { count: questionCount } = await (supabase as any)
                         .from('questions')
                         .select('id', { count: 'exact', head: true })
-                        .eq('test_id', existing.id);
+                        .eq('test_id', inProgressTest.id);
 
                     if (!isBlacklisted && (questionCount || 0) > 0) {
-                        // Safe to resume — questions exist and not blacklisted
+                        // Safe to resume
                         if (isSectionedExam) {
-                            navigate(`/mobile/sectioned-test/${existing.id}`);
+                            navigate(`/mobile/sectioned-test/${inProgressTest.id}`);
                         } else {
-                            navigate(`/mobile/test/${existing.id}`);
+                            navigate(`/mobile/test/${inProgressTest.id}`);
                         }
+                        setIsStarting(false);
                         return;
                     } else {
                         // Ghost test or blacklisted test — mark as abandoned
@@ -135,34 +156,31 @@ export default function MobileMockWaitingRoom() {
                                 status: 'abandoned',
                                 proctoring_status: 'disqualified' 
                             })
-                            .eq('id', existing.id);
+                            .eq('id', inProgressTest.id);
                         
                         toast({
                             title: "Previous Session Recovered",
                             description: "Your previous session was incomplete. Starting a fresh test now.",
                         });
-                        // Fall through to create fresh test below...
+                        inProgressTest.status = 'abandoned';
                     }
                 }
             }
 
             // Check total completed attempts (Only for live sessions)
-            const isPast = new Date(session.end_time) < new Date();
             if (!isPast) {
-                const { count: completedCount } = await (supabase as any)
-                    .from('tests')
-                    .select('id', { count: 'exact', head: true })
-                    .eq('user_id', user.id)
-                    .eq('session_id', session.id)
-                    .neq('status', 'in_progress');
+                const completedCount = tests?.filter((t: any) =>
+                    t.status !== 'in_progress'
+                ).length || 0;
 
                 const limit = session.max_attempts || session.attempts_per_person || 1;
-                if ((completedCount || 0) >= limit) {
+                if (completedCount >= limit) {
                     toast({
                         title: "Attempt Limit Reached",
-                        description: `This session has an attempt limit of ${limit}.`,
+                        description: `Live mock limit reached. Now you can attempt this mock once the mock is not in live.`,
                         variant: "default"
                     });
+                    setIsStarting(false);
                     return;
                 }
             }

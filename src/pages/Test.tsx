@@ -54,6 +54,7 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { ReportQuestionDialog } from '@/components/ReportQuestionDialog';
+import { IsolatedTimer } from '@/components/IsolatedTimer';
 
 interface DiagramData {
   type: 'svg' | 'description' | 'coordinates';
@@ -142,8 +143,8 @@ export default function TestPage() {
   }, [test?.exam_type, activeExam, allExams]);
   const [questions, setQuestions] = useState<Question[]>([]);
   const [currentIndex, setCurrentIndex] = useState(0);
-  const [timeRemaining, setTimeRemaining] = useState(0);
-  const [sectionTimeRemaining, setSectionTimeRemaining] = useState(0);
+  const targetTotalTimeRef = useRef<number | null>(null);
+  const targetSectionTimeRef = useRef<number | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -530,13 +531,14 @@ export default function TestPage() {
         if (currentSec) {
           // Restore saved section time or use default
           const savedSectionTime = testData.section_time_remaining_seconds;
-          setSectionTimeRemaining(savedSectionTime !== null && savedSectionTime !== undefined ? savedSectionTime : currentSec.durationMinutes * 60);
+          const remaining = savedSectionTime !== null && savedSectionTime !== undefined ? savedSectionTime : currentSec.durationMinutes * 60;
+          targetSectionTimeRef.current = Date.now() + (remaining * 1000);
         }
       }
 
       // Calculate remaining time - use restored time if available (local or db)
       if (restoredTime !== null && restoredTime !== undefined) {
-        setTimeRemaining(restoredTime);
+        targetTotalTimeRef.current = Date.now() + (restoredTime * 1000);
       } else {
         // If we're just starting, give the full time. Otherwise calculate elapsed.
         const startTime = new Date(testData.started_at).getTime();
@@ -544,11 +546,11 @@ export default function TestPage() {
         
         // If elapsed time is very small (e.g., < 60s) or we are in proctoring setup, assume full time
         if (isProctored && elapsedSeconds < 120) {
-            setTimeRemaining(testData.time_limit_minutes * 60);
+            targetTotalTimeRef.current = Date.now() + (testData.time_limit_minutes * 60 * 1000);
         } else {
             const endTime = startTime + testData.time_limit_minutes * 60 * 1000;
             const remaining = Math.max(0, Math.floor((endTime - Date.now()) / 1000));
-            setTimeRemaining(remaining);
+            targetTotalTimeRef.current = Date.now() + (remaining * 1000);
         }
       }
 
@@ -656,6 +658,9 @@ export default function TestPage() {
     if (!testId || !test || test.status !== 'in_progress') return;
 
     try {
+      const timeRemaining = targetTotalTimeRef.current ? Math.max(0, Math.floor((targetTotalTimeRef.current - Date.now()) / 1000)) : 0;
+      const sectionTimeRemaining = targetSectionTimeRef.current ? Math.max(0, Math.floor((targetSectionTimeRef.current - Date.now()) / 1000)) : 0;
+
       await supabase
         .from('tests')
         .update({
@@ -672,7 +677,7 @@ export default function TestPage() {
     } catch (error) {
       console.error('Failed to save progress:', error);
     }
-  }, [testId, test, currentIndex, timeRemaining, sectionTimeRemaining, currentSectionIndex]);
+  }, [testId, test, currentIndex, currentSectionIndex]);
 
   // Auto-save progress periodically (Cross-device sync)
   useEffect(() => {
@@ -696,6 +701,7 @@ export default function TestPage() {
     if (!test || (test as any).is_proctored || test.is_ranked || isDisqualified) return;
 
     const cacheInterval = setInterval(() => {
+      const timeRemaining = targetTotalTimeRef.current ? Math.max(0, Math.floor((targetTotalTimeRef.current - Date.now()) / 1000)) : 0;
       sessionStorage.setItem(`test_cache_${testId}`, JSON.stringify({
         timeRemaining,
         currentIndex,
@@ -705,7 +711,7 @@ export default function TestPage() {
     }, 1500);
 
     return () => clearInterval(cacheInterval);
-  }, [test, testId, timeRemaining, currentIndex, currentSectionIndex, isDisqualified]);
+  }, [test, testId, currentIndex, currentSectionIndex, isDisqualified]);
 
   // Save progress when navigating or answering
   useEffect(() => {
@@ -713,44 +719,7 @@ export default function TestPage() {
     saveProgress();
   }, [currentIndex, currentSectionIndex, test?.status, saveProgress]);
 
-  // Timer logic — stable interval, no teardown every tick
-  const timeRemainingRef = useRef(timeRemaining);
-  const sectionTimeRemainingRef = useRef(sectionTimeRemaining);
-  useEffect(() => { timeRemainingRef.current = timeRemaining; }, [timeRemaining]);
-  useEffect(() => { sectionTimeRemainingRef.current = sectionTimeRemaining; }, [sectionTimeRemaining]);
-
-  useEffect(() => {
-    if (!test || showProctoringSetup || isDisqualified || isLocked) return; // PAUSE timer if proctoring setup is active or exam terminated
-
-    const timer = setInterval(() => {
-      const newTime = Math.max(0, timeRemainingRef.current - 1);
-      setTimeRemaining(newTime);
-      if (newTime <= 0) {
-        clearInterval(timer);
-        handleAutoSubmit();
-        return;
-      }
-      if (isMockExam) {
-        // Only decrement section timer if in 'section' timing mode
-        if (test.section_timing_mode !== 'total') {
-            const newSectionTime = Math.max(0, sectionTimeRemainingRef.current - 1);
-            setSectionTimeRemaining(newSectionTime);
-            if (newSectionTime <= 0) {
-              clearInterval(timer);
-              // Force immediate completion and move (passing true for isAuto)
-              handleCompleteSection(true);
-            }
-        } else {
-            // In total time mode, we still sync the section duration for internal tracking 
-            // but we don't force moves based on it.
-            setSectionTimeRemaining(timeRemainingRef.current);
-        }
-      }
-    }, 1000);
-
-    return () => clearInterval(timer);
-    // Restart if test, section, or proctoring setup visibility changes
-  }, [test, isMockExam, currentSectionIndex, showProctoringSetup]);
+  // Timer logic extracted to IsolatedTimer
 
   const handleDisqualification = async () => {
     setIsDisqualified(true);
@@ -1016,7 +985,7 @@ export default function TestPage() {
 
       setCurrentSectionIndex(currentSectionIndex + 1);
       setCurrentIndex(nextSection.startIndex);
-      setSectionTimeRemaining(nextSection.durationMinutes * 60);
+      targetSectionTimeRef.current = Date.now() + (nextSection.durationMinutes * 60 * 1000);
       questionStartTime.current = Date.now();
 
       // Persist to DB
@@ -1055,7 +1024,7 @@ export default function TestPage() {
       const nextSection = sections[currentSectionIndex + 1];
       setCurrentSectionIndex(currentSectionIndex + 1);
       setCurrentIndex(nextSection.startIndex);
-      setSectionTimeRemaining(nextSection.durationMinutes * 60);
+      targetSectionTimeRef.current = Date.now() + (nextSection.durationMinutes * 60 * 1000);
       questionStartTime.current = Date.now();
 
       toast({
@@ -1120,6 +1089,7 @@ export default function TestPage() {
       // Standardized percentage
       const maxPossibleScore = allQuestions.length * corrPts;
       const scorePercentage = maxPossibleScore > 0 ? Math.round((finalScore / maxPossibleScore) * 100) : 0;
+      const timeRemaining = targetTotalTimeRef.current ? Math.max(0, Math.floor((targetTotalTimeRef.current - Date.now()) / 1000)) : 0;
       const timeTaken = test.time_limit_minutes * 60 - timeRemaining;
 
       const penaltyScore = wrong * Math.abs(incorrPts);
@@ -1433,42 +1403,94 @@ export default function TestPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-5 gap-2">
-          {(isMockExam && currentSection
-            ? questions.slice(currentSection.startIndex, currentSection.endIndex + 1)
-            : questions
-          ).map((q, i) => {
-            const actualIndex = isMockExam && currentSection ? currentSection.startIndex + i : i;
-            const isImat = test?.exam_type === 'imat-prep';
-            const isLocked = !isImat && isMockExam && sections.length > 0 && (
-              sections.findIndex(s => actualIndex >= s.startIndex && actualIndex <= s.endIndex) !== currentSectionIndex
-            );
+        {test?.exam_type?.toLowerCase().includes('iat') || test?.exam_type?.toLowerCase().includes('imat') ? (
+            <div className="space-y-6">
+                {[
+                    { title: "Logical Reasoning & General Knowledge", count: 9 },
+                    { title: "Biology", count: 23 },
+                    { title: "Chemistry", count: 15 },
+                    { title: "Physics & Mathematics", count: 13 }
+                ].map((section, secIdx, arr) => {
+                    const startIdx = arr.slice(0, secIdx).reduce((acc, curr) => acc + curr.count, 0);
+                    const sectionQuestions = questions.slice(startIdx, startIdx + section.count);
+                    
+                    if (sectionQuestions.length === 0) return null;
 
-            return (
-              <button
-                key={q.id}
-                onClick={() => !isLocked && handleNavigate(actualIndex)}
-                disabled={isLocked}
-                className={cn(
-                  "aspect-square rounded-xl text-[10px] font-black border-2 transition-all active:scale-95",
-                  isLocked
-                    ? "bg-slate-50 border-transparent text-slate-100 cursor-not-allowed"
-                    : actualIndex === currentIndex
-                      ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200"
-                      : q.user_answer !== null
-                        ? q.is_marked
-                          ? "bg-orange-50 border-orange-200 text-orange-600"
-                          : "bg-emerald-50 border-emerald-200 text-emerald-600"
-                        : q.is_marked
-                          ? "bg-orange-50 border-orange-200 text-orange-600"
-                          : "bg-white border-slate-100 text-slate-400 hover:border-indigo-400 hover:text-indigo-600"
-                )}
-              >
-                {actualIndex + 1}
-              </button>
-            );
-          })}
-        </div>
+                    return (
+                        <div key={section.title} className="space-y-3">
+                            <h4 className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">{section.title}</h4>
+                            <div className="grid grid-cols-5 gap-2">
+                                {sectionQuestions.map((q, localIdx) => {
+                                    const actualIndex = startIdx + localIdx;
+                                    const isLocked = false;
+
+                                    return (
+                                        <button
+                                            key={q.id}
+                                            onClick={() => !isLocked && handleNavigate(actualIndex)}
+                                            disabled={isLocked}
+                                            className={cn(
+                                                "aspect-square rounded-xl text-[10px] font-black border-2 transition-all active:scale-95",
+                                                isLocked
+                                                    ? "bg-slate-50 border-transparent text-slate-100 cursor-not-allowed"
+                                                    : actualIndex === currentIndex
+                                                        ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200"
+                                                        : q.user_answer !== null
+                                                            ? q.is_marked
+                                                                ? "bg-orange-50 border-orange-200 text-orange-600"
+                                                                : "bg-emerald-50 border-emerald-200 text-emerald-600"
+                                                            : q.is_marked
+                                                                ? "bg-orange-50 border-orange-200 text-orange-600"
+                                                                : "bg-white border-slate-100 text-slate-400 hover:border-indigo-400 hover:text-indigo-600"
+                                            )}
+                                        >
+                                            {actualIndex + 1}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    );
+                })}
+            </div>
+        ) : (
+            <div className="grid grid-cols-5 gap-2">
+              {(isMockExam && currentSection
+                ? questions.slice(currentSection.startIndex, currentSection.endIndex + 1)
+                : questions
+              ).map((q, i) => {
+                const actualIndex = isMockExam && currentSection ? currentSection.startIndex + i : i;
+                const isImat = test?.exam_type === 'imat-prep';
+                const isLocked = !isImat && isMockExam && sections.length > 0 && (
+                  sections.findIndex(s => actualIndex >= s.startIndex && actualIndex <= s.endIndex) !== currentSectionIndex
+                );
+
+                return (
+                  <button
+                    key={q.id}
+                    onClick={() => !isLocked && handleNavigate(actualIndex)}
+                    disabled={isLocked}
+                    className={cn(
+                      "aspect-square rounded-xl text-[10px] font-black border-2 transition-all active:scale-95",
+                      isLocked
+                        ? "bg-slate-50 border-transparent text-slate-100 cursor-not-allowed"
+                        : actualIndex === currentIndex
+                          ? "bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-200"
+                          : q.user_answer !== null
+                            ? q.is_marked
+                              ? "bg-orange-50 border-orange-200 text-orange-600"
+                              : "bg-emerald-50 border-emerald-200 text-emerald-600"
+                            : q.is_marked
+                              ? "bg-orange-50 border-orange-200 text-orange-600"
+                              : "bg-white border-slate-100 text-slate-400 hover:border-indigo-400 hover:text-indigo-600"
+                    )}
+                  >
+                    {actualIndex + 1}
+                  </button>
+                );
+              })}
+            </div>
+        )}
 
         <div className="pt-6 border-t border-slate-100">
              <Button
@@ -1505,15 +1527,18 @@ export default function TestPage() {
 
           <div className="flex items-center gap-3 lg:gap-8">
             {/* Timer Block */}
-            <div className="flex items-center gap-3 px-3 lg:px-4 py-1.5 bg-slate-50 dark:bg-slate-900/50 rounded-xl border border-slate-100 dark:border-border">
-              <Clock className={cn("w-4 h-4", (isMockExam ? sectionTimeRemaining : timeRemaining) < 300 ? "text-destructive animate-pulse" : "text-indigo-600")} />
-              <div className="flex flex-col">
-                <span className="text-[8px] font-black text-slate-400 uppercase leading-none mb-0.5">Time Left</span>
-                <span className={cn("font-mono text-xs lg:text-base font-black tabular-nums leading-none", (isMockExam && test.section_timing_mode !== 'total' && test.exam_type !== 'imat-prep' ? sectionTimeRemaining : timeRemaining) < 300 ? "text-destructive" : "text-slate-900 dark:text-white")}>
-                  {formatTime((isMockExam && test.section_timing_mode !== 'total' && test.exam_type !== 'imat-prep') ? sectionTimeRemaining : timeRemaining)}
-                </span>
-              </div>
-            </div>
+            {!showProctoringSetup && !isDisqualified && !isLocked && (
+              <IsolatedTimer 
+                targetTimeRef={(isMockExam && test.section_timing_mode !== 'total' && test.exam_type !== 'imat-prep') ? targetSectionTimeRef : targetTotalTimeRef} 
+                onTimeUp={() => {
+                  if (isMockExam && test.section_timing_mode !== 'total' && test.exam_type !== 'imat-prep') {
+                    handleCompleteSection(true);
+                  } else {
+                    handleAutoSubmit();
+                  }
+                }} 
+              />
+            )}
 
             <div className="hidden sm:flex items-center gap-4">
               <Button

@@ -11,8 +11,31 @@ export interface SitePageConfigs {
 }
 
 export const usePageVisibility = () => {
-    const [configs, setConfigs] = useState<SitePageConfigs>({});
-    const [loading, setLoading] = useState(true);
+    const CACHE_KEY = 'italostudy_page_configs_v1';
+    const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+    // Read from localStorage synchronously — same stale-while-revalidate pattern
+    // used for auth profile. This means loading starts as false if cache exists,
+    // so ProtectedRoute never triggers an extra re-render when the DB responds.
+    const readCache = (): SitePageConfigs | null => {
+        try {
+            const raw = localStorage.getItem(CACHE_KEY);
+            if (!raw) return null;
+            const { data, ts } = JSON.parse(raw);
+            return (Date.now() - ts < CACHE_TTL) ? data : null;
+        } catch { return null; }
+    };
+
+    const writeCache = (data: SitePageConfigs) => {
+        try {
+            localStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() }));
+        } catch { /* silent */ }
+    };
+
+    const cachedConfigs = readCache();
+    const [configs, setConfigs] = useState<SitePageConfigs>(cachedConfigs || {});
+    // If we have a valid cache, start with loading=false (instant unlock)
+    const [loading, setLoading] = useState(!cachedConfigs);
 
     const fetchConfigs = async () => {
         try {
@@ -39,6 +62,7 @@ export const usePageVisibility = () => {
             }
 
             setConfigs(finalConfigs);
+            writeCache(finalConfigs); // Persist for instant hydration on next mount
         } catch (err) {
             console.error('Error fetching page configs:', err);
         } finally {

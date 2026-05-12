@@ -413,7 +413,10 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children, isLoading, hideHe
           <NavButton to="/mobile/mock-exams" icon={<Target />} isGlobal={isGlobal} />
           
           {/* Center Home Button - Elevated */}
-          <div className="relative -top-3">
+          {/* pointer-events-auto: the -top-3 offset lifts this button above the nav's */}
+          {/* natural boundary into the outer pointer-events-none zone. Without this fix, */}
+          {/* the top half of the button swallows taps silently, requiring 2 presses.   */}
+          <div className="relative -top-3 pointer-events-auto">
              <NavLink
                to="/mobile/dashboard"
                className={cn(

@@ -196,57 +196,34 @@ export default function InternationalMockWaitingRoom() {
 
                 const inProgressTest = tests?.find((t: any) => t.status === 'in_progress');
                 if (inProgressTest) {
-                    // Check local blacklist: if the client previously terminated this test but RLS
-                    // blocked the database update, we MUST NOT resume it.
-                    let isBlacklisted = false;
-                    try {
-                        const blackList = JSON.parse(localStorage.getItem('terminated_tests') || '[]');
-                        if (blackList.includes(inProgressTest.id)) {
-                            isBlacklisted = true;
-                        }
-                    } catch(e) {}
-
-                    // Validate this test actually has questions before resuming.
-                    // A reload-terminated test may have been deleted and a ghost record left behind,
-                    // or the question insert may have failed silently.
-                    const { count: questionCount } = await (supabase as any)
-                        .from('questions')
-                        .select('id', { count: 'exact', head: true })
-                        .eq('test_id', inProgressTest.id);
-
-                    if (!isBlacklisted && (questionCount || 0) > 0) {
-                        // Safe to resume — questions exist and test is not blacklisted
-                        navigate(`/test/${inProgressTest.id}`);
-                        setIsStarting(false);
-                        return;
-                    } else {
-                        // Ghost test — mark it abandoned so the attempt counter doesn't count it,
-                        // and set disqualified so it doesn't appear in History.
-                        // then fall through to create a fresh new test
-                        await (supabase as any)
-                            .from('tests')
-                            .update({ 
-                                status: 'abandoned',
-                                proctoring_status: 'disqualified' 
-                            })
-                            .eq('id', inProgressTest.id);
-                        toast({
-                            title: "Previous Session Recovered",
-                            description: "Your previous session was incomplete. Starting a fresh test now.",
-                        });
-                    }
+                    // LIVE MOCK: No resuming allowed! 
+                    // Automatically mark it as abandoned/disqualified and force a new attempt.
+                    await (supabase as any)
+                        .from('tests')
+                        .update({ 
+                            status: 'abandoned',
+                            proctoring_status: 'disqualified' 
+                        })
+                        .eq('id', inProgressTest.id);
+                    
+                    toast({
+                        title: "Attempt Forfeited",
+                        description: "You left the live session. Your previous attempt was forfeited.",
+                    });
+                    
+                    inProgressTest.status = 'abandoned';
                 }
 
-                // Count completed (non-abandoned, non-in_progress) tests for limit check
+                // Count ALL tests that are not in_progress (including abandoned ones)
                 const completedCount = tests?.filter((t: any) =>
-                    t.status !== 'in_progress' && t.status !== 'abandoned'
+                    t.status !== 'in_progress'
                 ).length || 0;
                 const limit = session.max_attempts || session.attempts_per_person || 1;
 
                 if (completedCount >= limit) {
                     toast({
                         title: "Attempt Limit Reached",
-                        description: `This session has an attempt limit of ${limit}.`,
+                        description: `Live mock limit reached. Now you can attempt this mock once the mock is not in live.`,
                         variant: "default"
                     });
                     setIsStarting(false);

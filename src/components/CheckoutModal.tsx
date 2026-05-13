@@ -911,52 +911,50 @@ export default function CheckoutModal({
                                     </div>
 
                                     {/* Payment Methods */}
-                                    <div className="space-y-6 pt-2">
-                                        {/* ── INDIA: Razorpay + Cashfree only ── */}
-                                        {targetCurrency === 'INR' && (
+                                    <div className="space-y-3 pt-2">
+
+                                        {/* ── INDIA: Razorpay + PayPal ── */}
+                                        {targetCurrency === 'INR' && gateways.razorpay?.enabled && (
                                             <div className="space-y-2">
                                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
                                                     <CreditCard className="w-3 h-3" /> Pay with Card, UPI or Wallet
                                                 </label>
-                                                <div className="grid grid-cols-1 gap-2">
-                                                    {gateways.razorpay?.enabled && (
-                                                        <button onClick={handleRazorpay} disabled={isProcessing} className="flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-[#3395FF] hover:bg-slate-50 dark:hover:bg-slate-800 transition-all group disabled:opacity-50">
-                                                            <span className="font-bold text-slate-700 dark:text-slate-200 group-hover:text-[#3395FF] flex items-center gap-3">
-                                                                <div className="w-8 h-5 rounded bg-[#3395FF] text-white flex items-center justify-center">
-                                                                    <CreditCard className="w-3.5 h-3.5" />
-                                                                </div>
-                                                                Card / UPI / Wallet / NetBanking
-                                                            </span>
-                                                            <span className="text-[9px] font-black text-[#3395FF]/70 uppercase tracking-wider">Razorpay</span>
-                                                        </button>
-                                                    )}
-                                                </div>
+                                                <button onClick={handleRazorpay} disabled={isProcessing} className="w-full flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-[#3395FF] hover:bg-slate-50 dark:hover:bg-slate-800 transition-all group disabled:opacity-50">
+                                                    <span className="font-bold text-slate-700 dark:text-slate-200 group-hover:text-[#3395FF] flex items-center gap-3">
+                                                        <div className="w-8 h-5 rounded bg-[#3395FF] text-white flex items-center justify-center">
+                                                            <CreditCard className="w-3.5 h-3.5" />
+                                                        </div>
+                                                        Card / UPI / Wallet / NetBanking
+                                                    </span>
+                                                    <span className="text-[9px] font-black text-[#3395FF]/70 uppercase tracking-wider">Razorpay 🇮🇳</span>
+                                                </button>
                                             </div>
                                         )}
 
-                                        {/* ── GLOBAL: Dodo + PayPal only ── */}
-                                        {targetCurrency !== 'INR' && (gateways.dodo?.enabled || gateways.paypal?.enabled) && (
+                                        {/* ── GLOBAL: Dodo (non-India only) ── */}
+                                        {targetCurrency !== 'INR' && gateways.dodo?.enabled && (
                                             <div className="space-y-2">
                                                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest flex items-center gap-2">
-                                                    <CreditCard className="w-3 h-3" /> Pay with Card, Google Pay or PayPal
+                                                    <CreditCard className="w-3 h-3" /> Pay with Card or Google Pay
                                                 </label>
-                                                <div className="grid grid-cols-1 gap-2">
-                                                    {gateways.dodo?.enabled && (
-                                                        <button onClick={handleDodoPayment} disabled={isProcessing} className="flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-teal-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all group disabled:opacity-50">
-                                                            <span className="font-bold text-slate-700 dark:text-slate-200 group-hover:text-teal-600 flex items-center gap-3">
-                                                                <div className="w-8 h-5 rounded bg-teal-500 text-white flex items-center justify-center text-[10px] font-bold">DO</div>
-                                                                Card / Google Pay / Stripe
-                                                            </span>
-                                                            <span className="text-[9px] font-black text-teal-600/70 uppercase tracking-wider">Secure Checkout</span>
-                                                        </button>
-                                                    )}
-                                                </div>
+                                                <button onClick={handleDodoPayment} disabled={isProcessing} className="w-full flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-teal-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all group disabled:opacity-50">
+                                                    <span className="font-bold text-slate-700 dark:text-slate-200 group-hover:text-teal-600 flex items-center gap-3">
+                                                        <div className="w-8 h-5 rounded bg-teal-500 text-white flex items-center justify-center text-[10px] font-bold">DO</div>
+                                                        Card / Google Pay / Apple Pay
+                                                    </span>
+                                                    <span className="text-[9px] font-black text-teal-600/70 uppercase tracking-wider">Secure Checkout</span>
+                                                </button>
                                             </div>
                                         )}
 
-                                        {/* PayPal — Global only */}
-                                        {gateways.paypal?.enabled && targetCurrency !== 'INR' && (
+                                        {/* ── PayPal — ALL regions (pays in EUR for India) ── */}
+                                        {gateways.paypal?.enabled && (
                                             <div className="space-y-2">
+                                                {targetCurrency === 'INR' && (
+                                                    <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest text-center">
+                                                        PayPal charges in EUR (~equivalent amount)
+                                                    </p>
+                                                )}
                                                 <button onClick={handlePayPal} disabled={isProcessing} className="w-full flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-[#003087] hover:bg-slate-50 dark:hover:bg-slate-800 transition-all group disabled:opacity-50">
                                                     <span className="font-bold text-slate-700 dark:text-slate-200 group-hover:text-[#003087] flex items-center gap-3">
                                                         <div className="w-8 h-5 rounded bg-[#003087] text-white flex items-center justify-center text-[10px] font-black italic">PP</div>
@@ -968,18 +966,6 @@ export default function CheckoutModal({
                                             </div>
                                         )}
 
-                                        {/* Cashfree — India only, shown alongside Razorpay */}
-                                        {gateways.cashfree?.enabled && targetCurrency === 'INR' && (
-                                            <div className="space-y-2">
-                                                <button onClick={handleCashfree} disabled={isProcessing} className="flex items-center justify-between p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-indigo-500 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all group disabled:opacity-50">
-                                                    <span className="font-bold text-slate-700 dark:text-slate-200 group-hover:text-indigo-600 flex items-center gap-3">
-                                                        <div className="w-8 h-5 rounded bg-[#111111] text-white flex items-center justify-center text-[8px] font-black">CF</div>
-                                                        UPI / Cards / Wallets
-                                                    </span>
-                                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-wider">🇮🇳 Cashfree</span>
-                                                </button>
-                                            </div>
-                                        )}
                                     </div>
                                 </div>
 

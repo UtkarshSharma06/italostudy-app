@@ -1,6 +1,6 @@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, VisuallyHidden } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Zap, MessageCircle, Globe, Sparkles, ArrowRight, ShieldCheck, CheckCircle2, Heart, Star } from "lucide-react";
+import { Zap, MessageCircle, Globe, Sparkles, ArrowRight, ShieldCheck, RefreshCw, Star } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useEffect, useState } from "react";
 import { useAuth } from "@/lib/auth";
@@ -38,12 +38,6 @@ export function SeatTrackerModal({ isOpen, onClose, isGlobal }: SeatTrackerModal
                 .order("test_date", { ascending: true });
 
             if (error) throw error;
-
-            // If No slots found locally, offer to seed from the latest crawl data
-            if (!data || data.length === 0) {
-                console.log("No slots found in DB. You can use the seed button to populate current known seats.");
-            }
-
             setAvailableSlots(data || []);
         } catch (error) {
             console.error("Fetch Slots Error:", error);
@@ -52,43 +46,17 @@ export function SeatTrackerModal({ isOpen, onClose, isGlobal }: SeatTrackerModal
         }
     };
 
-    const seedCurrentSeats = async () => {
+    // Trigger the real CISIA scraper edge function, then refresh local data
+    const refreshSlots = async () => {
         setIsLoadingSlots(true);
         try {
-            const seats = [
-                { test_date: '2026-02-19', location: 'CENT@UNI', university: "Universita' degli studi di Padova", region: 'VENETO', city: 'PADOVA', registration_deadline: '2026-02-13', seats_available: true, seats_status: 'POSTI DISPONIBILI', seats_count: '81' },
-                { test_date: '2026-02-19', location: 'CENT@UNI', university: "Universita' di Bologna - Ravenna", region: 'EMILIA-ROMAGNA', city: 'RAVENNA', registration_deadline: '2026-02-13', seats_available: true, seats_status: 'POSTI DISPONIBILI', seats_count: '35' },
-                { test_date: '2026-02-26', location: 'CENT@UNI', university: "Universita' di Bologna - Rimini", region: 'EMILIA-ROMAGNA', city: 'RIMINI', registration_deadline: '2026-02-20', seats_available: true, seats_status: 'POSTI DISPONIBILI', seats_count: '7' },
-                { test_date: '2026-02-26', location: 'CENT@UNI', university: "Universita' di Bologna - Ravenna", region: 'EMILIA-ROMAGNA', city: 'RAVENNA', registration_deadline: '2026-02-20', seats_available: true, seats_status: 'POSTI DISPONIBILI', seats_count: '11' }
-            ];
-
-            const { error } = await supabase
-                .from('cent_exam_slots')
-                .upsert(seats, { onConflict: 'test_date, location, university' });
-
-            if (error) {
-                console.warn("Database sync failed, showing local data only:", error);
-                toast({
-                    title: "Local Radar Active",
-                    description: "Updated your view with current slots.",
-                });
-            } else {
-                toast({
-                    title: "Radar Synced",
-                    description: "Latest available seats have been loaded.",
-                });
-            }
-
-            // ALWAYS show the data in the UI regardless of DB success
-            setAvailableSlots(seats);
-        } catch (error) {
-            console.error("Critical Seed Error:", error);
-            // Fallback to minimal data if something really breaks
-            setAvailableSlots([
-                { id: '1', test_date: '2026-02-19', location: 'CENT@UNI', university: "Universita' degli studi di Padova", city: 'PADOVA', seats_available: true },
-                { id: '2', test_date: '2026-02-19', location: 'CENT@UNI', university: "Universita' di Bologna - Ravenna", city: 'RAVENNA', seats_available: true }
-            ]);
-        } finally {
+            const { error } = await supabase.functions.invoke("scrape-cent-slots", { body: {} });
+            if (error) throw error;
+            toast({ title: "Radar Synced", description: "Live seat data refreshed from CISIA." });
+            await fetchAvailableSlots();
+        } catch (err) {
+            console.error("Refresh error:", err);
+            toast({ title: "Refresh failed", description: "Could not reach CISIA right now. Try again later.", variant: "destructive" });
             setIsLoadingSlots(false);
         }
     };
@@ -186,15 +154,14 @@ export function SeatTrackerModal({ isOpen, onClose, isGlobal }: SeatTrackerModal
                                 <Globe className="w-3 h-3" />
                                 Live Available Seats
                                 <div className="ml-auto flex items-center gap-2">
-                                    {availableSlots.length === 0 && !isLoadingSlots && (
-                                        <button
-                                            onClick={seedCurrentSeats}
-                                            className="text-[8px] font-black text-indigo-500 hover:text-indigo-600 underline flex items-center gap-1"
-                                        >
-                                            <Sparkles className="w-2 h-2" />
-                                            SYNC LATEST
-                                        </button>
-                                    )}
+                                    <button
+                                        onClick={refreshSlots}
+                                        disabled={isLoadingSlots}
+                                        className="text-[8px] font-black text-indigo-500 hover:text-indigo-600 underline flex items-center gap-1 disabled:opacity-40"
+                                    >
+                                        <RefreshCw className={`w-2 h-2 ${isLoadingSlots ? 'animate-spin' : ''}`} />
+                                        REFRESH
+                                    </button>
                                 </div>
                             </h3>
 

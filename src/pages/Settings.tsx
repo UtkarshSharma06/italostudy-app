@@ -270,34 +270,40 @@ export default function Settings() {
 
     const handleCancelSubscription = async () => {
         if (!user) return;
-        if (!confirm('Are you sure you want to cancel your subscription? You will be downgraded to the free Explorer plan immediately.')) return;
+        if (!confirm(
+            'Are you sure you want to cancel your subscription?\n\n' +
+            '• Your access will end immediately.\n' +
+            '• No future payments will be charged.\n\n' +
+            'This action cannot be undone.'
+        )) return;
+
         setLoading(true);
         try {
-            const { error } = await supabase
-                .from('profiles')
-                .update({
-                    selected_plan: 'explorer',
-                    subscription_tier: 'initiate',
-                    subscription_expiry_date: null,
-                })
-                .eq('id', user.id);
+            // ⚠️ IMPORTANT: Call the edge function which cancels at Dodo FIRST
+            // then updates our DB. Direct DB update is NOT enough — Dodo would
+            // still charge and reactivate the subscription on next billing date.
+            const { data, error } = await supabase.functions.invoke('cancel-dodo-subscription', {});
 
-            if (error) throw error;
+            if (error) throw new Error(error.message || 'Cancellation failed');
 
-            // Send Telegram/push notification
-            await supabase.functions.invoke('send-push', {
-                body: {
-                    title: "Subscription Cancelled 😢",
-                    body: "Your subscription has been cancelled. You have been switched to the Explorer plan. You can re-subscribe anytime from Pricing.",
-                    data: { target_user_id: user.id }
-                }
+            if (!data?.success) {
+                throw new Error(data?.error || 'Cancellation was not confirmed by the payment provider.');
+            }
+
+            toast({
+                title: "✅ Subscription Cancelled",
+                description: "No future payments will be charged. You are now on the Explorer plan.",
             });
-
-            toast({ title: "Subscription Cancelled", description: "You have been switched to the Explorer plan." });
             refreshProfile();
             setIsMembershipDialogOpen(false);
         } catch (error: any) {
-            toast({ title: "Cancellation Failed", description: error.message, variant: "destructive" });
+            toast({
+                title: "Cancellation Failed",
+                description: error.message.includes('support')
+                    ? error.message
+                    : `${error.message} — Contact support@italostudy.com if you need help.`,
+                variant: "destructive"
+            });
         } finally {
             setLoading(false);
         }
@@ -885,8 +891,6 @@ export default function Settings() {
                         </button>
                     </div>
 
-                    </div>
-
                     {/* Cancel Subscription — only for paid users */}
                     {profile?.selected_plan && profile.selected_plan !== 'explorer' && (
                         <div className="pt-2 border-t border-slate-100 dark:border-white/5">
@@ -909,11 +913,12 @@ export default function Settings() {
                             onClick={() => setIsMembershipDialogOpen(false)}
                             className="w-full text-[10px] font-black uppercase tracking-widest text-slate-400"
                         >
-                            Cancel
+                            Close
                         </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
 
             {/* Cropper Integration */}
             {isCropperOpen && selectedImage && (

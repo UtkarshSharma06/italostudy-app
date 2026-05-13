@@ -319,37 +319,38 @@ export default function MobileSettings() {
 
     const handleCancelSubscription = async () => {
         if (!user) return;
-        if (!confirm('Cancel your subscription? You will be moved to the free Explorer plan immediately.')) return;
+        if (!confirm(
+            'Cancel your subscription?\n\n' +
+            '• Your access ends immediately.\n' +
+            '• No future payments will be charged.'
+        )) return;
         setLoading(true);
         try {
-            const { error } = await supabase
-                .from('profiles')
-                .update({
-                    selected_plan: 'explorer',
-                    subscription_tier: 'initiate',
-                    subscription_expiry_date: null,
-                })
-                .eq('id', user.id);
+            // ⚠️ Must call edge function to cancel at Dodo first
+            const { data, error } = await supabase.functions.invoke('cancel-dodo-subscription', {});
 
-            if (error) throw error;
+            if (error) throw new Error(error.message || 'Cancellation failed');
+            if (!data?.success) throw new Error(data?.error || 'Cancellation not confirmed by payment provider.');
 
-            await supabase.functions.invoke('send-push', {
-                body: {
-                    title: "Subscription Cancelled 😢",
-                    body: "Your subscription has been cancelled. You are now on the Explorer plan. Re-subscribe anytime from Pricing.",
-                    data: { target_user_id: user.id }
-                }
+            toast({
+                title: "✅ Subscription Cancelled",
+                description: "No future payments will be charged. You are now on the Explorer plan.",
             });
-
-            toast({ title: "Subscription Cancelled", description: "Switched to Explorer plan." });
             refreshProfile();
             setIsMembershipDialogOpen(false);
         } catch (error: any) {
-            toast({ title: "Cancellation Failed", description: error.message, variant: "destructive" });
+            toast({
+                title: "Cancellation Failed",
+                description: error.message.includes('support')
+                    ? error.message
+                    : `${error.message} — Contact support@italostudy.com for help.`,
+                variant: "destructive"
+            });
         } finally {
             setLoading(false);
         }
     };
+
 
     const handleInvite = async () => {
         setIsSharing(true);

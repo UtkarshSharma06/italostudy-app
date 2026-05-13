@@ -268,6 +268,41 @@ export default function Settings() {
         }
     };
 
+    const handleCancelSubscription = async () => {
+        if (!user) return;
+        if (!confirm('Are you sure you want to cancel your subscription? You will be downgraded to the free Explorer plan immediately.')) return;
+        setLoading(true);
+        try {
+            const { error } = await supabase
+                .from('profiles')
+                .update({
+                    selected_plan: 'explorer',
+                    subscription_tier: 'initiate',
+                    subscription_expiry_date: null,
+                })
+                .eq('id', user.id);
+
+            if (error) throw error;
+
+            // Send Telegram/push notification
+            await supabase.functions.invoke('send-push', {
+                body: {
+                    title: "Subscription Cancelled 😢",
+                    body: "Your subscription has been cancelled. You have been switched to the Explorer plan. You can re-subscribe anytime from Pricing.",
+                    data: { target_user_id: user.id }
+                }
+            });
+
+            toast({ title: "Subscription Cancelled", description: "You have been switched to the Explorer plan." });
+            refreshProfile();
+            setIsMembershipDialogOpen(false);
+        } catch (error: any) {
+            toast({ title: "Cancellation Failed", description: error.message, variant: "destructive" });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const fetchMFAFactors = async () => {
         const { data, error } = await mfa.listFactors();
         if (error) {
@@ -849,6 +884,24 @@ export default function Settings() {
                             </div>
                         </button>
                     </div>
+
+                    </div>
+
+                    {/* Cancel Subscription — only for paid users */}
+                    {profile?.selected_plan && profile.selected_plan !== 'explorer' && (
+                        <div className="pt-2 border-t border-slate-100 dark:border-white/5">
+                            <button
+                                onClick={() => {
+                                    setIsMembershipDialogOpen(false);
+                                    handleCancelSubscription();
+                                }}
+                                disabled={loading}
+                                className="w-full py-3 text-rose-500 text-[10px] font-black uppercase tracking-widest hover:bg-rose-50 dark:hover:bg-rose-900/10 rounded-xl transition-colors"
+                            >
+                                Cancel Subscription
+                            </button>
+                        </div>
+                    )}
 
                     <DialogFooter>
                         <Button

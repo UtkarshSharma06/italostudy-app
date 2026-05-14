@@ -35,6 +35,7 @@ export default function MobileSpeakingSession() {
     const [isVideoOff, setIsVideoOff] = useState(false);
     const peerConnection = useRef<RTCPeerConnection | null>(null);
     const localStream = useRef<MediaStream | null>(null);
+    const signalingChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
 
     // Scoring State
     const [scores, setScores] = useState({ fluency: 6.0, vocab: 6.0, grammar: 6.0, pron: 6.0 });
@@ -111,10 +112,13 @@ export default function MobileSpeakingSession() {
                     sendSignal('offer', offer);
                 }
             });
+        signalingChannelRef.current = supabase.channel(`speaking_${sessionId}`);
     };
 
     const sendSignal = async (type: string, data: any) => {
-        await supabase.channel(`speaking_${sessionId}`).send({
+        const ch = signalingChannelRef.current;
+        if (!ch) return;
+        await ch.send({
             type: 'broadcast',
             event: 'signal',
             payload: { type, data }
@@ -124,7 +128,10 @@ export default function MobileSpeakingSession() {
     const cleanupSession = () => {
         localStream.current?.getTracks().forEach(track => track.stop());
         peerConnection.current?.close();
-        supabase.removeAllChannels();
+        if (signalingChannelRef.current) {
+            supabase.removeChannel(signalingChannelRef.current);
+            signalingChannelRef.current = null;
+        }
     };
 
     const handleSwapRoles = () => {

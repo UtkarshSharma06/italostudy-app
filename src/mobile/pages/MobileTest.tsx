@@ -81,7 +81,7 @@ export default function MobileTest() {
     const { user } = useAuth();
     const navigate = useNavigate();
     const { toast } = useToast();
-    const { activeExam } = useExam();
+    const { activeExam, allExams } = useExam();
 
     const [test, setTest] = useState<any>(null);
     const [questions, setQuestions] = useState<Question[]>([]);
@@ -216,7 +216,7 @@ export default function MobileTest() {
                                 return q;
                             }));
                         }
-                    });
+                    }).catch(err => console.error('[MobileTest] Background passage fetch failed:', err));
                 }
 
                 const missingMediaIds = processedQuestions
@@ -243,7 +243,7 @@ export default function MobileTest() {
                                 return q;
                             }));
                         }
-                    });
+                    }).catch(err => console.error('[MobileTest] Background media fetch failed:', err));
                 }
                 setIsLoading(false); // FINISH LOADING
             } else if (testData.total_questions > 0) {
@@ -468,15 +468,45 @@ export default function MobileTest() {
             title: 'Submitting Results...',
             description: 'Please wait while we calculate your score.',
         });
-        let correct = 0;
-        questions.forEach(q => { if (q.user_answer === q.correct_index) correct++; });
 
-        const scorePercentage = Math.round((correct / questions.length) * 100);
+        // ── Exam-aware scoring (CENT-S: +1/-0.25, IMAT: +1.5/-0.4) ──────────────
+        // Resolve using the test's exam_type from the DB, not the user's currently selected exam.
+        // This ensures CENT-S and IMAT never share the same scoring formula even if the user
+        // switches exam between starting a test and finishing it.
+        const examConfig = (test?.exam_type && allExams[test.exam_type]) || activeExam;
+        const scoring = examConfig?.scoring ?? { correct: 1, incorrect: -0.25, skipped: 0 };
+
+        let correct = 0;
+        let wrong = 0;
+        let skipped = 0;
+        let finalScore = 0;
+
+        questions.forEach(q => {
+            if (q.user_answer === null || q.user_answer === undefined) {
+                skipped++;
+                finalScore += scoring.skipped;
+            } else if (q.user_answer === q.correct_index) {
+                correct++;
+                finalScore += scoring.correct;
+            } else {
+                wrong++;
+                finalScore += scoring.incorrect;
+            }
+        });
+
+        const maxPossibleScore = questions.length * scoring.correct;
+        const scorePercentage = maxPossibleScore > 0 ? Math.max(0, Math.round((finalScore / maxPossibleScore) * 100)) : 0;
+        const preciseScore = Number(finalScore.toFixed(2));
+        const penaltyScore = Number((wrong * Math.abs(scoring.incorrect)).toFixed(2));
 
         await supabase.from('tests').update({
             status: 'completed',
             score: scorePercentage,
             correct_answers: correct,
+            wrong_answers: wrong,
+            skipped_answers: skipped,
+            precise_score: preciseScore,
+            penalty_score: penaltyScore,
             completed_at: new Date().toISOString(),
         }).eq('id', testId);
 
@@ -582,7 +612,30 @@ export default function MobileTest() {
         <div className="flex flex-col h-screen bg-background text-foreground overflow-hidden">
             {/* Top Header - Focused */}
             <header className="p-4 flex items-center justify-between border-b border-border/50 bg-background/80 backdrop-blur-xl">
-                <Button variant="ghost" size="icon" onClick={() => navigate(-1)} className="rounded-full">
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    className="rounded-full"
+                    onClick={async () => {
+                        // Guard: ask before abandoning an active test
+                        if (test && test.status === 'in_progress') {
+                            const result = await ActionSheet.showActions({
+                                title: 'Leave Test?',
+                                message: 'Your progress is saved. You can resume this test later.',
+                                options: [
+                                    { title: 'Leave Test', style: 1 as any /* DESTRUCTIVE */ },
+                                    { title: 'Stay', style: 0 as any /* DEFAULT */ },
+                                ],
+                            });
+                            if (result.index === 0) {
+                                await saveProgress();
+                                navigate('/mobile/dashboard');
+                            }
+                        } else {
+                            navigate(-1);
+                        }
+                    }}
+                >
                     <ChevronLeft className="w-6 h-6" />
                 </Button>
                 <SimpleMobileTimer 

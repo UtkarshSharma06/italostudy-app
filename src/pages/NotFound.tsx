@@ -641,7 +641,7 @@ export default function NotFound() {
 
       <div className="fixed bottom-12 flex items-center justify-center animate-in fade-in slide-in-from-bottom-8 duration-700">
         <Button
-          onClick={() => window.location.href = '/'}
+          onClick={() => navigate('/')}
           className="h-12 px-8 rounded-full bg-slate-900 text-white font-bold uppercase tracking-widest hover:bg-slate-800 transition-all shadow-lg hover:shadow-xl hover:-translate-y-1"
         >
           <Home className="w-4 h-4 mr-2" />

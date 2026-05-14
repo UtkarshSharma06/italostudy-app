@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useParams } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
@@ -30,6 +30,7 @@ export default function WritingTest({
     const submissionId = paramSubmissionId;
     const { user } = useAuth();
     const { toast } = useToast();
+    const navigate = useNavigate();
 
     const [task, setTask] = useState<any>(null);
     const [content, setContent] = useState('');
@@ -305,7 +306,7 @@ export default function WritingTest({
 
                             <div className="pt-4 w-full">
                                 <Button
-                                    onClick={() => window.location.href = '/writing/history'}
+                                    onClick={() => navigate('/writing/history')}
                                     className="w-full bg-slate-900 hover:bg-slate-800 text-white font-black h-14 rounded-2xl shadow-xl transition-all hover:scale-[1.02]"
                                 >
                                     Return to My Writing History

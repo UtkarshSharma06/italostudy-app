@@ -413,14 +413,13 @@ export default function ChatInterface({ communityId }: ChatInterfaceProps) {
             })
             .subscribe();
 
-        const pollInterval = setInterval(fetchNewMessages, 30000);
-
+        // Note: Realtime subscription above handles all message delivery.
+        // No polling needed — postgres_changes fires on every INSERT/UPDATE/DELETE.
         return () => {
-            pinnedChannel.unsubscribe();
-            channel.unsubscribe();
-            communityChannel.unsubscribe();
-            reactionChannel.unsubscribe();
-            clearInterval(pollInterval);
+            supabase.removeChannel(pinnedChannel);
+            supabase.removeChannel(channel);
+            supabase.removeChannel(communityChannel);
+            supabase.removeChannel(reactionChannel);
         };
     }, [communityId, user?.id]);
 

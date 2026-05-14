@@ -374,7 +374,7 @@ export default function ConsultantApplicationDetail({ applicationId, hideSidebar
                     </nav>
 
                     <div className="p-8 mt-auto">
-                        <Button variant="outline" className="w-full justify-start text-slate-500" onClick={() => window.location.href = '/consultant/dashboard'}>
+                        <Button variant="outline" className="w-full justify-start text-slate-500" onClick={() => navigate('/consultant/dashboard')}>
                             &larr; Back to Dashboard
                         </Button>
                     </div>

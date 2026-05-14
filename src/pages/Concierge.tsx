@@ -212,7 +212,7 @@ export default function Concierge() {
                 .insert({ user_id: user.id, status: 'draft', progress_percentage: 0 })
                 .select().single();
 
-            if (data) window.location.href = `/apply-university/apply/${data.id}`;
+            if (data) navigate(`/apply-university/apply/${data.id}`);
         } catch (err) {
             console.error('Init error:', err);
         } finally {

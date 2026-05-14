@@ -736,42 +736,55 @@ export default function Dashboard() {
     const fetchTopStudents = async () => {
         try {
             if (!activeExam?.id) return;
+
+            // ── Try weekly first (last 7 days) ──────────────────────────────────
             const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
-            const { data: championsData, error } = await supabase
+            const { data: weeklyData, error: weeklyError } = await supabase
                 .rpc('get_champions_by_questions_solved', { target_exam_id: activeExam.id, since_date: weekAgo });
 
-            if (error) {
-                console.error("Error fetching champions:", error);
-                return;
+            if (weeklyError) console.error('Weekly champions error:', weeklyError);
+
+            const weeklyResults = (weeklyData as any[]) || [];
+
+            // ── If no one practiced this week, fall back to all-time ──────────
+            let championsData = weeklyResults;
+            let isWeekly = true;
+
+            if (weeklyResults.length === 0) {
+                isWeekly = false;
+                const { data: allTimeData, error: allTimeError } = await supabase
+                    .rpc('get_champions_by_questions_solved', { target_exam_id: activeExam.id });
+                if (allTimeError) console.error('All-time champions error:', allTimeError);
+                championsData = (allTimeData as any[]) || [];
             }
 
-            console.log("Champions data received:", championsData);
+            setIsWeeklyData(isWeekly);
 
-            if (!championsData || (championsData as any[]).length === 0) {
-                console.log("No champions data available");
+            if (!championsData || championsData.length === 0) {
                 setTopStudents([]);
                 return;
             }
 
-            const studentsWithScores: TopStudent[] = (championsData as any[]).map((champion: any) => ({
+            const studentsWithScores: TopStudent[] = championsData.map((champion: any) => ({
                 id: champion.user_id,
                 display_name: champion.display_name || 'Student',
                 email: null,
                 avatar_url: champion.avatar_url,
-                total_score: champion.questions_solved, // Questions solved
-                tests_taken: champion.total_questions, // Total available questions
-                accuracy: champion.accuracy, // Real accuracy percentage
+                total_score: champion.questions_solved,
+                tests_taken: champion.total_questions,
+                accuracy: champion.accuracy,
             }));
 
-            setTopStudents(studentsWithScores.slice(0, 10)); // Increased to 10 for scrollable view
+            setTopStudents(studentsWithScores.slice(0, 10));
         } catch (err) {
-            console.error("Failed to load champions", err);
+            console.error('Failed to load champions', err);
         }
     };
 
     // --- Live Ranking Logic ---
     const [rankingView, setRankingView] = useState<'all-time' | 'live'>('all-time');
     const [liveRankings, setLiveRankings] = useState<TopStudent[]>([]);
+    const [isWeeklyData, setIsWeeklyData] = useState(true);
 
     const fetchLiveRankings = async () => {
         if (!activeExam?.id) return;
@@ -1541,8 +1554,8 @@ export default function Dashboard() {
                                             {rankingView === 'live' ? <Zap className="w-4 h-4 text-white" /> : <Trophy className="w-4 h-4 text-white" />}
                                         </div>
                                         <div>
-                                            <h3 className="text-sm font-black text-slate-900 dark:text-white">{rankingView === 'live' ? 'Mock Ranking' : 'Weekly Top'}</h3>
-                                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{rankingView === 'live' ? 'Mock Session' : "This Week's Best"}</p>
+                                            <h3 className="text-sm font-black text-slate-900 dark:text-white">{rankingView === 'live' ? 'Mock Ranking' : isWeeklyData ? 'Weekly Top' : 'Top Students'}</h3>
+                                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{rankingView === 'live' ? 'Mock Session' : isWeeklyData ? "This Week's Best" : 'All Time'}</p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -1553,7 +1566,7 @@ export default function Dashboard() {
                                             </div>
                                         )}
                                         <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-full border border-slate-200 dark:border-slate-700">
-                                            <button onClick={() => setRankingView('all-time')} className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-widest transition-all ${rankingView === 'all-time' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-400'}`}>This Week</button>
+                                            <button onClick={() => setRankingView('all-time')} className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-widest transition-all ${rankingView === 'all-time' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-400'}`}>{isWeeklyData ? 'This Week' : 'All Time'}</button>
                                             <button onClick={() => setRankingView('live')} className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-widest transition-all ${rankingView === 'live' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-400'}`}>Mock</button>
                                         </div>
                                     </div>

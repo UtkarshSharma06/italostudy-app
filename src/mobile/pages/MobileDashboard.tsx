@@ -237,6 +237,7 @@ const MobileDashboard: React.FC = () => {
     });
     const [rankingView, setRankingView] = useState<'all-time' | 'live'>('all-time');
     const [liveRankings, setLiveRankings] = useState<TopStudent[]>([]);
+    const [isWeeklyData, setIsWeeklyData] = useState(true);
     const [activeDates, setActiveDates] = useState<Set<string>>(new Set());
     const [latestBlogPost, setLatestBlogPost] = useState<any>(null);
     const [upcomingSession, setUpcomingSession] = useState<any>(null);
@@ -668,8 +669,21 @@ const MobileDashboard: React.FC = () => {
             setLastProgress(progressData);
             setPlatformTotalQuestions(totalPlatformRes.count || 0);
 
-            if (championsRes.data) {
-                const mappedChampions = championsRes.data.slice(0, 10).map((c: any) => ({
+            // ── Champions: weekly first, fallback to all-time if empty ──────────
+            let championsSource = championsRes.data || [];
+            let weeklyActive = true;
+
+            if (championsSource.length === 0) {
+                weeklyActive = false;
+                const { data: allTimeData } = await (supabase as any)
+                    .rpc('get_champions_by_questions_solved', { target_exam_id: activeExam.id });
+                championsSource = allTimeData || [];
+            }
+
+            setIsWeeklyData(weeklyActive);
+
+            if (championsSource.length > 0) {
+                const mappedChampions = championsSource.slice(0, 10).map((c: any) => ({
                     id: c.user_id,
                     display_name: c.display_name || 'Student',
                     avatar_url: c.avatar_url,
@@ -1145,7 +1159,7 @@ const MobileDashboard: React.FC = () => {
             <section className="mt-10 space-y-4">
                 <div className="px-6 flex items-center justify-between">
                     <h2 className="font-black text-xs uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
-                        <Trophy size={14} className="text-amber-500" /> Weekly Top
+                        <Trophy size={14} className="text-amber-500" /> {isWeeklyData ? 'Weekly Top' : 'Top Students'}
                     </h2>
 
                     {/* View Toggle */}
@@ -1157,7 +1171,7 @@ const MobileDashboard: React.FC = () => {
                                 : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
                                 }`}
                         >
-                            This Week
+                            {isWeeklyData ? 'This Week' : 'All Time'}
                         </button>
                         <button
                             onClick={() => setRankingView('live')}

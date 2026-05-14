@@ -656,7 +656,7 @@ const MobileDashboard: React.FC = () => {
             ] = await Promise.all([
                 getLastProgress(),
                 (supabase as any).from('practice_questions').select('*', { count: 'exact', head: true }).eq('exam_type', activeExam.id),
-                (supabase as any).rpc('get_champions_by_questions_solved', { target_exam_id: activeExam.id }),
+                (supabase as any).rpc('get_champions_by_questions_solved', { target_exam_id: activeExam.id, since_date: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString() }),
                 activeExam?.id === 'ielts-academic' ? Promise.all([
                     supabase.from('reading_submissions').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
                     supabase.from('listening_submissions').select('*', { count: 'exact', head: true }).eq('user_id', user.id),
@@ -1145,7 +1145,7 @@ const MobileDashboard: React.FC = () => {
             <section className="mt-10 space-y-4">
                 <div className="px-6 flex items-center justify-between">
                     <h2 className="font-black text-xs uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
-                        <Trophy size={14} className="text-amber-500" /> Top Performers
+                        <Trophy size={14} className="text-amber-500" /> Weekly Top
                     </h2>
 
                     {/* View Toggle */}
@@ -1157,7 +1157,7 @@ const MobileDashboard: React.FC = () => {
                                 : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
                                 }`}
                         >
-                            All Time
+                            This Week
                         </button>
                         <button
                             onClick={() => setRankingView('live')}
@@ -1243,7 +1243,8 @@ const MobileDashboard: React.FC = () => {
                             ) : (
                                 <>
                                     <Sparkles className="w-8 h-8 mx-auto text-primary/30 mb-2 animate-pulse" />
-                                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">Data still calculating...</p>
+                                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">No weekly champions yet</p>
+                                    <p className="text-[8px] font-bold text-muted-foreground/60 uppercase mt-1">Solve questions this week to appear here</p>
                                 </>
                             )}
                         </div>

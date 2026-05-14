@@ -617,19 +617,37 @@ export default function MobileTest() {
                     size="icon"
                     className="rounded-full"
                     onClick={async () => {
-                        // Guard: ask before abandoning an active test
                         if (test && test.status === 'in_progress') {
-                            const result = await ActionSheet.showActions({
-                                title: 'Leave Test?',
-                                message: 'Your progress is saved. You can resume this test later.',
-                                options: [
-                                    { title: 'Leave Test', style: 1 as any /* DESTRUCTIVE */ },
-                                    { title: 'Stay', style: 0 as any /* DEFAULT */ },
-                                ],
-                            });
-                            if (result.index === 0) {
-                                await saveProgress();
-                                navigate('/mobile/dashboard');
+                            const isLiveTest = test.is_ranked === true || (test.is_mock && test.session_id);
+
+                            if (isLiveTest) {
+                                // ── Live/Ranked test: no resume allowed ──────────────────
+                                // Matches desktop behaviour: leaving a live test submits it.
+                                const result = await ActionSheet.showActions({
+                                    title: 'Submit Live Test?',
+                                    message: 'This is a live ranked exam. Leaving will immediately submit your answers. You cannot resume.',
+                                    options: [
+                                        { title: 'Submit & Leave', style: 1 as any /* DESTRUCTIVE */ },
+                                        { title: 'Stay in Exam', style: 0 as any /* DEFAULT */ },
+                                    ],
+                                });
+                                if (result.index === 0) {
+                                    await submitTest('back_button');
+                                }
+                            } else {
+                                // ── Practice test: save progress, resume later ────────────
+                                const result = await ActionSheet.showActions({
+                                    title: 'Leave Test?',
+                                    message: 'Your progress will be saved. You can resume this test later from the dashboard.',
+                                    options: [
+                                        { title: 'Leave & Save', style: 1 as any /* DESTRUCTIVE */ },
+                                        { title: 'Stay', style: 0 as any /* DEFAULT */ },
+                                    ],
+                                });
+                                if (result.index === 0) {
+                                    await saveProgress();
+                                    navigate('/mobile/dashboard');
+                                }
                             }
                         } else {
                             navigate(-1);

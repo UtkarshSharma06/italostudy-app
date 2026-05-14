@@ -736,8 +736,9 @@ export default function Dashboard() {
     const fetchTopStudents = async () => {
         try {
             if (!activeExam?.id) return;
+            const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString();
             const { data: championsData, error } = await supabase
-                .rpc('get_champions_by_questions_solved', { target_exam_id: activeExam.id });
+                .rpc('get_champions_by_questions_solved', { target_exam_id: activeExam.id, since_date: weekAgo });
 
             if (error) {
                 console.error("Error fetching champions:", error);
@@ -1540,8 +1541,8 @@ export default function Dashboard() {
                                             {rankingView === 'live' ? <Zap className="w-4 h-4 text-white" /> : <Trophy className="w-4 h-4 text-white" />}
                                         </div>
                                         <div>
-                                            <h3 className="text-sm font-black text-slate-900 dark:text-white">{rankingView === 'live' ? 'Mock Ranking' : 'Top Students'}</h3>
-                                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{rankingView === 'live' ? 'Mock Session' : 'Champions League'}</p>
+                                            <h3 className="text-sm font-black text-slate-900 dark:text-white">{rankingView === 'live' ? 'Mock Ranking' : 'Weekly Top'}</h3>
+                                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-widest">{rankingView === 'live' ? 'Mock Session' : "This Week's Best"}</p>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
@@ -1552,7 +1553,7 @@ export default function Dashboard() {
                                             </div>
                                         )}
                                         <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-full border border-slate-200 dark:border-slate-700">
-                                            <button onClick={() => setRankingView('all-time')} className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-widest transition-all ${rankingView === 'all-time' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-400'}`}>All Time</button>
+                                            <button onClick={() => setRankingView('all-time')} className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-widest transition-all ${rankingView === 'all-time' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm' : 'text-slate-400'}`}>This Week</button>
                                             <button onClick={() => setRankingView('live')} className={`px-2.5 py-1 rounded-full text-[8px] font-black uppercase tracking-widest transition-all ${rankingView === 'live' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-400'}`}>Mock</button>
                                         </div>
                                     </div>
@@ -1567,8 +1568,8 @@ export default function Dashboard() {
                                             {topStudents.length === 0 && (
                                                 <div className="flex flex-col items-center justify-center text-center py-8 grayscale opacity-50">
                                                     <Trophy className="w-12 h-12 text-slate-200 dark:text-slate-800 mb-3" />
-                                                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">No Champions Yet</p>
-                                                    <p className="text-[10px] text-slate-400/80 mt-1">Solve practice questions to claim the throne!</p>
+                                                    <p className="text-xs font-black text-slate-400 uppercase tracking-widest">No Weekly Champions Yet</p>
+                                                    <p className="text-[10px] text-slate-400/80 mt-1">Solve practice questions this week to claim the throne!</p>
                                                 </div>
                                             )}
                                         </>

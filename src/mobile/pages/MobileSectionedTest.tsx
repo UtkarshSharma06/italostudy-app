@@ -491,10 +491,41 @@ export default function MobileSectionedTest() {
                     dynamicSections = examConfig.sections.map((s, idx) => ({
                         number: idx + 1,
                         name: s.name,
-                        questionCount: s.questionCount,
+                        questionCount: s.questionCount, // will be corrected below
                         durationMinutes: s.durationMinutes,
                         icon: s.icon || '📝'
                     }));
+
+                    // ── Override with ACTUAL question counts ──────────────────
+                    // The DB config (exams table) may have stale section.questionCount
+                    // values. Count real questions per section from the loaded data so
+                    // the mobile palette always matches what is actually in the test.
+                    if (finalQuestions.length > 0) {
+                        const actualCounts = new Array(dynamicSections.length).fill(0);
+                        finalQuestions.forEach((q: any) => {
+                            // section_number is 1-based; fall back to section_name match
+                            let secIdx = q.section_number != null ? q.section_number - 1 : -1;
+                            if (secIdx < 0 || secIdx >= dynamicSections.length) {
+                                // Try matching by name
+                                const nameIdx = dynamicSections.findIndex(
+                                    s => s.name.toLowerCase() === (q.section_name || '').toLowerCase()
+                                );
+                                secIdx = nameIdx;
+                            }
+                            if (secIdx >= 0 && secIdx < actualCounts.length) {
+                                actualCounts[secIdx]++;
+                            }
+                        });
+
+                        const totalCounted = actualCounts.reduce((a: number, b: number) => a + b, 0);
+                        if (totalCounted === finalQuestions.length && totalCounted > 0) {
+                            // All questions mapped — use real counts
+                            dynamicSections = dynamicSections.map((s, i) => ({
+                                ...s,
+                                questionCount: actualCounts[i] > 0 ? actualCounts[i] : s.questionCount
+                            }));
+                        }
+                    }
                 } else {
                     let currentSectionName = '';
                     let currentSecIdx = -1;

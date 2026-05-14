@@ -114,10 +114,10 @@ export const EXAMS: Record<string, ExamConfig> = {
         },
         isLive: true,
         sections: [
-            { id: 'logic_gk', name: 'Logical Reasoning & General Knowledge', questionCount: 22, durationMinutes: 37, icon: '💡', color: 'indigo' },
-            { id: 'biology', name: 'Biology', questionCount: 18, durationMinutes: 30, icon: '🧬', color: 'green' },
-            { id: 'chemistry', name: 'Chemistry', questionCount: 12, durationMinutes: 20, icon: '🧪', color: 'orange' },
-            { id: 'physics_maths', name: 'Physics & Mathematics', questionCount: 8, durationMinutes: 13, icon: '⚡', color: 'red' }
+            { id: 'logic_gk', name: 'Logical Reasoning & General Knowledge', questionCount: 9,  durationMinutes: 15, icon: '💡', color: 'indigo' },
+            { id: 'biology',  name: 'Biology',                               questionCount: 23, durationMinutes: 38, icon: '🧬', color: 'green'  },
+            { id: 'chemistry',name: 'Chemistry',                             questionCount: 15, durationMinutes: 25, icon: '🧪', color: 'orange' },
+            { id: 'physics_maths', name: 'Physics & Mathematics',            questionCount: 13, durationMinutes: 22, icon: '⚡', color: 'red'   }
         ],
         syllabus: {
             'Logical Reasoning & General Knowledge': [

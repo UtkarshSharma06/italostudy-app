@@ -121,6 +121,22 @@ export default function Auth() {
                 }
             }
 
+            // ── External return_url (e.g. back to italostudy.com/resources/slug) ──
+            // This is set by public-seo pages that gate content behind login.
+            // Only allow redirects to trusted italostudy.com domains.
+            const returnUrl = searchParams.get('return_url');
+            if (returnUrl) {
+                try {
+                    const parsed = new URL(returnUrl);
+                    const isTrusted = parsed.hostname === 'italostudy.com' ||
+                                      parsed.hostname.endsWith('.italostudy.com');
+                    if (isTrusted) {
+                        window.location.href = returnUrl;
+                        return;
+                    }
+                } catch { /* invalid URL — fall through to default */ }
+            }
+
             // Only navigate if MFA is not required or already verified
             const storeRedirect = sessionStorage.getItem('post_login_redirect');
             const from = (location.state as any)?.from?.pathname || storeRedirect || '/dashboard';
@@ -135,7 +151,7 @@ export default function Auth() {
         };
 
         handleInitialRedirect();
-    }, [user, navigate, isLoading, requiresMFA, aal, hasMFA, location.state]);
+    }, [user, navigate, isLoading, requiresMFA, aal, hasMFA, location.state, searchParams]);
 
     const validateForm = () => {
         const newErrors: { email?: string; password?: string } = {};

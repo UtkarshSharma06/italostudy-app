@@ -87,17 +87,9 @@ export function useVisitorTracking() {
 
                 if (ip) setUserIp(ip);
 
-                // 3. Log visit to site_visits and marketing events
+                // 3. Log visit to site_visits and marketing events (Disabled to prevent Supabase Disk IO depletion on Free Tier)
                 if (ip) {
-                    await supabase.from('site_visits').insert({
-                        ip_address: ip,
-                        path: location.pathname,
-                        user_agent: navigator.userAgent
-                    });
-                    
-                    // Fire analytics event
-                    trackEvent('page_view', { ip_captured: true, country });
-                    
+                    // We skip database logging for raw page views to keep the DB free
                     sessionStorage.setItem(sessionTrackKey, 'true');
                 }
 

@@ -500,16 +500,16 @@ export default function MobileMockWaitingRoom() {
                         <Share2 className="w-3 h-3 text-primary" />
                         <span className="text-[9px] font-black text-foreground uppercase tracking-widest">Share Test</span>
                     </div>
-                    <div className="w-full flex items-center gap-2 bg-background border border-border/10 rounded-xl p-1.5 pl-3">
-                        <span className="text-[9px] font-medium text-muted-foreground truncate flex-1 tracking-tight">
-                            {window.location.href}
-                        </span>
+                    <div className="flex items-center gap-3 bg-secondary/30 p-4 rounded-2xl border border-border/50">
+                        <p className="flex-1 text-[11px] font-black text-muted-foreground truncate font-mono">
+                            {`https://italostudy.com${window.location.pathname}${window.location.search}`}
+                        </p>
                         <Button
                             onClick={() => {
-                                navigator.clipboard.writeText(window.location.href);
+                                navigator.clipboard.writeText(`https://italostudy.com${window.location.pathname}${window.location.search}`);
                                 toast({
-                                    title: "Link Copied",
-                                    description: "Share this link with your peers!",
+                                    title: "Link Copied!",
+                                    description: "Share this link with other candidates.",
                                 });
                             }}
                             size="sm"

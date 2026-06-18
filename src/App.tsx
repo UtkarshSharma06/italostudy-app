@@ -40,7 +40,6 @@ const readProfileCache = () => {
   } catch { return null; }
 };
 
-import { captureUTMParams } from '@/utils/telemetry';
 import { APKOnboarding } from "@/mobile/components/APKOnboarding";
 import { PricingProvider, usePricing } from "@/context/PricingContext";
 import { usePlanAccess } from "@/hooks/usePlanAccess";
@@ -104,6 +103,13 @@ const Billing = lazy(() => import("./pages/Billing"));
 const DetailedAnalysis = lazy(() => import("./pages/DetailedAnalysis"));
 const StudyPlanner = lazy(() => import("./pages/StudyPlanner"));
 const PaymentCallback = lazy(() => import("./pages/PaymentCallback"));
+const Courses = lazy(() => import("./pages/Courses"));
+const CourseDetail = lazy(() => import("./pages/CourseDetail"));
+const CourseCheckout = lazy(() => import("./pages/CourseCheckout"));
+const CourseSubjectView = lazy(() => import("./pages/CourseSubjectView"));
+const CourseChapterView = lazy(() => import("./pages/CourseChapterView"));
+const CoursePaymentCallback = lazy(() => import("./pages/CoursePaymentCallback"));
+const BundlePaymentCallback = lazy(() => import("./pages/BundlePaymentCallback"));
 
 const MobileBilling = lazy(() => import("@/mobile/pages/MobileBilling"));
 const MobileDetailedAnalysis = lazy(() => import("@/mobile/pages/MobileDetailedAnalysis"));
@@ -288,6 +294,18 @@ const WebRouter = ({ user, authLoading }: { user: any, authLoading: boolean }) =
     {/* Study & Content Cluster */}
     <Route path="/learning" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Learning /></ProtectedRoute>} />
     <Route path="/start-test" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><StartTest /></ProtectedRoute>} />
+
+    {/* Courses Cluster */}
+    <Route path="/courses" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Courses /></ProtectedRoute>} />
+    <Route path="/courses/:courseId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><CourseDetail /></ProtectedRoute>} />
+    <Route path="/courses/:courseId/checkout" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><CourseCheckout /></ProtectedRoute>} />
+    <Route path="/courses/:courseId/subject/:subjectId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><CourseSubjectView /></ProtectedRoute>} />
+    <Route path="/courses/:courseId/subject/:subjectId/chapter/:chapterId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><CourseChapterView /></ProtectedRoute>} />
+    {/* Course payment callback — SEPARATE from /payment/callback (subscriptions) and store orders */}
+    {/* No ProtectedRoute — callback handles session rehydration internally after payment redirect */}
+    <Route path="/course-payment/callback" element={<CoursePaymentCallback />} />
+    {/* Bundle payment callback — verifies course + guides subscription completion */}
+    <Route path="/bundle-payment/callback" element={<BundlePaymentCallback />} />
     
     {/* Marketing Redirects */}
     <Route path="/blog" element={<HardRedirectToMarketing path="blog" />} />
@@ -448,6 +466,35 @@ const MobileRouter = ({ user, isNative, authLoading }: { user: any, isNative: bo
         <Route path="/solutions/:sessionId" element={<PublicSolutions />} />
         <Route path="/start-test" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileStartTest /></ProtectedRoute>} />
 
+        {/* Courses Cluster — wrapped in MobileLayout for native header + dock */}
+        <Route path="/courses" element={
+          <ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}>
+            <MobileLayout><Courses isMobileLayout={true} /></MobileLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/courses/:courseId" element={
+          <ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}>
+            <MobileLayout><CourseDetail isMobileLayout={true} /></MobileLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/courses/:courseId/checkout" element={
+          <ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}>
+            <MobileLayout><CourseCheckout isMobileLayout={true} /></MobileLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/courses/:courseId/subject/:subjectId" element={
+          <ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}>
+            <MobileLayout><CourseSubjectView isMobileLayout={true} /></MobileLayout>
+          </ProtectedRoute>
+        } />
+        <Route path="/courses/:courseId/subject/:subjectId/chapter/:chapterId" element={
+          <ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}>
+            <MobileLayout><CourseChapterView isMobileLayout={true} /></MobileLayout>
+          </ProtectedRoute>
+        } />
+
+        <Route path="/course-payment/callback" element={<CoursePaymentCallback />} />
+        <Route path="/bundle-payment/callback" element={<BundlePaymentCallback />} />
         <Route path="/reset-password" element={<ResetPassword />} />
         <Route path="/download-app" element={<DownloadApp />} />
 
@@ -469,7 +516,6 @@ const App = () => {
   const { setTheme } = useTheme();
 
   useEffect(() => {
-    captureUTMParams();
     // FIX: Do NOT call immediately — useState() already computed the correct value
     // synchronously. Just set up the resize listener.
     // For resize, use isSmall WITHOUT the touch check: a desktop user explicitly
@@ -733,43 +779,67 @@ const ToasterProvider = () => {
 };
 
 // Component to handle native deep links and auth redirects
+// Supports both:
+//   1. PKCE flow  → com.italostudy.app://google-auth?code=XXXX  (Supabase default)
+//   2. Implicit   → com.italostudy.app://google-auth#access_token=XXX (legacy fallback)
 const DeepLinkHandler = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Store the listener handle so we only remove THIS specific listener on cleanup
     let listenerHandle: { remove: () => Promise<void> } | null = null;
 
     const setup = async () => {
       listenerHandle = await CapApp.addListener('appUrlOpen', async (data: { url: string }) => {
-        const url = new URL(data.url);
-        const hash = url.hash.substring(1);
-        const params = new URLSearchParams(hash);
+        try {
+          const url = new URL(data.url);
 
-        const accessToken = params.get('access_token');
-        const refreshToken = params.get('refresh_token');
-
-        if (accessToken && refreshToken) {
-          const { error } = await supabase.auth.setSession({
-            access_token: accessToken,
-            refresh_token: refreshToken
-          });
-
-          if (!error) {
-            // Clear the token hash from the URL so tokens don't persist
-            // in browser history or the address bar
-            window.history.replaceState({}, '', window.location.pathname);
-            navigate('/mobile/dashboard');
-          } else {
-            console.error('DeepLink Error:', error.message);
+          // ── PKCE flow: Supabase returns ?code= in query string ────────────
+          // This is the correct path when flowType: 'pkce' is set in the client.
+          const code = url.searchParams.get('code');
+          if (code) {
+            const { error } = await supabase.auth.exchangeCodeForSession(code);
+            if (!error) {
+              navigate('/mobile/dashboard', { replace: true });
+            } else {
+              console.error('[DeepLink] PKCE exchange failed:', error.message);
+            }
+            return;
           }
+
+          // ── Implicit flow fallback: tokens in URL hash ────────────────────
+          // Handles older OAuth providers or non-PKCE configurations.
+          const hash = url.hash.substring(1);
+          const params = new URLSearchParams(hash);
+          const accessToken = params.get('access_token');
+          const refreshToken = params.get('refresh_token');
+
+          if (accessToken && refreshToken) {
+            const { error } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken
+            });
+            if (!error) {
+              navigate('/mobile/dashboard', { replace: true });
+            } else {
+              console.error('[DeepLink] Implicit setSession failed:', error.message);
+            }
+            return;
+          }
+
+          // ── Other deep links (payment callbacks, etc.) ────────────────────
+          const path = url.pathname || '/';
+          if (path && path !== '/') {
+            navigate(path, { replace: true });
+          }
+        } catch (e) {
+          console.error('[DeepLink] Failed to parse URL:', data.url, e);
         }
       });
     };
 
     setup();
 
-    // Only remove THIS listener — not all Capacitor App listeners globally
+    // Only remove THIS specific listener on cleanup
     return () => {
       listenerHandle?.remove();
     };

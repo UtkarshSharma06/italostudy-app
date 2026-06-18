@@ -299,7 +299,12 @@ export default function Auth() {
             const from = (location.state as any)?.from?.pathname || storeRedirect || '/dashboard';
             
             if (from && from !== '/dashboard') sessionStorage.setItem('onboarding_redirect', from);
-            const redirectUrl = `${window.location.origin}${from}`;
+            // FIX: Always redirect OAuth back to /auth, NOT /dashboard.
+            // The /dashboard route has a <Navigate to="/" replace /> which fires synchronously
+            // during render and strips the PKCE ?code= param from the URL before
+            // Supabase's getSession() useEffect can read it — causing a permanent auth loop.
+            // Redirecting to /auth keeps the page stable so Supabase can exchange the code.
+            const redirectUrl = `${window.location.origin}/auth`;
             const { error } = await signInWithGoogle(redirectUrl);
             if (error) throw error;
         } catch (error: any) {

@@ -1,0 +1,65 @@
+name: Build iOS App
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  build:
+    name: Build iOS App
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Build Web App
+        run: npm run build
+
+      - name: Sync Capacitor for iOS
+        run: |
+          npm i @capacitor/ios
+          npx cap add ios || true
+          npx cap sync ios
+
+      - name: Set up Ruby
+        uses: ruby/setup-ruby@v1
+        with:
+          ruby-version: '3.0'
+          bundler-cache: true
+
+      - name: Setup CocoaPods
+        run: |
+          cd ios/App
+          pod install
+
+      - name: Build iOS Xcode Project
+        run: |
+          cd ios/App
+          # We build an unsigned xcarchive just to verify the build passes.
+          # To build an installable .ipa, Apple Developer certificates are required.
+          xcodebuild clean archive \
+            -workspace App.xcworkspace \
+            -scheme App \
+            -configuration Release \
+            -archivePath $PWD/build/App.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY=""
+
+      - name: Upload iOS Archive Artifact
+        uses: actions/upload-artifact@v3
+        with:
+          name: ios-xcarchive
+          path: ios/App/build/App.xcarchive

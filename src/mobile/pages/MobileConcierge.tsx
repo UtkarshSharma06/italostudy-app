@@ -18,6 +18,17 @@ import { AdmissionChat } from "@/components/concierge/AdmissionChat";
 import MobileLayout from '../components/MobileLayout';
 
 import { usePlanAccess } from "@/hooks/usePlanAccess";
+import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
+
+// Helper: open external URL correctly on both web and native
+const openExternalUrl = async (url: string) => {
+    if (Capacitor.isNativePlatform()) {
+        await Browser.open({ url });
+    } else {
+        window.open(url, '_blank', 'noopener,noreferrer');
+    }
+};
 
 export default function MobileConcierge() {
     const { user, profile } = useAuth();
@@ -192,7 +203,7 @@ export default function MobileConcierge() {
                                 <h4 className="text-2xl font-black uppercase tracking-tighter mb-2">Strategy Consultation</h4>
                                 <p className="text-indigo-100/60 text-xs font-bold uppercase tracking-tight mb-8">Via Zoom</p>
                                 <Button
-                                    onClick={() => window.open(app.meeting_link, '_blank')}
+                                    onClick={() => openExternalUrl(app.meeting_link)}
                                     className="w-full h-14 rounded-2xl bg-indigo-500 hover:bg-indigo-400 text-white font-black uppercase text-[10px] tracking-widest gap-2 shadow-xl shadow-indigo-500/20"
                                 >
                                     Join Meeting <Video size={16} />

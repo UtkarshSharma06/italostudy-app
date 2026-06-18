@@ -252,13 +252,13 @@ export default function Onboarding() {
         try {
             const rawDigits = getDigits(phoneNumber);
             const fullPhone = `${countryDial}${rawDigits.startsWith('+') ? rawDigits.slice(countryDial.length) : rawDigits}`.trim();
-            const tierMap: any = { 'explorer': 'initiate', 'pro': 'elite', 'elite': 'global', 'global': 'global' };
-            const targetTier = tierMap[selectedPlan] || 'initiate';
+            
+            const isPremium = selectedPlan && selectedPlan !== 'explorer';
 
             const { error } = await supabase.from('profiles').update({
                 selected_exam: selectedExam,
-                selected_plan: selectedPlan,
-                subscription_tier: targetTier,
+                selected_plan: 'explorer',
+                subscription_tier: 'initiate',
                 target_score: targetScore,
                 study_hours: selectedHours,
                 first_name: firstName,
@@ -285,6 +285,10 @@ export default function Onboarding() {
                 sessionStorage.removeItem('post_login_redirect');
             } else if (pendingDownload) {
                 targetPath = `/resources/${pendingDownload}`;
+            }
+
+            if (isPremium) {
+                openPricingModal();
             }
 
             console.log(`Profile refresh successful, navigating to ${targetPath} in 2.5s...`);

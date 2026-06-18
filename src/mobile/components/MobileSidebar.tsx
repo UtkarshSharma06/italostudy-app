@@ -19,8 +19,9 @@ import { useTranslation } from 'react-i18next';
 import { usePricing } from '@/context/PricingContext';
 import { useExam } from '@/context/ExamContext';
 import { getOptimizedImageUrl } from '@/lib/image-optimizer';
-// EXAMS import removed
 import { cn } from '@/lib/utils';
+import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
 
 interface MobileSidebarProps {
     isOpen: boolean;
@@ -43,7 +44,12 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onOpenChange }) =
             else if (path === '/resources') url = 'https://italostudy.com/resources';
             else if (path === '/exams') url = 'https://italostudy.com/exams';
             
-            window.open(url, '_blank', 'noopener,noreferrer');
+            // Use @capacitor/browser on native, window.open on web
+            if (Capacitor.isNativePlatform()) {
+                Browser.open({ url });
+            } else {
+                window.open(url, '_blank', 'noopener,noreferrer');
+            }
         } else {
             navigate(path);
         }
@@ -59,7 +65,8 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onOpenChange }) =
 
     const mainActions = [
         { icon: FileText, label: 'Resources', path: '/resources', color: 'bg-pink-500/10 text-pink-600' },
-        { icon: Target, label: t('menu.mock'), path: '/mobile/mock-exams', color: 'bg-rose-500/10 text-rose-600' },
+        { icon: Target, label: 'Mock Exams', path: '/mobile/mock-exams', color: 'bg-rose-500/10 text-rose-600' },
+        // { icon: GraduationCap, label: 'Courses', path: '/courses', color: 'bg-indigo-500/10 text-indigo-600' },
         { icon: ShoppingBag, label: 'Store', path: '/store', color: 'bg-emerald-500/10 text-emerald-600' },
     ];
 
@@ -141,8 +148,8 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onOpenChange }) =
 
                 {/* --- NAVIGATION AREA --- */}
                 <div className="flex-1 overflow-y-auto px-4 py-4 space-y-5 scrollbar-hide">
-                    {/* Main Quick Actions Grid */}
-                    <div className="grid grid-cols-3 gap-2">
+                    {/* Main Quick Actions Grid — 2x2 for 4 items */}
+                    <div className="grid grid-cols-2 gap-2">
                         {mainActions.map((item) => (
                             <button
                                 key={item.label}

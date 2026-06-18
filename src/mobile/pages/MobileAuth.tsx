@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
+import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
 import { 
     Mail, 
     Lock, 
@@ -27,6 +29,15 @@ import {
     DialogTitle,
     DialogDescription,
 } from "@/components/ui/dialog";
+
+// Helper: open external URL correctly on both web and native
+const openExternalUrl = async (url: string) => {
+    if (Capacitor.isNativePlatform()) {
+        await Browser.open({ url });
+    } else {
+        window.open(url, '_blank', 'noopener,noreferrer');
+    }
+};
 
 export default function MobileAuth() {
     const [isLogin, setIsLogin] = useState(true);
@@ -201,7 +212,7 @@ export default function MobileAuth() {
             <div className="p-6 flex items-center justify-between shrink-0">
                 <img src="/logo.webp" alt="Italostudy" className="h-7" />
                 <button 
-                    onClick={() => window.location.href = 'https://italostudy.com'}
+                    onClick={() => Capacitor.isNativePlatform() ? navigate('/mobile/dashboard') : openExternalUrl('https://italostudy.com')}
                     className="p-2 rounded-xl hover:bg-slate-50 transition-colors"
                 >
                     <ChevronLeft className="w-5 h-5 text-slate-400" />
@@ -385,22 +396,23 @@ export default function MobileAuth() {
                 </div>
             </div>
 
-            {/* Bottom Links */}
             <div className="p-6 flex items-center justify-center gap-6 shrink-0">
-                <button 
-                    onClick={() => window.location.href = 'https://italostudy.com'}
-                    className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors flex items-center gap-1.5"
-                >
-                    <ChevronLeft className="w-3 h-3" />
-                    Back to Italostudy
-                </button>
-                <div className="w-px h-3 bg-slate-200" />
-                <a href="https://italostudy.com/terms" className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">
+                {!Capacitor.isNativePlatform() && (
+                    <button 
+                        onClick={() => openExternalUrl('https://italostudy.com')}
+                        className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors flex items-center gap-1.5"
+                    >
+                        <ChevronLeft className="w-3 h-3" />
+                        Back to Italostudy
+                    </button>
+                )}
+                {!Capacitor.isNativePlatform() && <div className="w-px h-3 bg-slate-200" />}
+                <button onClick={() => openExternalUrl('https://italostudy.com/terms')} className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">
                     Terms
-                </a>
-                <a href="https://italostudy.com/privacy" className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">
+                </button>
+                <button onClick={() => openExternalUrl('https://italostudy.com/privacy')} className="text-[10px] font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">
                     Privacy
-                </a>
+                </button>
             </div>
 
             {/* MFA SECURITY OVERLAY */}

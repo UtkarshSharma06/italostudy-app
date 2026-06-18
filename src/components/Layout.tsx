@@ -34,7 +34,8 @@ import {
     Pencil,
     ShoppingBag,
     Bug,
-    Radar
+    Radar,
+    GraduationCap
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
@@ -53,7 +54,6 @@ import { useExam } from '@/context/ExamContext';
 import { usePricing } from '@/context/PricingContext';
 const FeedbackDialog = lazy(() => import('./FeedbackDialog').then(m => ({ default: m.FeedbackDialog })));
 const AuthModal = lazy(() => import('@/components/auth/AuthModal').then(m => ({ default: m.AuthModal })));
-import { useVisitorTracking } from '@/hooks/useVisitorTracking';
 import { usePlanAccess } from '@/hooks/usePlanAccess';
 const PremiumSuccessAnimation = lazy(() => import('./PremiumSuccessAnimation').then(m => ({ default: m.PremiumSuccessAnimation })));
 import { useToast } from '@/hooks/use-toast';
@@ -114,8 +114,6 @@ export default function Layout({
     const { isPageEnabled, getMaintenanceMessage } = usePageVisibility();
     const [isBypassed, setIsBypassed] = useState(false);
 
-    // Global Visitor Analytics & IP Tracking
-    useVisitorTracking();
 
     useEffect(() => {
         const checkPlatform = async () => {
@@ -282,6 +280,7 @@ export default function Layout({
         { label: 'Subjects', path: '/subjects', icon: Book },
         { label: 'Practice', path: '/practice', icon: Pencil },
         { label: 'Learning', path: '/learning', icon: Play, isSoon: true },
+        // { label: 'Courses', path: '/courses', icon: GraduationCap },
         { label: 'Community', path: '/community', icon: MessageCircle },
         { label: 'Store', path: '/store', icon: ShoppingBag },
         { label: 'Mock Exams', path: '/mock-exams', icon: Globe },
@@ -464,7 +463,7 @@ export default function Layout({
             )}
 
             <div className={cn(
-                "flex-1 w-full flex flex-col transition-all duration-300 ease-out",
+                "flex-1 flex flex-col transition-all duration-300 ease-out min-w-0",
                 !isMobile && showHeader && !isAdminPath && !isEditMode && !location.pathname.startsWith('/community') 
                     ? 'ml-[72px]' 
                     : '',

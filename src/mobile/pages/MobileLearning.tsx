@@ -22,7 +22,17 @@ import { Suspense, lazy } from 'react';
 import MobileLayout from '../components/MobileLayout';
 import { LearningSkeleton, Skeleton } from '@/components/SkeletonLoader';
 import { readDashboardCache, invalidateDashboardCache } from '@/hooks/useDashboardPrefetch';
+import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
 
+// Helper: open external URL correctly on both web and native
+const openExternalUrl = async (url: string) => {
+    if (Capacitor.isNativePlatform()) {
+        await Browser.open({ url });
+    } else {
+        window.open(url, '_blank', 'noopener,noreferrer');
+    }
+};
 const ResourceListSkeleton = () => (
     <div className="p-6 space-y-4">
         {[1, 2, 3].map(i => (
@@ -546,7 +556,7 @@ export default function MobileLearning() {
                                         </p>
                                     </div>
                                     <Button
-                                        onClick={() => window.open(videoUrl, '_blank')}
+                                        onClick={() => openExternalUrl(videoUrl)}
                                         size="sm"
                                         className="h-10 px-6 rounded-full bg-primary hover:bg-primary/90 text-white font-black text-[9px] uppercase tracking-widest active:scale-95 transition-all flex items-center gap-2"
                                     >
@@ -576,7 +586,7 @@ export default function MobileLearning() {
                                             <span className="text-[10px] font-black text-primary uppercase tracking-[0.3em] opacity-70">Sector Briefing</span>
                                             {!canEmbed && docUrl && (
                                                 <Button
-                                                    onClick={() => window.open(docUrl, '_blank')}
+                                                    onClick={() => openExternalUrl(docUrl)}
                                                     variant="outline"
                                                     size="sm"
                                                     className="h-6 px-3 bg-primary/5 text-primary border-primary/20 rounded-lg text-[8px] font-black uppercase tracking-widest hover:bg-primary hover:text-white transition-all"

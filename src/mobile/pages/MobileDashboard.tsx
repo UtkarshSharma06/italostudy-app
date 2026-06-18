@@ -1,4 +1,4 @@
-
+﻿
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,6 +23,17 @@ import MobileLayout from '../components/MobileLayout';
 import { useActiveTest } from '@/hooks/useActiveTest';
 import { usePlanAccess } from '@/hooks/usePlanAccess';
 import { lazy, Suspense } from 'react';
+import { Capacitor } from '@capacitor/core';
+import { Browser } from '@capacitor/browser';
+
+// Helper: open external URL correctly on both web and native
+const openExternalUrl = async (url: string) => {
+    if (Capacitor.isNativePlatform()) {
+        await Browser.open({ url });
+    } else {
+        window.open(url, '_blank', 'noopener,noreferrer');
+    }
+};
 
 const UpgradeModal = lazy(() => import('@/components/UpgradeModal').then(mod => ({ default: mod.UpgradeModal })));
 const SeatTrackerModal = lazy(() => import('@/components/SeatTrackerModal').then(mod => ({ default: mod.SeatTrackerModal })));
@@ -35,6 +46,7 @@ import { DashboardSkeleton } from '@/mobile/components/DashboardSkeleton';
 import { useToast } from '@/hooks/use-toast';
 import { PWAPrompt } from '@/components/PWAPrompt';
 import StudyPlannerWidget from '@/components/StudyPlannerWidget';
+
 
 interface SubjectMastery {
     subject: string;
@@ -213,7 +225,7 @@ const MobileDashboard: React.FC = () => {
         writing: 0,
         avgBand: 0
     });
-    // ── Mobile Dashboard Cache (stale-while-revalidate) ──
+    // â”€â”€ Mobile Dashboard Cache (stale-while-revalidate) â”€â”€
     const MOBILE_DASH_CACHE_KEY = user?.id ? `mobile_dash_cache_${user.id}` : null;
     const readMobileDashCache = () => {
         if (!MOBILE_DASH_CACHE_KEY) return null;
@@ -230,7 +242,7 @@ const MobileDashboard: React.FC = () => {
             try {
                 const key = `mobile_dash_cache_${user.id}`;
                 const cached = localStorage.getItem(key);
-                if (cached) return false; // instant — no skeleton for returning users
+                if (cached) return false; // instant â€” no skeleton for returning users
             } catch {}
         }
         return true;
@@ -242,7 +254,7 @@ const MobileDashboard: React.FC = () => {
     const [latestBlogPost, setLatestBlogPost] = useState<any>(null);
     const [upcomingSession, setUpcomingSession] = useState<any>(null);
 
-    // ── Check for Personal Study Plan ──
+    // â”€â”€ Check for Personal Study Plan â”€â”€
     const [hasStudyPlan, setHasStudyPlan] = useState(false);
     useEffect(() => {
         if (!user || !activeExam?.id) return;
@@ -538,7 +550,7 @@ const MobileDashboard: React.FC = () => {
                 })
             ]);
 
-            // ── PROCESS DATES & STREAK ──
+            // â”€â”€ PROCESS DATES & STREAK â”€â”€
             const learningProgress = learningProgressRes.data || [];
             const tests = testsRes.data || [];
             const getUTCDateString = (date: Date) => date.toISOString().split('T')[0];
@@ -589,7 +601,7 @@ const MobileDashboard: React.FC = () => {
             }
             bestStreak = Math.max(bestStreak, streak);
 
-            // ── PROCESS STATS ──
+            // â”€â”€ PROCESS STATS â”€â”€
             const summary = (summaryStatsRes.data as any[])?.[0] || {};
             const subjectStats = (subjectStatsRes.data as any[]) || [];
             const mockSubmissions = mockSubmissionsRes?.data || [];
@@ -600,7 +612,7 @@ const MobileDashboard: React.FC = () => {
             const totalQuestionsInTests = tests.reduce((acc: number, t: any) => acc + (t.total_questions || 0), 0);
             const totalQuestionsIncludingSkipped = practiceTotal + totalQuestionsInTests;
 
-            // ── FETCH TODAY'S PRACTICE SPECIFICALLY ──
+            // â”€â”€ FETCH TODAY'S PRACTICE SPECIFICALLY â”€â”€
             const todayStart = new Date();
             todayStart.setHours(0, 0, 0, 0);
             
@@ -623,7 +635,7 @@ const MobileDashboard: React.FC = () => {
             });
 
 
-            // ── PROCESS MASTERY ──
+            // â”€â”€ PROCESS MASTERY â”€â”€
             const mastery = (activeExam.sections || []).map((section: any) => {
                 const sectionName = section.name || '';
                 const subjStat = subjectStats.find(s => (s.subject || '').toLowerCase() === sectionName.toLowerCase());
@@ -636,7 +648,7 @@ const MobileDashboard: React.FC = () => {
             });
             setSubjectMastery(mastery);
 
-            // ✅ Write fresh data to cache for next reload (stale-while-revalidate)
+            // âœ… Write fresh data to cache for next reload (stale-while-revalidate)
             writeMobileDashCache({
                 stats: {
                     streak, bestStreak, totalActiveDays: activeDatesSet.size,
@@ -669,7 +681,7 @@ const MobileDashboard: React.FC = () => {
             setLastProgress(progressData);
             setPlatformTotalQuestions(totalPlatformRes.count || 0);
 
-            // ── Champions: weekly first, fallback to all-time if empty ──────────
+            // â”€â”€ Champions: weekly first, fallback to all-time if empty â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
             let championsSource = championsRes.data || [];
             let weeklyActive = true;
 
@@ -708,7 +720,7 @@ const MobileDashboard: React.FC = () => {
         } catch (e) {
             console.error("Dashboard Sync Error:", e);
         } finally {
-            // ✅ FIX: Always clear skeleton — refreshActiveTest cannot block this
+            // âœ… FIX: Always clear skeleton â€” refreshActiveTest cannot block this
             setIsLoading(false);
             refreshActiveTest().catch(() => { /* silent */ });
         }
@@ -889,7 +901,7 @@ const MobileDashboard: React.FC = () => {
                                     animate={{ rotate: [0, 20, 0, 20, 0] }}
                                     transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
                                 >
-                                    👋
+                                    ðŸ‘‹
                                 </motion.span>
                             </h1>
                             <p className="text-slate-400 text-sm font-medium mt-2">Let's continue your learning journey!</p>
@@ -1032,7 +1044,7 @@ const MobileDashboard: React.FC = () => {
                 <button
                     onClick={() => {
                         if (activeExam?.id === 'imat-prep' || activeExam?.id === 'imat') {
-                            window.open('https://chat.whatsapp.com/CfVh7u9L6vT7ZFpZwwVa4A', '_blank');
+                            openExternalUrl('https://chat.whatsapp.com/CfVh7u9L6vT7ZFpZwwVa4A');
                         } else {
                             setIsTrackerModalOpen(true);
                         }
@@ -1097,7 +1109,7 @@ const MobileDashboard: React.FC = () => {
                                                     ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600'
                                                     : 'bg-red-100 dark:bg-red-900/20 text-red-400'
                                         )}>
-                                            {didPractice ? '✓' : '✗'}
+                                            {didPractice ? 'âœ“' : 'âœ—'}
                                         </div>
                                     </div>
                                 );
@@ -1133,7 +1145,7 @@ const MobileDashboard: React.FC = () => {
                                     <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-1">Live Event</p>
                                     <h3 className="text-base font-bold text-slate-900 tracking-tight leading-tight truncate">{upcomingSession.title || 'Mock Exam Session'}</h3>
                                     <p className="text-[11px] font-medium text-slate-400 mt-1">
-                                        {format(new Date(upcomingSession.start_time), 'MMM d · h:mm a')}
+                                        {format(new Date(upcomingSession.start_time), 'MMM d Â· h:mm a')}
                                     </p>
                                 </div>
                             </div>
@@ -1389,7 +1401,7 @@ const MobileDashboard: React.FC = () => {
                         icon={<FileText size={18} />}
                         label="Resources"
                         sub="Library"
-                        onClick={() => window.open('https://italostudy.com/resources', '_blank')}
+                        onClick={() => openExternalUrl('https://italostudy.com/resources')}
                         color="bg-cyan-500/20 text-cyan-500"
                     />
                     <HubItem
@@ -1405,7 +1417,7 @@ const MobileDashboard: React.FC = () => {
             {/* WhatsApp Community (Mobile) */}
             <section className="mt-10 px-4 pb-10">
                 <div
-                    onClick={() => window.open('https://chat.whatsapp.com/CfVh7u9L6vT7ZFpZwwVa4A', '_blank')}
+                    onClick={() => openExternalUrl('https://chat.whatsapp.com/CfVh7u9L6vT7ZFpZwwVa4A')}
                     className="group relative flex items-center justify-between p-5 rounded-3xl bg-[#25D366] text-white cursor-pointer shadow-xl shadow-emerald-900/10 active:scale-[0.98] transition-all border border-white/10 overflow-hidden"
                 >
                     <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-400/10 blur-2xl rounded-full -mr-12 -mt-12" />
@@ -1421,7 +1433,7 @@ const MobileDashboard: React.FC = () => {
                                 <div className="h-1 w-1 rounded-full bg-emerald-400 animate-pulse" />
                             </div>
                             <p className="text-[10px] font-bold text-emerald-100/60 uppercase tracking-widest truncate">
-                                2000+ Students Preparing 🎒
+                                2000+ Students Preparing ðŸŽ’
                             </p>
                         </div>
                     </div>

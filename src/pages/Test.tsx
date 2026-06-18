@@ -680,13 +680,13 @@ export default function TestPage() {
   }, [testId, test, currentIndex, currentSectionIndex]);
 
   // Auto-save progress periodically (Cross-device sync)
+  // Standard mode: 30s interval — sufficient for resume, avoids per-question DB writes
+  // Proctored/Live: 60s — reloads are restricted anyway
   useEffect(() => {
     if (!test || test.status !== 'in_progress' || isDisqualified) return;
 
-    // Standard mode: High frequency (10s) for cross-device resume
-    // Proctored/Live: Lower frequency (30s) as reloads are restricted anyway
     const isStandard = !(test as any).is_proctored && !test.is_ranked;
-    const intervalTime = isStandard ? 10000 : 30000;
+    const intervalTime = isStandard ? 30000 : 60000;
 
     const interval = setInterval(() => {
       saveProgress();
@@ -696,7 +696,7 @@ export default function TestPage() {
   }, [test, isDisqualified, saveProgress]);
 
   // HIGH-FREQUENCY Local Caching for Standard Mode (every 1.5 seconds)
-  // This ensures that an accidental reload restores the EXACT second.
+  // Writes only to sessionStorage (zero DB cost), ensuring exact-second restore on reload.
   useEffect(() => {
     if (!test || (test as any).is_proctored || test.is_ranked || isDisqualified) return;
 
@@ -713,11 +713,9 @@ export default function TestPage() {
     return () => clearInterval(cacheInterval);
   }, [test, testId, currentIndex, currentSectionIndex, isDisqualified]);
 
-  // Save progress when navigating or answering
-  useEffect(() => {
-    if (!test || test.status !== 'in_progress' || isDisqualified) return;
-    saveProgress();
-  }, [currentIndex, currentSectionIndex, test?.status, saveProgress]);
+  // NOTE: Per-navigation saveProgress() removed — the periodic interval above handles
+  // cross-device sync. trackQuestionTime() (called inside handleNavigate) already writes
+  // time_spent_seconds to DB on each question change, which is sufficient.
 
   // Timer logic extracted to IsolatedTimer
 

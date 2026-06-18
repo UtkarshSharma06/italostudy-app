@@ -272,13 +272,23 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children, isLoading, hideHe
     if (path.includes('store/orders')) return 'My Orders';
     if (path.includes('store/products')) return 'All Products';
     if (path.includes('store')) return 'Italostudy Store';
+    if (path.includes('/courses') && path.includes('/subject/') && path.includes('/chapter/')) return 'Chapter';
+    if (path.includes('/courses') && path.includes('/subject/')) return 'Subject';
+    if (path.match(/\/courses\/[^/]+$/)) return 'Course';
+    if (path.includes('/courses')) return 'Courses';
+    if (path.includes('course-payment')) return 'Enrollment';
     return 'ITALOSTUDY';
   };
 
   const isAdmin = profile?.role === 'admin' || profile?.role === 'sub_admin';
 
   // Global Page Visibility Enforcement (for public/unprotected routes)
-  const isProtectedPath = ['/mobile/dashboard', '/mobile/community', '/mobile/subjects', '/mobile/practice', '/mobile/mock-exams', '/mobile/analytics', '/mobile/history', '/mobile/settings', '/mobile/learning'].some(p => location.pathname.startsWith(p));
+  const isProtectedPath = [
+    '/mobile/dashboard', '/mobile/community', '/mobile/subjects',
+    '/mobile/practice', '/mobile/mock-exams', '/mobile/analytics',
+    '/mobile/history', '/mobile/settings', '/mobile/learning',
+    '/courses', '/course-payment',
+  ].some(p => location.pathname.startsWith(p));
   
   if (!isProtectedPath && !isPageEnabled(location.pathname) && !isBypassed) {
       return (

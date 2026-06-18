@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Rocket, Download, ShieldCheck, Zap, X } from 'lucide-react';
 import { Device } from '@capacitor/device';
+import { Browser } from '@capacitor/browser';
 
 // current app version
 export const CURRENT_APP_VERSION = "1.0.0";
@@ -63,9 +64,10 @@ export const AppUpdateChecker: React.FC<{ children: React.ReactNode }> = ({ chil
         return false;
     };
 
-    const handleUpdate = () => {
+    const handleUpdate = async () => {
         if (updateInfo?.update_url) {
-            window.open(updateInfo.update_url, '_system');
+            // Use @capacitor/browser — window.open('_system') is Cordova-only and doesn't work in Capacitor
+            await Browser.open({ url: updateInfo.update_url });
         }
     };
 

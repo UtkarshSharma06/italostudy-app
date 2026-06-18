@@ -4,7 +4,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { Capacitor } from '@capacitor/core';
 import { Browser } from '@capacitor/browser';
 import { invalidateDashboardCache } from '@/hooks/useDashboardPrefetch';
-import { getCachedUTMParams, updateLastSignIn, clearUTMParams } from '@/utils/telemetry';
 
 interface AuthContextType {
   user: User | null;
@@ -97,10 +96,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           if (profileFetchInFlight.current !== session.user.id) {
             fetchProfile(session.user.id);
           }
-          // ✅ FIX: Do NOT call updateAALStatus() here — it acquires auth
-          // locks that compete with getSession(), causing "lock stolen" errors
-          // on Vercel. The getSession().then() path handles MFA status.
-          if (event === 'SIGNED_IN') updateLastSignIn(session.user.id);
         } else {
           profileFetchInFlight.current = null;
           setProfile(null);
@@ -142,7 +137,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           // lock-acquiring MFA calls that slow down login by 1-3s. Fire it in background.
           await fetchProfile(initialUser.id);
           setLoading(false);
-          updateLastSignIn(initialUser.id);
           // MFA status loads in background — doesn't block dashboard render
           updateAALStatus();
         }
@@ -412,8 +406,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const signUp = async (email: string, password: string, displayName?: string) => {
-    const redirectUrl = `${window.location.origin}/`;
-    const utm = getCachedUTMParams();
+    // On native, redirect confirmation links to the app's custom URL scheme.
+    // On web, redirect to the origin so the browser handles it normally.
+    const isNative = Capacitor.isNativePlatform();
+    const redirectUrl = isNative
+      ? 'com.italostudy.app://email-confirm'
+      : `${window.location.origin}/`;
 
     const { data, error } = await supabase.auth.signUp({
       email,
@@ -422,14 +420,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         emailRedirectTo: redirectUrl,
         data: {
           display_name: displayName,
-          utm_source: utm?.source,
-          utm_medium: utm?.medium,
-          utm_campaign: utm?.campaign,
         },
       },
     });
-
-    if (!error) clearUTMParams();
 
     return { data, error: error as Error | null };
   };
@@ -457,41 +450,78 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isNative = Capacitor.isNativePlatform();
 
     if (isNative) {
+      // ── Step 1: Try native Google Sign-In (fastest, no browser popup) ──────
+      // Uses @codetrix-studio/capacitor-google-auth to get an ID token directly
+      // and exchange it with Supabase — zero browser required.
       try {
         const { GoogleAuth } = await import('@codetrix-studio/capacitor-google-auth');
         const googleUser = await GoogleAuth.signIn();
 
         if (googleUser && googleUser.authentication.idToken) {
-          const { data, error } = await supabase.auth.signInWithIdToken({
+          const { error } = await supabase.auth.signInWithIdToken({
             provider: 'google',
             token: googleUser.authentication.idToken,
           });
           if (!error) return { error: null };
-          console.error("Native Token Sign-In failed:", error);
+          console.error('[Auth] Native token sign-in failed, falling back to browser:', error);
         }
       } catch (err: any) {
-        console.warn("Native Google Auth Error/Cancelled, trying browser flow:", err);
-        if (err.message?.includes("cancelled") || err.code === "CANCELLED") {
+        // User cancelled the native picker — do NOT fall through to browser
+        if (
+          err.message?.includes('cancelled') ||
+          err.message?.includes('canceled') ||
+          err.code === 'CANCELLED' ||
+          err.code === 12501  // Google Sign-In cancelled error code
+        ) {
           return { error: null };
         }
+        // Any other error → fall through to browser OAuth
+        console.warn('[Auth] Native Google Auth error, falling back to browser OAuth:', err);
       }
-    }
-    // Web Browser Flow (or Fallback for Native)
-    const finalRedirect = isNative ? 'com.italostudy.app://google-auth' : (redirectTo || `${window.location.origin}/dashboard`);
 
-    const { data, error } = await supabase.auth.signInWithOAuth({
+      // ── Step 2: Browser-based OAuth fallback (PKCE) ───────────────────────
+      // CRITICAL: skipBrowserRedirect: true — we get the URL back and open it
+      // ourselves via @capacitor/browser so the deep link com.italostudy.app://
+      // callback is captured by the app (not lost in the system browser).
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          redirectTo: 'com.italostudy.app://google-auth',
+          skipBrowserRedirect: true,  // ← Don't let Supabase open the browser
+        }
+      });
+
+      if (error) return { error: error as Error };
+
+      // Open the OAuth URL in the Capacitor in-app browser
+      if (data?.url) {
+        await Browser.open({ url: data.url, windowName: '_self' });
+      }
+
+      return { error: null };
+    }
+
+    // ── Web browser flow (desktop + mobile web) ───────────────────────────────
+    // FIX: Always use /auth as the OAuth callback destination.
+    // The /dashboard route is a <Navigate to="/" replace /> which strips the
+    // PKCE ?code= query param before Supabase can exchange it.
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: finalRedirect,
-        skipBrowserRedirect: false
+        redirectTo: `${window.location.origin}/auth`,
+        skipBrowserRedirect: false,
       }
     });
 
     return { error: error as Error | null };
   };
   const resetPassword = async (email: string) => {
+    const isNative = Capacitor.isNativePlatform();
+    const redirectUrl = isNative
+      ? 'com.italostudy.app://reset-password'
+      : `${window.location.origin}/reset-password`;
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/reset-password`,
+      redirectTo: redirectUrl,
     });
     return { error: error as Error | null };
   };

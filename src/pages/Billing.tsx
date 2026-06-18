@@ -25,7 +25,7 @@ import { cn } from '@/lib/utils';
 import { useCurrency } from '@/hooks/useCurrency';
 import { usePricing } from '@/context/PricingContext';
 import { generateInvoice } from '@/utils/invoiceGenerator';
-import { Download } from 'lucide-react';
+import { Download, GraduationCap } from 'lucide-react';
 
 export default function Billing() {
     const { user, profile } = useAuth() as any;
@@ -34,6 +34,7 @@ export default function Billing() {
     const { config, isLoading: isConfigLoading, openPricingModal } = usePricing();
     const [isLoading, setIsLoading] = useState(true);
     const [transactions, setTransactions] = useState<any[]>([]);
+    const [courseTxns, setCourseTxns] = useState<any[]>([]);
 
     // Fetch Real Billing History from Database
     useEffect(() => {
@@ -42,6 +43,7 @@ export default function Billing() {
 
             setIsLoading(true);
             try {
+                // Subscription transactions
                 const { data, error } = await supabase
                     .from('transactions')
                     .select('*')
@@ -54,6 +56,16 @@ export default function Billing() {
 
                 if (error) throw error;
                 setTransactions(data || []);
+
+                // Course transactions
+                const { data: courseData } = await (supabase as any)
+                    .from('course_transactions')
+                    .select('*')
+                    .eq('user_id', user.id)
+                    .eq('status', 'completed')
+                    .order('created_at', { ascending: false })
+                    .limit(20);
+                setCourseTxns(courseData || []);
             } catch (err) {
                 console.error('Failed to fetch transactions:', err);
                 setTransactions([]);
@@ -259,6 +271,56 @@ export default function Billing() {
                                 </div>
                             </div>
                         </div>
+
+                        {/* Course Purchases Section */}
+                        {courseTxns.length > 0 && (
+                            <div className="grid md:grid-cols-3 gap-8 py-8">
+                                <div className="flex items-center gap-2">
+                                    <GraduationCap className="w-4 h-4 text-slate-400" />
+                                    <h2 className="text-xs font-black text-slate-400 uppercase tracking-[0.2em]">Course Purchases</h2>
+                                </div>
+                                <div className="md:col-span-2 space-y-4">
+                                    <div className="bg-slate-50 dark:bg-white/5 rounded-[2rem] overflow-hidden border border-slate-100 dark:border-white/10">
+                                        <table className="w-full text-left">
+                                            <thead>
+                                                <tr className="border-b border-slate-200 dark:border-white/5">
+                                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Date</th>
+                                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Course</th>
+                                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest">Invoice</th>
+                                                    <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Amount</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-slate-100 dark:divide-white/5">
+                                                {courseTxns.map((txn) => (
+                                                    <tr key={txn.id} className="hover:bg-white dark:hover:bg-white/5 transition-colors">
+                                                        <td className="px-6 py-4 text-xs font-bold text-slate-900 dark:text-white">
+                                                            {new Date(txn.created_at).toLocaleDateString()}
+                                                        </td>
+                                                        <td className="px-6 py-4 text-xs text-slate-500 font-medium">
+                                                            {txn.metadata?.course_title || 'Course'}
+                                                        </td>
+                                                        <td className="px-6 py-4">
+                                                            <button
+                                                                onClick={() => generateInvoice(null, profile, 'course', txn)}
+                                                                className="flex items-center gap-2 text-[10px] font-black text-violet-600 hover:text-violet-700 uppercase tracking-widest group"
+                                                            >
+                                                                <Download size={14} className="group-hover:translate-y-0.5 transition-transform" />
+                                                                <span>Download</span>
+                                                            </button>
+                                                        </td>
+                                                        <td className="px-6 py-4 text-xs font-black text-right">
+                                                            <span className="text-slate-900 dark:text-white">
+                                                                €{Number(txn.amount_eur).toFixed(2)}
+                                                            </span>
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
                     </div>
 
                     {/* Support Section */}

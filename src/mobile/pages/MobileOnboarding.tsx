@@ -219,11 +219,13 @@ export default function MobileOnboarding() {
         try {
             const rawDigits = getDigits(phoneNumber);
             const fullPhone = `${countryDial}${rawDigits.startsWith('+') ? rawDigits.slice(countryDial.length) : rawDigits}`.trim();
-            const tierMap: any = { 'explorer': 'initiate', 'pro': 'elite', 'elite': 'global', 'global': 'global' };
+            
+            const isPremium = selectedPlan && selectedPlan !== 'explorer';
+            
             const { error } = await supabase.from('profiles').update({
                 selected_exam: selectedExam,
-                selected_plan: selectedPlan,
-                subscription_tier: tierMap[selectedPlan] || 'initiate',
+                selected_plan: 'explorer',
+                subscription_tier: 'initiate',
                 target_score: targetScore,
                 study_hours: selectedHours,
                 first_name: firstName,
@@ -240,6 +242,10 @@ export default function MobileOnboarding() {
             
             const pendingDownload = sessionStorage.getItem('pending_resource_download');
             const targetPath = pendingDownload ? `/resources/${pendingDownload}` : '/mobile/dashboard';
+            
+            if (isPremium) {
+                openPricingModal();
+            }
             
             console.log("Mobile Profile refresh successful, navigating to mobile dashboard in 2.5s...");
             setTimeout(() => {

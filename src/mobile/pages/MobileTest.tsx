@@ -297,23 +297,20 @@ export default function MobileTest() {
         }
     }, [testId, test, currentIndex, currentSectionIndex]);
 
-    // Auto-save progress every 5 seconds (only for non-ranked tests)
+    // Auto-save progress every 30 seconds (reduced from 5s to cut DB write volume)
+    // sessionStorage local cache above handles exact-second restore on reload.
     useEffect(() => {
         if (!test || test.status !== 'in_progress' || test.is_ranked) return;
 
         const interval = setInterval(() => {
             saveProgress();
-        }, 5000); // Save every 5 seconds
+        }, 30000);
 
         return () => clearInterval(interval);
     }, [test, saveProgress]);
 
-    // Save progress when navigating or answering (only for non-ranked tests)
-    useEffect(() => {
-        if (test && test.status === 'in_progress' && !test.is_ranked) {
-            saveProgress();
-        }
-    }, [currentIndex, test, saveProgress]);
+    // NOTE: Per-navigation saveProgress() removed — the 30s interval handles sync.
+    // handleNavigate already records time_spent_seconds via trackQuestionTime().
 
     // Timer logic extracted to SimpleMobileTimer
 

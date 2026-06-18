@@ -43,7 +43,9 @@ import {
     ShieldCheck,
     Globe,
     Flame,
-    Pencil
+    Pencil,
+    Lock,
+    Compass
 } from 'lucide-react';
 import { subDays } from 'date-fns';
 import { useTranslation } from 'react-i18next';
@@ -371,6 +373,7 @@ export default function Dashboard() {
     const [activeDates, setActiveDates] = useState<Set<string>>(new Set());
     const [upcomingSession, setUpcomingSession] = useState<any>(null);
     const { hasPremiumAccess, isAdmin } = usePlanAccess();
+    const [hasAnyCourse, setHasAnyCourse] = useState(false);
 
     useEffect(() => {
         if (!loading && !user) {
@@ -505,50 +508,14 @@ export default function Dashboard() {
 
     const fetchLastProgress = async () => {
         try {
-            if (!user || !activeExam) return null;
-            const { data: progresses, error } = await supabase
-                .from('learning_progress')
-                .select(`
-                    id,
-                    content_id,
-                    last_accessed_at,
-                    content:learning_content(
-                        title,
-                        subunit:learning_subunits(
-                            unit:learning_units(
-                                topic:learning_topics(
-                                    course_id,
-                                    course:learning_courses(
-                                        learning_exams(name)
-                                    )
-                                )
-                            )
-                        )
-                    )
-                `)
-                .eq('user_id', user.id)
-                .order('last_accessed_at', { ascending: false })
-                .limit(10);
-
-            if (error || !progresses || progresses.length === 0) return null;
-
-            const brand = activeExam.id.split('-')[0].toLowerCase();
-            for (const progress of progresses) {
-                const c = progress.content as any;
-                if (!c) continue;
-
-                let courseInfo = c.subunit?.unit?.topic?.course || c.unit?.topic?.course || c.topic?.course;
-                if (courseInfo && courseInfo.learning_exams) {
-                    const examName = courseInfo.learning_exams.name.toLowerCase();
-                    if (examName.includes(brand)) {
-                        let courseId = c.subunit?.unit?.topic?.course_id || c.unit?.topic?.course_id || c.topic?.course_id;
-                        return { ...progress, courseId, contentId: (progress as any).content_id };
-                    }
-                }
+            if (!user) return null;
+            const stored = localStorage.getItem(`last_accessed_course_lecture_${user.id}`);
+            if (stored) {
+                return JSON.parse(stored);
             }
             return null;
         } catch (err) {
-            console.error("Error fetching progress:", err);
+            console.error("Error fetching progress from localStorage:", err);
             return null;
         }
     };
@@ -572,7 +539,7 @@ export default function Dashboard() {
 
         try {
             // Stage 1: Fetch fresh in parallel (using optimized RPCs)
-            const [testsRes, mockSubmissionsRes, learningProgressRes, summaryStatsRes, subjectStatsRes] = await Promise.all([
+            const [testsRes, mockSubmissionsRes, learningProgressRes, summaryStatsRes, subjectStatsRes, courseEnrollmentsRes] = await Promise.all([
                 (supabase as any).from('tests').select('total_questions, correct_answers, created_at, test_type, status, is_mock').eq('exam_type', activeExam.id).eq('user_id', user.id).abortSignal(signal),
                 supabase.from('mock_exam_submissions').select('id').eq('user_id', user.id).abortSignal(signal),
                 supabase.from('learning_progress').select('last_accessed_at').eq('user_id', user.id).abortSignal(signal),
@@ -583,7 +550,8 @@ export default function Dashboard() {
                 (supabase as any).rpc('get_analytics_subjects_secure', {
                     user_uuid: String(user.id),
                     exam_type_id: String(activeExam.id)
-                })
+                }),
+                (supabase as any).from('course_enrollments').select('id').eq('user_id', user.id).eq('status', 'active').abortSignal(signal)
             ]);
 
             if (signal?.aborted) return;
@@ -673,6 +641,8 @@ export default function Dashboard() {
                 lastExamScore: lastExamScore,
                 gettingStartedProgress: progressScore
             });
+            
+            setHasAnyCourse(hasPremiumAccess || (courseEnrollmentsRes.data && courseEnrollmentsRes.data.length > 0));
 
             // ── PROCESS MASTERY ──
             const mastery = (activeExam.sections || []).map((section: any) => {
@@ -1263,34 +1233,61 @@ export default function Dashboard() {
 
                             {/* Continue Learning + Your Progress */}
                             <div className="grid sm:grid-cols-2 gap-4">
-                                {/* Continue Learning - Video */}
-                                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-400 via-orange-500 to-amber-600 p-5 shadow-lg">
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 blur-2xl rounded-full -mr-10 -mt-10" />
-                                    <div className="relative z-10">
-                                        <div className="flex items-center gap-2 mb-3">
-                                            <Play className="w-4 h-4 text-white fill-white" />
-                                            <span className="text-[10px] font-black text-white/80 uppercase tracking-widest">Continue Learning</span>
-                                            <span className="ml-auto text-[8px] bg-white/20 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-widest">Video</span>
+                                {lastProgress || hasAnyCourse ? (
+                                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-orange-400 via-orange-500 to-amber-600 p-5 shadow-lg">
+                                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 blur-2xl rounded-full -mr-10 -mt-10" />
+                                        <div className="relative z-10">
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <Play className="w-4 h-4 text-white fill-white" />
+                                                <span className="text-[10px] font-black text-white/80 uppercase tracking-widest">
+                                                    {lastProgress ? 'Continue Learning' : 'Start Learning'}
+                                                </span>
+                                                <span className="ml-auto text-[8px] bg-white/20 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-widest">Video</span>
+                                            </div>
+                                            <h3 className="text-white font-black text-base leading-tight mb-1 truncate">
+                                                {lastProgress?.title || 'Start Video Lessons'}
+                                            </h3>
+                                            <p className="text-white/70 text-xs font-bold mb-4">
+                                                {lastProgress ? 'Pick up right where you left off' : 'Jump into your first video lesson'}
+                                            </p>
+                                            <button
+                                                onClick={() => {
+                                                    if (lastProgress) {
+                                                        navigate(`/courses/${lastProgress.courseId}/subject/${lastProgress.subjectId}/chapter/${lastProgress.chapterId}`);
+                                                    } else {
+                                                        navigate('/courses');
+                                                    }
+                                                }}
+                                                className="flex items-center gap-2 bg-white text-orange-600 font-black text-xs uppercase tracking-widest px-4 py-2 rounded-xl hover:bg-orange-50 transition-colors shadow-sm"
+                                            >
+                                                {lastProgress ? 'Resume Lecture' : 'Start Watching'} <ArrowRight className="w-3 h-3" />
+                                            </button>
                                         </div>
-                                        <h3 className="text-white font-black text-base leading-tight mb-1 truncate">
-                                            {lastProgress?.content?.title || (weakestSubject ? weakestSubject.subject : 'Start Video Lessons')}
-                                        </h3>
-                                        <p className="text-white/70 text-xs font-bold mb-4">
-                                            {lastProgress ? 'Pick up where you left off' : weakestSubject ? `Weakest area · ${weakestSubject.accuracy}% accuracy` : 'Jump into your first video lesson'}
-                                        </p>
-                                        <button
-                                            onClick={() => {
-                                                toast({
-                                                    title: "Under Development",
-                                                    description: "The Learning Portal is currently under development. Stay tuned for exciting updates!",
-                                                });
-                                            }}
-                                            className="flex items-center gap-2 bg-white text-orange-600 font-black text-xs uppercase tracking-widest px-4 py-2 rounded-xl hover:bg-orange-50 transition-colors"
-                                        >
-                                            {lastProgress ? 'Resume Lecture' : 'Start Learning'} <ArrowRight className="w-3 h-3" />
-                                        </button>
                                     </div>
-                                </div>
+                                ) : (
+                                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-indigo-500 via-purple-500 to-indigo-600 p-5 shadow-lg">
+                                        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 blur-2xl rounded-full -mr-10 -mt-10" />
+                                        <div className="relative z-10">
+                                            <div className="flex items-center gap-2 mb-3">
+                                                <Compass className="w-4 h-4 text-white" />
+                                                <span className="text-[10px] font-black text-white/80 uppercase tracking-widest">Explore</span>
+                                                <span className="ml-auto text-[8px] bg-white/20 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-widest">Courses</span>
+                                            </div>
+                                            <h3 className="text-white font-black text-base leading-tight mb-1">
+                                                Start Video Lessons
+                                            </h3>
+                                            <p className="text-white/80 text-xs font-bold mb-4 pr-4 leading-tight">
+                                                Browse expert-led video courses and unlock full study materials.
+                                            </p>
+                                            <button
+                                                onClick={() => navigate('/courses')}
+                                                className="w-full sm:w-auto flex justify-center items-center gap-2 bg-white text-indigo-600 font-black text-xs uppercase tracking-widest px-4 py-2 rounded-xl hover:bg-indigo-50 transition-colors shadow-sm"
+                                            >
+                                                Browse Courses <ArrowRight className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                )}
 
                                 {/* Your Progress â€” Last Exam Score */}
                                 <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-5 shadow-sm">

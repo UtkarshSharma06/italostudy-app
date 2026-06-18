@@ -1252,11 +1252,10 @@ export default function Dashboard() {
                                             </p>
                                             <button
                                                 onClick={() => {
-                                                    if (lastProgress) {
-                                                        navigate(`/courses/${lastProgress.courseId}/subject/${lastProgress.subjectId}/chapter/${lastProgress.chapterId}`);
-                                                    } else {
-                                                        navigate('/courses');
-                                                    }
+                                                    toast({
+                                                        title: 'Under Development',
+                                                        description: 'Video courses are currently under development and will be available soon.',
+                                                    });
                                                 }}
                                                 className="flex items-center gap-2 bg-white text-orange-600 font-black text-xs uppercase tracking-widest px-4 py-2 rounded-xl hover:bg-orange-50 transition-colors shadow-sm"
                                             >
@@ -1280,7 +1279,12 @@ export default function Dashboard() {
                                                 Browse expert-led video courses and unlock full study materials.
                                             </p>
                                             <button
-                                                onClick={() => navigate('/courses')}
+                                                onClick={() => {
+                                                    toast({
+                                                        title: 'Under Development',
+                                                        description: 'Video courses are currently under development and will be available soon.',
+                                                    });
+                                                }}
                                                 className="w-full sm:w-auto flex justify-center items-center gap-2 bg-white text-indigo-600 font-black text-xs uppercase tracking-widest px-4 py-2 rounded-xl hover:bg-indigo-50 transition-colors shadow-sm"
                                             >
                                                 Browse Courses <ArrowRight className="w-3 h-3" />

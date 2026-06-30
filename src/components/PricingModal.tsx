@@ -67,11 +67,11 @@ export default function PricingModal() {
     const [selectedPlan, setSelectedPlan] = useState<string>('');
     const [selectedCycleId, setSelectedCycleId] = useState<string>('');
 
-    // Smooth entry: wait for modal to animate before heavy DOM render
     useEffect(() => {
         if (isPricingModalOpen) {
             setIsRendering(true);
-            const timer = setTimeout(() => setIsRendering(false), 300);
+            // Reduced from 300ms → 50ms: just enough for the animation frame to start
+            const timer = setTimeout(() => setIsRendering(false), 50);
             return () => clearTimeout(timer);
         }
     }, [isPricingModalOpen]);
@@ -247,13 +247,14 @@ export default function PricingModal() {
                     >
                                 <motion.div
                                 key="pricing-modal-mobile"
-                                initial={{ scale: 0.95, opacity: 0 }}
-                                animate={{ scale: 1, opacity: 1 }}
-                                exit={{ scale: 0.95, opacity: 0 }}
+                                initial={{ y: 30, opacity: 0 }}
+                                animate={{ y: 0, opacity: 1 }}
+                                exit={{ y: 30, opacity: 0 }}
                                 transition={{
-                                    duration: 0.2,
-                                    ease: "easeOut"
+                                    duration: 0.18,
+                                    ease: [0.22, 1, 0.36, 1]
                                 }}
+                                style={{ willChange: 'transform, opacity' }}
                                 className="flex md:hidden bg-white dark:bg-slate-900 w-full h-[100dvh] overflow-hidden flex-col relative gpu-accelerated font-sans rounded-t-[2.5rem]"
                                 onClick={(e) => e.stopPropagation()}
                             >
@@ -541,10 +542,11 @@ export default function PricingModal() {
                         */}
                         <motion.div
                             key="pricing-modal-desktop"
-                            initial={{ scale: 0.95, opacity: 0 }}
-                            animate={{ scale: 1, opacity: 1 }}
-                            exit={{ scale: 0.95, opacity: 0 }}
-                            transition={{ duration: 0.2, ease: "easeOut" }}
+                            initial={{ y: 20, opacity: 0 }}
+                            animate={{ y: 0, opacity: 1 }}
+                            exit={{ y: 20, opacity: 0 }}
+                            transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
+                            style={{ willChange: 'transform, opacity' }}
                             className="hidden md:flex flex-col w-[1000px] max-w-full h-[100dvh] max-h-[100dvh] rounded-none bg-white dark:bg-slate-900 overflow-hidden relative shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] font-sans"
                             onClick={(e) => e.stopPropagation()}
                         >

@@ -48,6 +48,9 @@ async function broadcastAlert(seatInfo: SeatInfo): Promise<number> {
     // Fetch subscribers based on their plan AND their preferences
     // Plans: Global or Elite (ilike matches with wildcards)
     // Preference: track_cent_uni or track_cent_casa based on modality
+    // IMPORTANT: NULL is treated as opted-in (default). Using .eq('track_cent_casa', true)
+    // would silently skip all users who never explicitly set preferences (NULL rows in Postgres
+    // do NOT match .eq(..., true)). We use .or() to include both NULL and true.
     // Also ensures subscription is NOT expired
     let query = supabase
         .from('profiles')
@@ -56,8 +59,9 @@ async function broadcastAlert(seatInfo: SeatInfo): Promise<number> {
         .or('selected_plan.ilike.%global%,selected_plan.ilike.%elite%,subscription_tier.ilike.%global%,subscription_tier.ilike.%elite%')
         .or(`subscription_expiry_date.gt.${new Date().toISOString()},subscription_expiry_date.is.null`);
 
-    if (isCasa) query = query.eq('track_cent_casa', true);
-    if (isUni) query = query.eq('track_cent_uni', true);
+    // NULL = not explicitly disabled → treat as opted-in (notify by default)
+    if (isCasa) query = query.or('track_cent_casa.is.null,track_cent_casa.eq.true');
+    if (isUni) query = query.or('track_cent_uni.is.null,track_cent_uni.eq.true');
 
     const { data: subscribers, error } = await query;
 

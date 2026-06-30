@@ -89,7 +89,7 @@ export default function MobileOnboarding() {
     const [isCheckingUsername, setIsCheckingUsername] = useState(false);
     const [isUsernameAvailable, setIsUsernameAvailable] = useState<boolean | null>(null);
 
-    const [selectedPlan, setSelectedPlan] = useState<string | null>(profile?.selected_plan || null);
+    const [selectedPlan, setSelectedPlan] = useState<string | null>(profile?.selected_plan || 'explorer');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showPricingHover, setShowPricingHover] = useState(false);
     const [isRedirecting, setIsRedirecting] = useState(false);
@@ -109,7 +109,6 @@ export default function MobileOnboarding() {
             // Smart Jump Logic: Jump to the FIRST missing field
             if (!profile.selected_exam) setStep(1);
             else if (!profile.username || !profile.phone_number) setStep(4);
-            else if (!profile.selected_plan) setStep(5);
             else {
                 // If everything is present, we shouldn't be here, but let's redirect to be safe
                 navigate('/mobile/dashboard');
@@ -604,57 +603,8 @@ export default function MobileOnboarding() {
                                     </>
                                 )}
 
-                                {step === 5 && (
-                                    <>
-                                        <div className="flex gap-3 items-start mb-5">
-                                            <div className="w-10 h-10 rounded-full bg-indigo-50 text-[#5A32FA] flex items-center justify-center shrink-0">
-                                                <Shield className="w-5 h-5" />
-                                            </div>
-                                            <div className="flex-1">
-                                                <h2 className="text-lg font-black text-slate-900 mb-0.5">Select Access Plan</h2>
-                                                <p className="text-slate-500 text-[11px] sm:text-xs">Choose the plan that fits your study needs.</p>
-                                            </div>
-                                            <button
-                                                onClick={() => setShowPricingHover(true)}
-                                                className="shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-indigo-50 text-[#5A32FA]"
-                                            >
-                                                <Info className="w-4 h-4" />
-                                            </button>
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-3 mb-2">
-                                            {plans.map((p) => {
-                                                const PlanIconMap: Record<string, any> = {
-                                                    'explorer': Shield,
-                                                    'pro': Rocket,
-                                                    'elite': Star,
-                                                    'global': Globe,
-                                                };
-                                                const PlanIcon = PlanIconMap[p.id] || Sparkles;
-                                                return (
-                                                    <button
-                                                        key={p.id}
-                                                        onClick={() => setSelectedPlan(p.id)}
-                                                        className={cn(
-                                                            "p-4 rounded-[1.25rem] border transition-all flex flex-col items-center text-center",
-                                                            selectedPlan === p.id ? "border-[#5A32FA] bg-[#F4F1FF]/50 ring-1 ring-[#5A32FA]" : "border-slate-200 bg-white active:bg-slate-50"
-                                                        )}
-                                                    >
-                                                        <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center mb-2 shadow-sm", selectedPlan === p.id ? "bg-[#5A32FA] text-white" : "bg-indigo-50 text-[#5A32FA]")}>
-                                                            <PlanIcon className="w-5 h-5" />
-                                                        </div>
-                                                        <h3 className={cn("font-black text-[11px] uppercase mb-0.5", selectedPlan === p.id ? "text-[#5A32FA]" : "text-slate-900")}>{p.name}</h3>
-                                                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
-                                                            {config.mode === 'beta' ? 'FREE ACCESS' : (p.monthlyPrice === 0 ? 'FREE' : formatPrice(p.monthlyPrice || 0))}
-                                                        </p>
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </>
-                                )}
-                                
                                 <div className="flex gap-3 justify-center w-full mt-6">
-                                    {!isMissingOnlyPhone && step > 1 && (
+                                    {step > 1 && (
                                         <button
                                             onClick={() => setStep(step === 4 ? 1 : step - 1)}
                                             className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 active:text-slate-600 transition-colors px-3 h-12 rounded-xl active:bg-slate-50 shrink-0"
@@ -665,14 +615,13 @@ export default function MobileOnboarding() {
                                     <Button
                                         disabled={
                                             (step === 1 && !selectedExam) ||
-                                            (step === 4 && (!firstName || !lastName || !username || !isUsernameAvailable || getDigits(phoneNumber).length !== phoneLimit || isSubmitting)) ||
-                                            (step === 5 && (!selectedPlan || isSubmitting || getDigits(phoneNumber).length !== phoneLimit || !firstName || !lastName || !username || !isUsernameAvailable))
+                                            (step === 4 && (!firstName || !lastName || !username || !isUsernameAvailable || getDigits(phoneNumber).length !== phoneLimit || isSubmitting))
                                         }
-                                        onClick={(step === 5 || (step === 4 && isMissingOnlyPhone)) ? handleConfirm : () => setStep(step === 1 ? 4 : step + 1)}
+                                        onClick={step === 4 ? handleConfirm : () => setStep(step === 1 ? 4 : step + 1)}
                                         className="flex-1 h-12 rounded-xl bg-[#5A32FA] text-white font-bold text-sm transition-all shadow-lg shadow-[#5A32FA]/20 active:scale-[0.98]"
                                     >
                                         {isSubmitting ? <Loader2 className="animate-spin w-4 h-4" /> :
-                                            (step === 5 || (step === 4 && isMissingOnlyPhone)) ? "Begin Preparation" : "Continue"}
+                                            (step === 4) ? "Begin Preparation" : "Continue"}
                                         {!isSubmitting && <ArrowRight className="ml-1.5 w-4 h-4" />}
                                     </Button>
                                 </div>

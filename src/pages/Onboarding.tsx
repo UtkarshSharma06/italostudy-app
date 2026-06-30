@@ -89,7 +89,7 @@ export default function Onboarding() {
     const [isCheckingUsername, setIsCheckingUsername] = useState(false);
     const [isUsernameAvailable, setIsUsernameAvailable] = useState<boolean | null>(null);
 
-    const [selectedPlan, setSelectedPlan] = useState<string | null>(profile?.selected_plan || null);
+    const [selectedPlan, setSelectedPlan] = useState<string | null>(profile?.selected_plan || 'explorer');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showPricingHover, setShowPricingHover] = useState(false);
     const [isRedirecting, setIsRedirecting] = useState(false);
@@ -109,7 +109,6 @@ export default function Onboarding() {
             // Smart Jump Logic: Jump to the FIRST missing piece of information
             if (!profile.selected_exam) setStep(1);
             else if (!profile.phone_number || !profile.username) setStep(4);
-            else if (!profile.selected_plan) setStep(5);
             else {
                 // If everything is present, we shouldn't be here
                 navigate('/dashboard');
@@ -215,11 +214,7 @@ export default function Onboarding() {
     const handleNextStep = () => {
         if (step === 1 && selectedExam) setStep(4);
         else if (step === 4 && firstName && lastName && username && isUsernameAvailable && getDigits(phoneNumber).length === phoneLimit) {
-            if (isMissingOnlyPhone) {
-                handleConfirm();
-            } else {
-                setStep(5);
-            }
+            handleConfirm();
         }
         else if (step === 4) {
             let desc = "Please fill in all details.";
@@ -600,60 +595,9 @@ export default function Onboarding() {
                             </>
                         )}
 
-                        {step === 5 && (
-                            <>
-                                <div className="flex gap-4 items-start mb-4 flex-col md:flex-row md:items-center md:justify-between w-full">
-                                    <div className="flex gap-4 items-center">
-                                        <div className="w-12 h-12 rounded-full bg-indigo-50 text-[#5A32FA] flex items-center justify-center shrink-0">
-                                            <Shield className="w-6 h-6" />
-                                        </div>
-                                        <div>
-                                            <h2 className="text-xl md:text-2xl font-black text-slate-900 mb-1">Select Access Plan</h2>
-                                            <p className="text-slate-500 text-sm">Choose the plan that fits your study needs.</p>
-                                        </div>
-                                    </div>
-                                    <button
-                                        onClick={() => setShowPricingHover(true)}
-                                        className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-[#5A32FA] hover:text-[#4a26d8] transition-colors bg-indigo-50 px-4 py-2 rounded-full"
-                                    >
-                                        <Info className="w-3.5 h-3.5" />
-                                        View Plan Details
-                                    </button>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                                    {plans.map((p) => {
-                                        const PlanIconMap: Record<string, any> = {
-                                            'explorer': Shield,
-                                            'pro': Rocket,
-                                            'elite': Star,
-                                            'global': Globe,
-                                        };
-                                        const PlanIcon = PlanIconMap[p.id] || Sparkles;
-                                        return (
-                                            <button
-                                                key={p.id}
-                                                onClick={() => setSelectedPlan(p.id)}
-                                                className={cn(
-                                                    "p-5 rounded-[2rem] border transition-all flex flex-col items-center text-center group",
-                                                    selectedPlan === p.id ? "border-[#5A32FA] bg-[#F4F1FF]/50 ring-1 ring-[#5A32FA]" : "border-slate-200 hover:border-[#5A32FA]/30 bg-white hover:bg-slate-50"
-                                                )}
-                                            >
-                                                <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center mb-4 shadow-sm", selectedPlan === p.id ? "bg-[#5A32FA] text-white" : "bg-indigo-50 text-[#5A32FA]")}>
-                                                    <PlanIcon className="w-6 h-6" />
-                                                </div>
-                                                <h3 className={cn("font-black text-xs uppercase mb-1", selectedPlan === p.id ? "text-[#5A32FA]" : "text-slate-900")}>{p.name}</h3>
-                                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
-                                                    {config.mode === 'beta' ? 'FREE ACCESS' : (p.monthlyPrice === 0 ? 'FREE' : formatPrice(p.monthlyPrice || 0))}
-                                                </p>
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </>
-                        )}
-                        
+
                         <div className="flex gap-4 justify-center w-full">
-                            {!isMissingOnlyPhone && step > 1 && (
+                            {step > 1 && (
                                 <button
                                     onClick={handleBack}
                                     className="flex items-center gap-2 text-[12px] font-bold text-slate-400 hover:text-slate-600 transition-colors px-6 h-12 rounded-xl hover:bg-slate-50"
@@ -664,14 +608,13 @@ export default function Onboarding() {
                             <Button
                                 disabled={
                                     (step === 1 && !selectedExam) ||
-                                    (step === 4 && (!firstName || !lastName || !username || !isUsernameAvailable || getDigits(phoneNumber).length !== phoneLimit || isSubmitting)) ||
-                                    (step === 5 && (!selectedPlan || isSubmitting || getDigits(phoneNumber).length !== phoneLimit || !firstName || !lastName || !username || !isUsernameAvailable))
+                                    (step === 4 && (!firstName || !lastName || !username || !isUsernameAvailable || getDigits(phoneNumber).length !== phoneLimit || isSubmitting))
                                 }
-                                onClick={step === 5 ? handleConfirm : handleNextStep}
+                                onClick={step === 4 ? handleConfirm : handleNextStep}
                                 className="w-full md:w-auto md:min-w-[200px] h-12 rounded-xl bg-[#5A32FA] hover:bg-[#4a26d8] text-white font-bold text-sm transition-all shadow-lg shadow-[#5A32FA]/20"
                             >
                                 {isSubmitting ? <Loader2 className="animate-spin w-4 h-4" /> :
-                                    (step === 5 || (step === 4 && isMissingOnlyPhone)) ? "Begin Preparation" : "Continue"}
+                                    (step === 4) ? "Begin Preparation" : "Continue"}
                                 {!isSubmitting && <ArrowRight className="ml-2 w-4 h-4" />}
                             </Button>
                         </div>

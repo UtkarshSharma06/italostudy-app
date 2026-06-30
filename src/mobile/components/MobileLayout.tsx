@@ -54,13 +54,13 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children, isLoading, hideHe
   const location = useLocation();
   const navigate = useNavigate();
   const [showPremiumAnimation, setShowPremiumAnimation] = useState(false);
-  const { isExplorer, isSubscriptionExpired } = usePlanAccess();
+  const { isExplorer, isSubscriptionExpired, isGlobal: isGlobalPlan, isElite } = usePlanAccess();
   const { toast } = useToast();
   const { isPageEnabled, getMaintenanceMessage } = usePageVisibility();
   const [isBypassed, setIsBypassed] = useState(false);
   const { openPricingModal } = usePricing();
 
-  const isGlobal = profile?.selected_plan === 'global';
+  const isGlobal = profile?.selected_plan === 'global' || isGlobalPlan || isElite;
 
   const currentPath = location.pathname;
   const activeIndex = tabs.findIndex(t => currentPath.startsWith(t.path));
@@ -389,7 +389,8 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children, isLoading, hideHe
         <SeatTrackerModal
           isOpen={isTrackerModalOpen}
           onClose={() => setIsTrackerModalOpen(false)}
-          isGlobal={profile?.selected_plan === 'global'}
+          isGlobal={isGlobal}
+          isExpired={isSubscriptionExpired}
         />
       </Suspense>
 

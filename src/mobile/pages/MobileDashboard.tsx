@@ -114,7 +114,7 @@ const MobileDashboard: React.FC = () => {
     const { activeTest, refreshActiveTest } = useActiveTest();
     const navigate = useNavigate();
     const { t } = useTranslation();
-    const { isExplorer, isGlobal } = usePlanAccess();
+    const { isExplorer, isGlobal, isElite, isSubscriptionExpired } = usePlanAccess();
     const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
     const [isTrackerModalOpen, setIsTrackerModalOpen] = useState(false);
     const [showReviewModal, setShowReviewModal] = useState(false);
@@ -1406,7 +1406,7 @@ const MobileDashboard: React.FC = () => {
                         description="Your current access level is Explorer. Upgrade to PRO to access full performance analysis and unlimited practice sessions."
                         feature="Full Platform Access"
                     />
-                    <SeatTrackerModal isOpen={isTrackerModalOpen} onClose={() => setIsTrackerModalOpen(false)} isGlobal={isGlobal} />
+                    <SeatTrackerModal isOpen={isTrackerModalOpen} onClose={() => setIsTrackerModalOpen(false)} isGlobal={isElite || isGlobal} isExpired={isSubscriptionExpired} />
                     <TrustpilotReviewModal
                         isOpen={showReviewModal}
                         onClose={() => setShowReviewModal(false)}

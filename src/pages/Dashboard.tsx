@@ -351,7 +351,7 @@ export default function Dashboard() {
     const [isTrackerModalOpen, setIsTrackerModalOpen] = useState(false);
     const [activeDates, setActiveDates] = useState<Set<string>>(new Set());
     const [upcomingSession, setUpcomingSession] = useState<any>(null);
-    const { hasPremiumAccess, isAdmin } = usePlanAccess();
+    const { hasPremiumAccess, isAdmin, isElite, isGlobal, isSubscriptionExpired } = usePlanAccess();
     const [hasAnyCourse, setHasAnyCourse] = useState(false);
 
     useEffect(() => {
@@ -1729,7 +1729,7 @@ export default function Dashboard() {
                 </>
             )}
 
-            <SeatTrackerModal isOpen={isTrackerModalOpen} onClose={() => setIsTrackerModalOpen(false)} isGlobal={hasPremiumAccess} />
+            <SeatTrackerModal isOpen={isTrackerModalOpen} onClose={() => setIsTrackerModalOpen(false)} isGlobal={isElite || isGlobal} isExpired={isSubscriptionExpired} />
             <TrustpilotReviewModal
                 isOpen={showReviewModal}
                 onClose={() => setShowReviewModal(false)}

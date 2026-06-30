@@ -12,9 +12,10 @@ interface SeatTrackerModalProps {
     isOpen: boolean;
     onClose: () => void;
     isGlobal: boolean;
+    isExpired?: boolean;
 }
 
-export function SeatTrackerModal({ isOpen, onClose, isGlobal }: SeatTrackerModalProps) {
+export function SeatTrackerModal({ isOpen, onClose, isGlobal, isExpired }: SeatTrackerModalProps) {
     const navigate = useNavigate();
     const { toast } = useToast();
     const { profile } = useAuth();
@@ -23,10 +24,10 @@ export function SeatTrackerModal({ isOpen, onClose, isGlobal }: SeatTrackerModal
     const [isLoadingSlots, setIsLoadingSlots] = useState(false);
 
     useEffect(() => {
-        if (isOpen && isGlobal) {
+        if (isOpen && isGlobal && !isExpired) {
             fetchAvailableSlots();
         }
-    }, [isOpen, isGlobal]);
+    }, [isOpen, isGlobal, isExpired]);
 
     const fetchAvailableSlots = async () => {
         setIsLoadingSlots(true);
@@ -88,6 +89,36 @@ export function SeatTrackerModal({ isOpen, onClose, isGlobal }: SeatTrackerModal
     };
 
     if (isGlobal) {
+        if (isExpired) {
+            return (
+                <Dialog open={isOpen} onOpenChange={onClose}>
+                    <DialogContent className="max-w-[340px] rounded-[2.5rem] border-none bg-white dark:bg-slate-900 p-8 shadow-2xl sm:max-w-md">
+                        <div className="flex flex-col items-center text-center space-y-4">
+                            <div className="w-16 h-16 bg-red-50 dark:bg-red-900/30 rounded-2xl flex items-center justify-center text-red-500 mb-2">
+                                <Zap className="w-8 h-8 opacity-50" />
+                            </div>
+                            <DialogTitle className="text-xl font-black text-slate-900 dark:text-slate-100 uppercase tracking-tight">
+                                Plan <span className="text-red-500">Expired</span>
+                            </DialogTitle>
+                            <DialogDescription className="text-slate-500 dark:text-slate-400 font-bold text-xs leading-relaxed max-w-[240px]">
+                                Your Global Plan has expired. Please renew your subscription to access the live seat radar and Telegram notifications again.
+                            </DialogDescription>
+                            
+                            <Button 
+                                onClick={() => {
+                                    onClose();
+                                    openPricingModal();
+                                }}
+                                className="w-full mt-4 h-12 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black uppercase text-[10px] tracking-widest shadow-lg active:scale-95 transition-all"
+                            >
+                                Renew Plan Now
+                            </Button>
+                        </div>
+                    </DialogContent>
+                </Dialog>
+            );
+        }
+
         // Construct the magic link using the user's unique token
         const botUsername = "ItaloStudyBot"; // This should match your actual bot username
         const telegramMagicLink = profile?.telegram_verification_token

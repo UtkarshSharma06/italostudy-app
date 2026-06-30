@@ -116,7 +116,7 @@ export default function Layout({
         return null;
     });
     const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-    const { shouldBlockAccess, isExplorer, plan, isSubscriptionExpired, hasPremiumAccess } = usePlanAccess();
+    const { shouldBlockAccess, isExplorer, plan, isSubscriptionExpired, hasPremiumAccess, isGlobal, isElite } = usePlanAccess();
     const { openPricingModal } = usePricing();
     const [showPremiumAnimation, setShowPremiumAnimation] = useState(false);
     const { toast } = useToast();
@@ -852,7 +852,8 @@ export default function Layout({
                 <SeatTrackerModal 
                     isOpen={isTrackerModalOpen} 
                     onClose={() => setIsTrackerModalOpen(false)} 
-                    isGlobal={profile?.selected_plan === 'global'} 
+                    isGlobal={isGlobal || isElite} 
+                    isExpired={isSubscriptionExpired}
                 />
             </Suspense>
 

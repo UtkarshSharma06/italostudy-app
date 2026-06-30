@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { useExam } from '@/context/ExamContext';
-import { BookOpen, ChevronRight, Zap, Target, Clock, ArrowLeft, Trophy, Crown } from 'lucide-react';
+import { BookOpen, ChevronRight, Zap, Target, Clock, ArrowLeft, Trophy, Crown, Info } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { usePlanAccess } from '@/hooks/usePlanAccess';
 import { UpgradeModal } from '@/components/UpgradeModal';

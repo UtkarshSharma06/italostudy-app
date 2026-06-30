@@ -168,7 +168,29 @@ export default function Pricing() {
 
     const getPlanCycle = (plan: any) => {
         if (plan.cycles && plan.cycles.length > 0) {
-            const index = billingCycle === 'monthly' ? 0 : 1;
+            // Match by name or duration properties — never by index, since admin can save cycles in any order
+            const isQuarterly = billingCycle === 'quarterly';
+            const isMonthly = billingCycle === 'monthly';
+
+            // Try name-based match first
+            const byName = plan.cycles.find((c: any) => {
+                const n = (c.name || '').toLowerCase();
+                if (isQuarterly) return n.includes('quarter');
+                if (isMonthly) return n.includes('month') && !n.includes('quarter');
+                return n.includes(billingCycle.toLowerCase());
+            });
+            if (byName) return byName;
+
+            // Fallback: match by durationValue/durationUnit
+            const byDuration = plan.cycles.find((c: any) => {
+                if (isQuarterly) return c.durationValue === 3 && c.durationUnit === 'months';
+                if (isMonthly) return c.durationValue === 1 && c.durationUnit === 'months';
+                return false;
+            });
+            if (byDuration) return byDuration;
+
+            // Last resort: index-based (0 = monthly, 1 = quarterly)
+            const index = isMonthly ? 0 : 1;
             return plan.cycles[Math.min(index, plan.cycles.length - 1)];
         }
         return null;
@@ -517,7 +539,7 @@ export default function Pricing() {
                         onClose={() => setShowCheckout(false)}
                         planId={checkoutPlan.id}
                         planName={checkoutPlan.name}
-                        amount={billingCycle === 'monthly' ? checkoutPlan.monthlyPrice : checkoutPlan.quarterlyPrice}
+                        amount={getPlanCycle(checkoutPlan)?.price ?? (billingCycle === 'monthly' ? checkoutPlan.monthlyPrice : checkoutPlan.quarterlyPrice)}
                         currency="EUR"
                         regionalPrices={getPlanCycle(checkoutPlan)?.regionalPrices || checkoutPlan.regionalPrices}
                         billingCycle={billingCycle}

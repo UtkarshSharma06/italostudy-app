@@ -364,10 +364,10 @@ export default function CheckoutModal({
         }
     };
 
-    // Helper to match duration roughly
+    // Helper to match duration roughly — NOTE: check 'quarter' BEFORE 'month' to avoid false-positive
     const filterDurationValue = (cycle: string) => {
-        if (cycle.includes('month')) return 1;
         if (cycle.includes('quarter')) return 3;
+        if (cycle.includes('month')) return 1;
         if (cycle.includes('year')) return 1;
         return 1;
     }
@@ -377,6 +377,34 @@ export default function CheckoutModal({
         if (cycle.includes('year')) return 'years';
         return 'months';
     }
+
+    /**
+     * Finds the correct cycle for a plan using multiple strategies in priority order:
+     * 1. Match by the actualDurationValue/actualDurationUnit props (most reliable — already resolved by parent)
+     * 2. Match by cycle name containing billingCycle string
+     * 3. Match by filterDurationValue/filterDurationUnit derived from billingCycle string
+     * Falls back to undefined (caller handles missing ID).
+     */
+    const findMatchingCycle = (plan: any) => {
+        if (!plan?.cycles) return undefined;
+        // Priority 1: exact durationValue + durationUnit match using already-resolved props
+        const byProps = plan.cycles.find((c: any) =>
+            c.durationValue === actualDurationValue && c.durationUnit === actualDurationUnit
+        );
+        if (byProps) return byProps;
+
+        // Priority 2: name contains billing cycle keyword
+        const byName = plan.cycles.find((c: any) =>
+            c.name.toLowerCase().includes(billingCycle.toLowerCase())
+        );
+        if (byName) return byName;
+
+        // Priority 3: derive from billingCycle string
+        return plan.cycles.find((c: any) =>
+            c.durationValue === filterDurationValue(billingCycle) &&
+            c.durationUnit === filterDurationUnit(billingCycle)
+        );
+    };
 
     // ── Edge Function Retry Helper ───────────────────────────────────────────
     // Invokes an edge function with up to 3 retries and exponential backoff on failure.
@@ -401,14 +429,8 @@ export default function CheckoutModal({
 
             // 1. Get the Gateway Plan ID for Razorpay Subscriptions
             const plan = config?.plans.find(p => p.id === planId);
-            let gatewayPlanId = null;
-            if (plan?.cycles) {
-                const cycle = plan.cycles.find(c => 
-                    (c.durationValue === filterDurationValue(billingCycle) && c.durationUnit === filterDurationUnit(billingCycle)) || 
-                    c.name.toLowerCase().includes(billingCycle.toLowerCase())
-                );
-                gatewayPlanId = cycle?.razorpayId;
-            }
+            const matchedCycle = findMatchingCycle(plan);
+            const gatewayPlanId = matchedCycle?.razorpayId ?? null;
 
             if (!gatewayPlanId) {
                 throw new Error('Razorpay Subscription Plan ID is not configured for this cycle.');
@@ -515,14 +537,8 @@ export default function CheckoutModal({
 
             // 1. Get the Gateway Plan ID for PayPal Subscriptions
             const plan = config?.plans.find(p => p.id === planId);
-            let gatewayPlanId = null;
-            if (plan?.cycles) {
-                const cycle = plan.cycles.find(c => 
-                    (c.durationValue === filterDurationValue(billingCycle) && c.durationUnit === filterDurationUnit(billingCycle)) || 
-                    c.name.toLowerCase().includes(billingCycle.toLowerCase())
-                );
-                gatewayPlanId = cycle?.paypalId;
-            }
+            const matchedCycle = findMatchingCycle(plan);
+            const gatewayPlanId = matchedCycle?.paypalId ?? null;
 
             if (!gatewayPlanId) {
                 throw new Error('PayPal Subscription Plan ID is not configured for this cycle.');
@@ -735,14 +751,8 @@ export default function CheckoutModal({
 
             // 1. Get the Gateway Plan ID for Dodo Subscriptions
             const plan = config?.plans.find(p => p.id === planId);
-            let gatewayPlanId = null;
-            if (plan?.cycles) {
-                const cycle = plan.cycles.find(c =>
-                    (c.durationValue === filterDurationValue(billingCycle) && c.durationUnit === filterDurationUnit(billingCycle)) ||
-                    c.name.toLowerCase().includes(billingCycle.toLowerCase())
-                );
-                gatewayPlanId = cycle?.dodoId;
-            }
+            const matchedCycle = findMatchingCycle(plan);
+            const gatewayPlanId = matchedCycle?.dodoId ?? null;
 
             if (!gatewayPlanId) {
                 throw new Error('Dodo Subscription Plan ID is not configured for this cycle. Please contact support.');

@@ -118,7 +118,8 @@ export default function ProtectedRoute({ children, allowedRoles, allowedPlans }:
     }
 
     // Role-based protection
-    const userPlan = profile?.selected_plan || 'explorer';
+    const rawPlan = profile?.selected_plan || 'explorer';
+    const userPlan = (rawPlan === 'free' || rawPlan === 'initiate') ? 'explorer' : rawPlan;
     const userTier = profile?.subscription_tier?.toLowerCase() || '';
 
     // Check if the current user has any of the allowed roles

@@ -26,10 +26,13 @@ export function usePlanAccess() {
     const plan = profile?.selected_plan || 'explorer';
     const tier = profile?.subscription_tier?.toLowerCase() || '';
 
-    const isExplorer = plan === 'explorer';
+    // 'free' and 'initiate' are DB-level values that map to the Explorer/free tier
+    const FREE_TIERS = ['free', 'initiate', 'explorer', ''];
+    const isExplorer = plan === 'explorer' || plan === 'free' || FREE_TIERS.includes(tier);
     const isPro = plan === 'pro'; // Legacy check
-    const isElite = plan === 'global' || tier === 'elite' || tier === 'global';
-    const isGlobal = tier === 'global';
+    // Only treat as elite/global if tier is explicitly premium (not free/initiate)
+    const isElite = (plan === 'global' || tier === 'elite' || tier === 'global') && !FREE_TIERS.includes(tier);
+    const isGlobal = tier === 'global' && !FREE_TIERS.includes(tier);
     const isAdmin = profile?.role === 'admin';
 
     // Subscription Expiry Check
@@ -42,7 +45,6 @@ export function usePlanAccess() {
     // "Premium" means valid Elite/Global subscription (Admins must use overrides or specific plan to see premium UI)
     // Changing this so Admin status doesn't automatically hide limits in the UI, allowing for testing.
     const hasPremiumAccess = (isElite || isGlobal) && !isSubscriptionExpired;
-
 
     // Block access if expired and trying to use paid features (and not admin)
     const shouldBlockAccess = isSubscriptionExpired && !isExplorer && !isAdmin;

@@ -24,7 +24,7 @@ const PremiumOverlay: React.FC<PremiumOverlayProps> = ({
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             className={cn(
-                "fixed inset-0 z-[100] flex flex-col items-center justify-center p-6 bg-white/10 dark:bg-slate-900/20 backdrop-blur-xl saturate-[1.8] transition-all duration-700 pointer-events-auto",
+                "fixed inset-0 z-[40] flex flex-col items-center justify-center p-6 bg-white/10 dark:bg-slate-900/20 backdrop-blur-xl saturate-[1.8] transition-all duration-700 pointer-events-auto",
                 className
             )}
         >

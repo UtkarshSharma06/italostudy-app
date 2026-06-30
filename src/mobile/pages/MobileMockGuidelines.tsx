@@ -3,6 +3,8 @@ import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useExam } from '@/context/ExamContext';
 import { useAuth } from '@/lib/auth';
+import { usePricing } from '@/context/PricingContext';
+import { usePlanAccess } from '@/hooks/usePlanAccess';
 import { 
   ShieldCheck, Clock, Target, Info, Zap, 
   CheckCircle2, Monitor, Globe, ChevronLeft,
@@ -23,6 +25,8 @@ export default function MobileMockGuidelines() {
     const { allExams } = useExam();
     const { profile } = useAuth();
     const { toast } = useToast();
+    const { openPricingModal } = usePricing();
+    const { hasReachedMockLimit } = usePlanAccess();
     
     const sessionId = searchParams.get('session_id');
     const examTypeParam = searchParams.get('exam_type');
@@ -56,6 +60,11 @@ export default function MobileMockGuidelines() {
     };
 
     const handleStart = () => {
+        if (hasReachedMockLimit()) {
+            openPricingModal();
+            return;
+        }
+
         if (!isAccepted) {
             toast({
                 title: "Missing Action: Checkbox",

@@ -15,6 +15,7 @@ import { usePlanAccess } from '@/hooks/usePlanAccess';
 import { cn } from '@/lib/utils';
 // EXAMS import removed
 import { UpgradeModal } from '@/components/UpgradeModal';
+import { SubjectIcon } from '@/components/ui/SubjectIcon';
 import { useActiveTest } from '@/hooks/useActiveTest';
 import { ToastAction } from '@/components/ui/toast';
 import { readDashboardCache, invalidateDashboardCache } from '@/hooks/useDashboardPrefetch';
@@ -24,7 +25,7 @@ export default function MobileStartTest() {
     const navigate = useNavigate();
     const { toast } = useToast();
     const { activeExam, allExams } = useExam();
-    const { hasReachedSubjectLimit, getRemainingQuestions, isExplorer } = usePlanAccess();
+    const { hasReachedSubjectLimit, hasReachedMockLimit, getRemainingQuestions, isExplorer } = usePlanAccess();
     const { activeTest } = useActiveTest();
     const [searchParams] = useSearchParams();
 
@@ -109,6 +110,12 @@ export default function MobileStartTest() {
 
     const handlePracticeMockStart = async () => {
         if (!user || !sessionId) return;
+
+        if (hasReachedMockLimit()) {
+            setIsUpgradeModalOpen(true);
+            return;
+        }
+
         setIsGenerating(true);
         try {
             // Fetch session details
@@ -292,6 +299,7 @@ export default function MobileStartTest() {
             const examIds = [activeExam?.id || ''];
             if (activeExam?.id === 'cent-s-prep') examIds.push('cent-s');
             if (activeExam?.id === 'imat-prep') examIds.push('imat');
+            if (activeExam?.id === 'til-i-prep') examIds.push('til-i');
             query = query.in('exam_type', examIds)
                 .eq('subject', subject);
 
@@ -494,7 +502,9 @@ export default function MobileStartTest() {
                                 onClick={() => setSubject(s.name)}
                                 className={`shrink-0 flex flex-col items-center justify-center w-24 h-24 rounded-3xl border-2 transition-all active:scale-95 relative ${subject === s.name ? 'border-primary bg-primary/5 shadow-lg' : 'border-border/50 bg-secondary/10'}`}
                             >
-                                <span className="text-2xl mb-1">{s.icon}</span>
+                                <span className="mb-1">
+                                    <SubjectIcon subjectName={s.name} fallbackIcon={s.icon} className="w-8 h-8" />
+                                </span>
                                 <span className="text-[8px] font-black uppercase text-center px-1 leading-tight">{s.name}</span>
                                 {subject === s.name && <div className="absolute top-2 right-2 w-4 h-4 bg-primary rounded-full flex items-center justify-center"><Check size={8} className="text-white" /></div>}
                             </button>

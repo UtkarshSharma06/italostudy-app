@@ -35,7 +35,15 @@ import {
     ShoppingBag,
     Bug,
     Radar,
-    GraduationCap
+    GraduationCap,
+    Flame,
+    Target,
+    ChevronsLeft,
+    ChevronsRight,
+    TrendingUp,
+    Trophy,
+    ChevronRight,
+    Newspaper
 } from 'lucide-react';
 import { useTheme } from 'next-themes';
 import { cn } from '@/lib/utils';
@@ -60,6 +68,8 @@ import { useToast } from '@/hooks/use-toast';
 import { getOptimizedImageUrl } from '@/lib/image-optimizer';
 import { useLiveEdit } from '@/contexts/LiveEditContext';
 import { usePageVisibility } from '@/hooks/usePageVisibility';
+import { useSystemSettings } from '@/context/SystemSettingsContext';
+import { useGamification } from '@/hooks/useGamification';
 import { MaintenanceOverlay } from './MaintenanceOverlay';
 import Footer from './Footer';
 
@@ -67,6 +77,7 @@ const AnnouncementBar = lazy(() => import('./AnnouncementBar'));
 const SeatTrackerModal = lazy(() => import('./SeatTrackerModal').then(m => ({ default: m.SeatTrackerModal })));
 import { SidebarSkeleton, HeaderSkeleton, MobileHeaderSkeleton, MobileBottomBarSkeleton } from './SkeletonLoader';
 import { getSkeletonForPath } from '@/lib/skeletons';
+const SupportWidget = lazy(() => import('./SupportWidget'));
 
 interface LayoutProps {
     children: ReactNode;
@@ -104,8 +115,8 @@ export default function Layout({
         }
         return null;
     });
-    const [isSidebarHovered, setIsSidebarHovered] = useState(false);
-    const { shouldBlockAccess, isExplorer, plan, isSubscriptionExpired } = usePlanAccess();
+    const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+    const { shouldBlockAccess, isExplorer, plan, isSubscriptionExpired, hasPremiumAccess } = usePlanAccess();
     const { openPricingModal } = usePricing();
     const [showPremiumAnimation, setShowPremiumAnimation] = useState(false);
     const { toast } = useToast();
@@ -113,6 +124,7 @@ export default function Layout({
     const [hasError, setHasError] = useState(false);
     const { isPageEnabled, getMaintenanceMessage } = usePageVisibility();
     const [isBypassed, setIsBypassed] = useState(false);
+    const gamification = useGamification(user?.id);
 
 
     useEffect(() => {
@@ -195,47 +207,13 @@ export default function Layout({
     }, [user]);
 
     const [hasUnreadCommunityMessages, setHasUnreadCommunityMessages] = useState(false);
-    const [enableCommunity, setEnableCommunity] = useState(true);
 
-    useEffect(() => {
-        const fetchSettings = async () => {
-            const { data } = await supabase
-                .from('system_settings')
-                .select('value')
-                .eq('key', 'enable_community')
-                .maybeSingle();
-            if (data) setEnableCommunity(data.value as boolean);
-        };
-        fetchSettings();
-
-        const channel = supabase
-            .channel('layout-community-check')
-            .on('postgres_changes', { event: '*', schema: 'public', table: 'system_settings' }, fetchSettings)
-            .subscribe();
-
-        return () => { supabase.removeChannel(channel); };
-    }, []);
+    const { getSetting } = useSystemSettings();
+    const enableCommunity = getSetting('enable_community') !== false; // default true
 
     useEffect(() => {
         if (!user) return;
         fetchGlobalUnread();
-
-        // Listen for subscription upgrades to show animation
-        const profileSub = supabase
-            .channel('profile-upsell-check')
-            .on('postgres_changes', {
-                event: 'UPDATE',
-                schema: 'public',
-                table: 'profiles',
-                filter: `id=eq.${user.id}`
-            }, (payload) => {
-                const oldPlan = payload.old?.selected_plan || 'explorer';
-                const newPlan = payload.new?.selected_plan;
-                if (oldPlan === 'explorer' && newPlan !== 'explorer') {
-                    setShowPremiumAnimation(true);
-                }
-            })
-            .subscribe();
 
         const messageSub = supabase
             .channel('global-chat-notifications')
@@ -243,7 +221,7 @@ export default function Layout({
             .on('postgres_changes', { event: '*', schema: 'public', table: 'community_read_status', filter: `user_id=eq.${user.id}` }, () => fetchGlobalUnread())
             .subscribe();
 
-        // Listen for premium upgrade success event (from payment completion)
+        // Listen for premium upgrade success event (from payment completion OR profile_changes in auth.tsx)
         const handlePremiumUpgrade = () => {
             setShowPremiumAnimation(true);
         };
@@ -251,7 +229,6 @@ export default function Layout({
 
         return () => {
             supabase.removeChannel(messageSub);
-            supabase.removeChannel(profileSub);
             window.removeEventListener('premium-upgrade-success', handlePremiumUpgrade);
         };
     }, [user, fetchGlobalUnread, activeExam?.id]);
@@ -275,17 +252,27 @@ export default function Layout({
     }
 
 
-    const navItems = [
+    const mainNav = [
         { label: 'Dashboard', path: '/', icon: LayoutDashboard },
-        { label: 'Subjects', path: '/subjects', icon: Book },
+        { label: 'Courses', path: '/courses', icon: GraduationCap },
+        { label: 'Subjects', path: '/subjects', icon: BookOpen },
         { label: 'Practice', path: '/practice', icon: Pencil },
-        { label: 'Learning', path: '/learning', icon: Play, isSoon: true },
-        // { label: 'Courses', path: '/courses', icon: GraduationCap },
-        { label: 'Community', path: '/community', icon: MessageCircle },
-        { label: 'Store', path: '/store', icon: ShoppingBag },
-        { label: 'Mock Exams', path: '/mock-exams', icon: Globe },
-        { label: 'Analytics', path: '/analytics', icon: BarChart3 },
+        { label: 'Mock Tests', path: '/mock-exams', icon: Target },
+        { label: 'Resources', path: '/resources', icon: FileText },
     ];
+
+    const trackNav = [
+        { label: 'Analytics', path: '/analytics', icon: BarChart3 },
+        { label: 'History', path: '/history', icon: Clock },
+        { label: 'Saved', path: '/bookmarks', icon: Bookmark },
+    ];
+
+    const exploreNav = [
+        { label: 'Blog', path: '/blog', icon: Newspaper },
+        { label: 'Store', path: '/store', icon: ShoppingBag },
+    ];
+
+    const allNavItems = [...mainNav, ...trackNav, ...exploreNav, { label: 'Chats', path: '/community', icon: MessageCircle }];
 
     const displayName = profile?.display_name || profile?.full_name?.split(' ')[0] || user?.user_metadata?.full_name?.split(' ')[0] || 'Student';
 
@@ -336,136 +323,299 @@ export default function Layout({
 
             {/* Sidebar logic stays at the top level of the horizontal flex container */}
 
-            {/* Disney+ Style Sidebar */}
+            {/* Disney+ Style Sidebar Redesigned */}
             {variant === 'dashboard' && showHeader && !isMobile && !isAdminPath && !isEditMode && !location.pathname.startsWith('/community') && (
                 <motion.nav
                     initial={false}
-                    animate={{ width: isSidebarHovered ? 210 : 72 }}
-                    onMouseEnter={() => setIsSidebarHovered(true)}
-                    onMouseLeave={() => setIsSidebarHovered(false)}
-                    className="fixed left-0 top-0 bottom-0 z-[120] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border-r border-slate-200 dark:border-slate-800 shadow-[8px_0_32px_rgba(0,0,0,0.06)] flex flex-col items-center py-6 group transition-colors duration-500"
-                    transition={{ type: "tween", ease: "circOut", duration: 0.15 }}
+                    animate={{ width: isSidebarCollapsed ? 72 : 280 }}
+                    style={{ zoom: '0.9' }}
+                    className="fixed left-0 top-0 bottom-0 z-[120] bg-[#fdfdfd] dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 shadow-[8px_0_32px_rgba(0,0,0,0.03)] flex flex-col pt-6 pb-4 transition-colors duration-500 group"
+                    transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 >
-                    {/* Sidebar Logo */}
-                    <Link to="/" className="mb-10 shrink-0 px-4 w-full h-12 flex items-center justify-center relative">
-                        <AnimatePresence mode="wait" initial={false}>
-                            {isSidebarHovered ? (
-                                <motion.img
-                                    key="full-logo"
-                                    initial={{ opacity: 0, scale: 0.95 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.95 }}
-                                    transition={{ duration: 0.1 }}
-                                    src={theme === 'dark' ? "/logo-dark-full.webp" : "/logo.webp"}
-                                    alt="logo"
-                                    loading="eager"
-                                    className="h-10 w-full object-contain"
-                                />
-                            ) : (
-                                <motion.div
-                                    key="collapsed-logo"
-                                    initial={{ opacity: 0, scale: 0.9 }}
-                                    animate={{ opacity: 1, scale: 1 }}
-                                    exit={{ opacity: 0, scale: 0.9 }}
-                                    transition={{ duration: 0.1 }}
-                                    className="w-12 h-12 flex items-center justify-center"
-                                >
-                                    <img 
-                                        src={theme === 'dark' ? "/logo-dark-compact.webp" : "/sidebar-logo.webp"} 
-                                        alt="logo" 
-                                        loading="eager"
-                                        className="w-12 h-12 object-contain" 
+                    {/* Header: Logo and Toggle */}
+                    <div className="flex items-center justify-between px-5 mb-8 shrink-0 relative">
+                        <Link to="/" className="flex items-center h-8">
+                            <AnimatePresence mode="wait" initial={false}>
+                                {!isSidebarCollapsed ? (
+                                    <motion.img
+                                        key="full-logo"
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        src={theme === 'dark' ? "/logo-dark-full.webp" : "/logo.webp"}
+                                        alt="logo"
+                                        className="h-8 object-contain origin-left"
                                     />
-                                </motion.div>
-                            )}
-                        </AnimatePresence>
-                    </Link>
+                                ) : (
+                                    <motion.img
+                                        key="collapsed-logo"
+                                        initial={{ opacity: 0 }}
+                                        animate={{ opacity: 1 }}
+                                        exit={{ opacity: 0 }}
+                                        src={theme === 'dark' ? "/logo-dark-compact.webp" : "/sidebar-logo.webp"}
+                                        alt="logo"
+                                        className="h-12 w-12 object-contain absolute left-3"
+                                    />
+                                )}
+                            </AnimatePresence>
+                        </Link>
+                        {!isSidebarCollapsed && (
+                            <button 
+                                onClick={() => setIsSidebarCollapsed(true)}
+                                className="w-6 h-6 rounded-full bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 flex items-center justify-center text-slate-500 transition-colors shrink-0"
+                            >
+                                <ChevronsLeft size={14} />
+                            </button>
+                        )}
+                        {isSidebarCollapsed && (
+                            <button 
+                                onClick={() => setIsSidebarCollapsed(false)}
+                                className="absolute right-[-12px] top-1 w-6 h-6 rounded-full bg-indigo-500 flex items-center justify-center text-white shadow-md z-10 hover:scale-110 transition-transform opacity-0 group-hover:opacity-100"
+                            >
+                                <ChevronRight size={14} />
+                            </button>
+                        )}
+                    </div>
 
                     {isLoading ? (
                         <SidebarSkeleton />
                     ) : (
-                        <>
-                            {/* Nav Items */}
-                            <div className="flex-1 w-full space-y-1 px-3">
-                                {navItems.map((item) => {
-                                    const isActive = location.pathname === item.path;
-                                    return (
-                                        <button
-                                            key={item.path}
-                                            onClick={() => handleNavClick(item.path)}
-                                            className={`relative flex items-center w-full h-12 rounded-xl transition-all duration-300 group ${isActive
-                                                ? 'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-100/50 dark:border-indigo-500/20'
-                                                : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800 hover:text-slate-600 dark:hover:text-slate-200'
-                                                }`}
-                                        >
-                                            <div className="min-w-[48px] h-12 flex items-center justify-center shrink-0 relative">
-                                                <item.icon className={cn(
-                                                    "w-[18px] h-[18px] transition-all duration-300",
-                                                    isActive ? 'scale-110 drop-shadow-[0_0_8px_rgba(79,70,229,0.3)]' : 'group-hover:scale-110',
-                                                    !isActive && plan === 'global' ? 'text-amber-500/80 shadow-[0_0_10px_rgba(245,158,11,0.2)]' : ''
-                                                )} />
-
-                                                {/* Notification Badge for Community */}
-                                                {item.label === 'Community' && hasUnreadCommunityMessages && (
-                                                    <motion.div
-                                                        initial={{ scale: 0 }}
-                                                        animate={{ scale: 1 }}
-                                                        className="absolute top-3 right-3 w-2.5 h-2.5 bg-rose-500 rounded-full border-2 border-white shadow-[0_0_10px_rgba(244,63,94,0.4)]"
-                                                    />
+                        <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide flex flex-col gap-6 px-4 pb-10">
+                            {/* Profile Card */}
+                            {!isSidebarCollapsed ? (
+                                <div className="p-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm flex flex-col gap-3 shrink-0">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-10 h-10 rounded-full bg-indigo-100 border-2 border-indigo-100 dark:border-slate-800 overflow-hidden shrink-0">
+                                            {profile?.avatar_url ? (
+                                                <img src={getOptimizedImageUrl(profile.avatar_url, 80, 80)} alt="avatar" className="w-full h-full object-cover" />
+                                            ) : (
+                                                <div className="w-full h-full flex items-center justify-center text-indigo-500 font-bold">
+                                                    {displayName.charAt(0).toUpperCase()}
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div className="flex-1 min-w-0">
+                                            <div className="flex items-center gap-1.5 flex-wrap">
+                                                <h4 className="text-[13px] font-bold text-slate-900 dark:text-white truncate max-w-[120px]">{displayName.split(' ')[0]}</h4>
+                                                {hasPremiumAccess ? (
+                                                    <span className="flex items-center gap-1 bg-gradient-to-r from-amber-200 to-yellow-400 text-yellow-900 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest shadow-sm shrink-0">
+                                                        <Crown size={10} className="shrink-0" />
+                                                        GLOBAL
+                                                    </span>
+                                                ) : (
+                                                    <ShieldCheck size={14} className="text-indigo-500 shrink-0" />
                                                 )}
                                             </div>
-                                            <AnimatePresence mode="wait">
-                                                {isSidebarHovered && (
-                                                    <motion.span
-                                                        initial={{ opacity: 0, x: -10 }}
-                                                        animate={{ opacity: 1, x: 0 }}
-                                                        exit={{ opacity: 0, x: -10 }}
-                                                        transition={{ duration: 0.1 }}
-                                                        className={`text-[10px] font-black uppercase tracking-[0.05em] whitespace-nowrap overflow-hidden origin-left ${isActive ? 'text-indigo-600' : 'text-slate-500'}`}
-                                                    >
-                                                        {item.label}
-                                                    </motion.span>
-                                                )}
-                                            </AnimatePresence>
-
-                                            {/* Active Indicator Strip */}
-                                            {isActive && (
-                                                <motion.div
-                                                    layoutId="active-indicator"
-                                                    className="absolute left-0 w-1 h-6 bg-indigo-600 rounded-r-full shadow-[0_0_10px_rgba(79,70,229,0.4)]"
-                                                />
-                                            )}
-                                        </button>
-                                    );
-                                })}
-                            </div>
-
-                            {/* Bottom Utility */}
-                            <div className="mt-auto w-full px-3">
-                                <button
-                                    onClick={() => navigate('/settings')}
-                                    className="w-full flex items-center h-12 rounded-xl text-slate-400 hover:bg-slate-50 hover:text-slate-600 transition-all group"
-                                >
-                                    <div className="min-w-[48px] h-12 flex items-center justify-center shrink-0">
-                                        <Settings className={cn(
-                                            "w-[18px] h-[18px] group-hover:rotate-45 transition-transform duration-500",
-                                            plan === 'global' ? 'text-amber-500/80' : ''
-                                        )} />
+                                            <p className="text-[11px] text-slate-500">Level {gamification.level} Student</p>
+                                        </div>
                                     </div>
-                                    {isSidebarHovered && (
-                                        <span className="text-[10px] font-black uppercase tracking-[0.05em]">Settings</span>
+                                    <div className="flex justify-between items-center px-1">
+                                        <div className="flex items-center gap-1">
+                                            <Flame size={12} className="text-amber-500" />
+                                            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">{gamification.xp} XP</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <Trophy size={12} className="text-yellow-500" />
+                                            <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">{gamification.stars} Stars</span>
+                                        </div>
+                                    </div>
+                                    <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                                        <div className="bg-indigo-500 h-full transition-all duration-1000 ease-out" style={{ width: `${gamification.progressPercent}%` }} />
+                                    </div>
+                                    <div className="flex justify-between items-center px-1">
+                                        <p className="text-[9px] text-slate-400 font-medium">{gamification.streak} Day Streak</p>
+                                        <p className="text-[9px] text-slate-400 font-medium">Next: {gamification.nextLevelTotalXp} XP</p>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="w-10 h-10 rounded-full bg-indigo-100 border-2 border-indigo-100 dark:border-slate-800 overflow-hidden mx-auto shrink-0 cursor-pointer" onClick={() => setIsSidebarCollapsed(false)}>
+                                    {profile?.avatar_url ? (
+                                        <img src={getOptimizedImageUrl(profile.avatar_url, 80, 80)} alt="avatar" className="w-full h-full object-cover" />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center text-indigo-500 font-bold">
+                                            {displayName.charAt(0).toUpperCase()}
+                                        </div>
                                     )}
-                                </button>
-                            </div>
-                        </>
+                                </div>
+                            )}
+
+                            {/* Render Nav Sections */}
+                            {[
+                                { title: 'MAIN', items: mainNav },
+                                { title: 'TRACK', items: trackNav },
+                                { title: 'EXPLORE', items: exploreNav }
+                            ].map((section) => (
+                                <div key={section.title} className="flex flex-col">
+                                    {!isSidebarCollapsed && (
+                                        <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-widest px-3 mb-2">{section.title}</h3>
+                                    )}
+                                    <div className="flex flex-col gap-1">
+                                        {section.items.map((item) => {
+                                            const isActive = location.pathname === item.path;
+                                            return (
+                                                <button
+                                                    key={item.path}
+                                                    onClick={() => handleNavClick(item.path)}
+                                                    className={cn(
+                                                        "relative flex items-center h-10 transition-all duration-300 group",
+                                                        isSidebarCollapsed ? "justify-center w-10 mx-auto rounded-xl" : "w-full px-3 rounded-[10px]",
+                                                        isActive 
+                                                            ? "bg-indigo-50/80 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-bold" 
+                                                            : "text-slate-500 hover:bg-slate-50 dark:hover:bg-slate-800/50 hover:text-slate-800 dark:hover:text-slate-200"
+                                                    )}
+                                                >
+                                                    <item.icon className={cn(
+                                                        "w-[18px] h-[18px] shrink-0 transition-transform",
+                                                        isActive ? "scale-105" : "group-hover:scale-110",
+                                                        isSidebarCollapsed ? "" : "mr-3"
+                                                    )} strokeWidth={isActive ? 2.5 : 2} />
+                                                    
+                                                    {!isSidebarCollapsed && (
+                                                        <span className="text-[13px] whitespace-nowrap overflow-hidden">
+                                                            {item.label}
+                                                        </span>
+                                                    )}
+
+                                                    {/* Notification Badge for Community */}
+                                                    {item.label === 'Community' && hasUnreadCommunityMessages && (
+                                                        <motion.div
+                                                            initial={{ scale: 0 }}
+                                                            animate={{ scale: 1 }}
+                                                            className={cn("absolute bg-rose-500 rounded-full border-2 border-white dark:border-slate-900 shadow-[0_0_10px_rgba(244,63,94,0.4)]", isSidebarCollapsed ? "top-1 right-1 w-2.5 h-2.5" : "top-2 right-2 w-2 h-2")}
+                                                        />
+                                                    )}
+
+                                                    {/* Active Indicator Left Strip */}
+                                                    {isActive && (
+                                                        <motion.div
+                                                            layoutId="active-nav-indicator"
+                                                            className={cn(
+                                                                "absolute bg-indigo-600 shadow-[0_0_10px_rgba(79,70,229,0.4)]",
+                                                                isSidebarCollapsed 
+                                                                    ? "left-[-8px] top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full"
+                                                                    : "left-[-12px] top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full"
+                                                            )}
+                                                        />
+                                                    )}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
                     )}
+
+                    {/* Bottom Actions Container */}
+                    <div className="shrink-0 p-2 flex flex-col gap-1 mt-auto border-t border-indigo-200/50 dark:border-indigo-800/30 bg-indigo-100/60 dark:bg-indigo-950/40 z-10">
+                        {/* Premium Banner */}
+                        {isExplorer && !isSidebarCollapsed && (
+                            <div className="bg-gradient-to-br from-[#1a0b38] to-[#2b1654] rounded-[12px] p-2.5 flex flex-col shadow-xl relative overflow-hidden group cursor-pointer" onClick={openPricingModal}>
+                                <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent group-hover:translate-x-[200%] transition-transform duration-1000" />
+                                <div className="flex items-center gap-2.5 relative z-10">
+                                    <div className="w-8 h-8 rounded-lg bg-[#5b36f5] shadow-inner flex items-center justify-center shrink-0">
+                                        <Crown size={16} className="text-white" />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <div className="flex items-center gap-1 mb-0.5">
+                                            <span className="text-white font-bold text-[12px]">Italo Premium</span>
+                                            <span className="bg-[#5b36f5] text-[7px] text-white font-black px-1 py-0.5 rounded uppercase tracking-widest shadow-sm">GLOBAL</span>
+                                        </div>
+                                        <span className="text-[9px] text-slate-300 leading-tight">Unlock all features</span>
+                                    </div>
+                                    <ChevronRight size={12} className="text-white/50 absolute right-0 top-1/2 -translate-y-1/2" />
+                                </div>
+                            </div>
+                        )}
+                        {isExplorer && isSidebarCollapsed && (
+                            <button onClick={openPricingModal} className="w-10 h-10 mx-auto bg-gradient-to-br from-[#1a0b38] to-[#2b1654] rounded-xl flex items-center justify-center shadow-lg group">
+                                <Crown size={18} className="text-amber-400 group-hover:scale-110 transition-transform" />
+                            </button>
+                        )}
+
+                        {/* Chats / Community */}
+                        <button
+                            onClick={() => handleNavClick('/community')}
+                            className={cn(
+                                "flex items-center h-10 transition-all group relative",
+                                isSidebarCollapsed ? "justify-center w-10 mx-auto rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800" : "w-full px-3 justify-between hover:bg-white dark:hover:bg-slate-800/50 rounded-[10px]",
+                                location.pathname.startsWith('/community') && !isSidebarCollapsed ? "bg-white dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 font-bold shadow-sm" : "text-slate-500 dark:text-slate-400"
+                            )}
+                        >
+                            <div className="flex items-center gap-3 relative">
+                                <MessageCircle size={18} className={cn(
+                                    "transition-transform",
+                                    location.pathname.startsWith('/community') ? "scale-105" : "group-hover:scale-110",
+                                    location.pathname.startsWith('/community') ? "text-indigo-600 dark:text-indigo-400" : "text-slate-400"
+                                )} strokeWidth={location.pathname.startsWith('/community') ? 2.5 : 2} />
+                                
+                                {/* Notification Badge */}
+                                {hasUnreadCommunityMessages && (
+                                    <motion.div
+                                        initial={{ scale: 0 }}
+                                        animate={{ scale: 1 }}
+                                        className={cn("absolute bg-rose-500 rounded-full border-2 border-white dark:border-slate-900 shadow-[0_0_10px_rgba(244,63,94,0.4)]", isSidebarCollapsed ? "top-[-4px] right-[-4px] w-2.5 h-2.5" : "top-[-2px] left-[10px] w-2 h-2")}
+                                    />
+                                )}
+
+                                {!isSidebarCollapsed && (
+                                    <span className={cn(
+                                        "text-[13px]",
+                                        location.pathname.startsWith('/community') ? "" : "font-medium text-slate-600 dark:text-slate-300"
+                                    )}>Chats</span>
+                                )}
+                            </div>
+                            
+                            {/* Active Indicator Left Strip */}
+                            {location.pathname.startsWith('/community') && (
+                                <motion.div
+                                    layoutId="active-nav-indicator"
+                                    className={cn(
+                                        "absolute bg-indigo-600 shadow-[0_0_10px_rgba(79,70,229,0.4)]",
+                                        isSidebarCollapsed 
+                                            ? "left-[-8px] top-1/2 -translate-y-1/2 w-1 h-5 rounded-r-full"
+                                            : "left-[-16px] top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full"
+                                    )}
+                                />
+                            )}
+                        </button>
+
+                        {/* Settings */}
+                        <button
+                            onClick={() => navigate('/settings')}
+                            className={cn(
+                                "flex items-center h-10 transition-all group",
+                                isSidebarCollapsed ? "justify-center w-10 mx-auto rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800" : "w-full px-3 justify-between hover:bg-white dark:hover:bg-slate-800/50 rounded-[10px]"
+                            )}
+                        >
+                            <div className="flex items-center gap-3">
+                                <Settings size={18} className="text-slate-400 group-hover:rotate-45 transition-transform duration-500" />
+                                {!isSidebarCollapsed && <span className="text-[13px] font-medium text-slate-600 dark:text-slate-300">Settings</span>}
+                            </div>
+                            {!isSidebarCollapsed && <ChevronRight size={14} className="text-slate-300" />}
+                        </button>
+
+                        {/* Logout */}
+                        <button
+                            onClick={handleSignOut}
+                            className={cn(
+                                "flex items-center h-10 transition-all group",
+                                isSidebarCollapsed ? "justify-center w-10 mx-auto rounded-xl hover:bg-red-50 dark:hover:bg-red-500/10" : "w-full px-3 justify-between hover:bg-white dark:hover:bg-red-500/10 rounded-[10px]"
+                            )}
+                        >
+                            <div className="flex items-center gap-3">
+                                <LogOut size={18} className="text-red-400 group-hover:text-red-500 transition-colors duration-500" />
+                                {!isSidebarCollapsed && <span className="text-[13px] font-medium text-red-500">Sign Out</span>}
+                            </div>
+                        </button>
+                    </div>
                 </motion.nav>
             )}
 
             <div className={cn(
                 "flex-1 flex flex-col transition-all duration-300 ease-out min-w-0",
                 !isMobile && showHeader && !isAdminPath && !isEditMode && !location.pathname.startsWith('/community') 
-                    ? 'ml-[72px]' 
+                    ? (isSidebarCollapsed ? 'ml-[65px]' : 'ml-[252px]')
                     : '',
                 isLoading ? 'overflow-hidden h-full' : ''
             )}>
@@ -488,7 +638,7 @@ export default function Layout({
                                     <div className="hidden lg:flex items-center gap-3">
                                         <div className="w-1.5 h-1.5 rounded-full bg-indigo-500 animate-pulse" />
                                         <span className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-                                            {navItems.find(i => i.path === location.pathname)?.label || 'Protocol'}
+                                            {allNavItems.find(i => i.path === location.pathname)?.label || 'Protocol'}
                                         </span>
                                     </div>
                                 </div>
@@ -580,16 +730,7 @@ export default function Layout({
                                         </div>
                                     )}
 
-                                    {isExplorer && (
-                                        <Button
-                                            onClick={() => openPricingModal()}
-                                            variant="default"
-                                            className="h-10 rounded-full px-5 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 hover:from-indigo-600 hover:via-purple-600 hover:to-pink-600 text-white font-black uppercase text-[10px] tracking-widest transition-all group active:scale-95 shadow-md border-0"
-                                        >
-                                            <Crown className="w-3.5 h-3.5 mr-2 text-white group-hover:rotate-12 transition-transform" />
-                                            {isSubscriptionExpired ? 'Renew Premium' : 'Explore Premium'}
-                                        </Button>
-                                    )}
+
 
                                     <div className="w-[1px] h-6 bg-slate-200/60 hidden md:block" />
                                     
@@ -612,60 +753,62 @@ export default function Layout({
                                         <NotificationDropdown />
                                     </Suspense>
 
-                                    <DropdownMenu>
-                                        <DropdownMenuTrigger asChild>
-                                            <button className="flex items-center gap-2.5 p-1 pr-4 rounded-full border border-slate-200/60 dark:border-slate-700/60 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all group overflow-hidden bg-white dark:bg-slate-900 shadow-sm ring-1 ring-transparent hover:ring-indigo-100 dark:hover:ring-indigo-900 relative">
-                                                <div className={cn(
-                                                    "w-8 h-8 rounded-full flex items-center justify-center text-slate-400 group-hover:scale-105 transition-transform duration-300 overflow-hidden shadow-inner relative transition-all",
-                                                    !isExplorer ? "ring-2 ring-amber-400 ring-offset-1 dark:ring-offset-slate-900 bg-amber-50 dark:bg-amber-900/20" : "bg-slate-100 dark:bg-slate-800"
-                                                )}>
-                                                    {profile?.avatar_url && !hasError ? (
-                                                        <img
-                                                            src={getOptimizedImageUrl(profile.avatar_url, 64, 64)}
-                                                            alt={displayName}
-                                                            className="w-full h-full object-cover"
-                                                            onError={() => setHasError(true)}
-                                                        />
-                                                    ) : (
-                                                        <User className="w-4 h-4" />
-                                                    )}
+                                    <div className="md:hidden">
+                                        <DropdownMenu>
+                                            <DropdownMenuTrigger asChild>
+                                                <button className="flex items-center gap-2.5 p-1 pr-4 rounded-full border border-slate-200/60 dark:border-slate-700/60 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all group overflow-hidden bg-white dark:bg-slate-900 shadow-sm ring-1 ring-transparent hover:ring-indigo-100 dark:hover:ring-indigo-900 relative">
+                                                    <div className={cn(
+                                                        "w-8 h-8 rounded-full flex items-center justify-center text-slate-400 group-hover:scale-105 transition-transform duration-300 overflow-hidden shadow-inner relative transition-all",
+                                                        !isExplorer ? "ring-2 ring-amber-400 ring-offset-1 dark:ring-offset-slate-900 bg-amber-50 dark:bg-amber-900/20" : "bg-slate-100 dark:bg-slate-800"
+                                                    )}>
+                                                        {profile?.avatar_url && !hasError ? (
+                                                            <img
+                                                                src={getOptimizedImageUrl(profile.avatar_url, 64, 64)}
+                                                                alt={displayName}
+                                                                className="w-full h-full object-cover"
+                                                                onError={() => setHasError(true)}
+                                                            />
+                                                        ) : (
+                                                            <User className="w-4 h-4" />
+                                                        )}
+                                                    </div>
+                                                    <span className="text-[10px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest leading-none flex items-center gap-2">
+                                                        {displayName}
+                                                        {!isExplorer && (
+                                                            <motion.span
+                                                                animate={{
+                                                                    backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
+                                                                }}
+                                                                transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
+                                                                className="bg-gradient-to-r from-amber-400 via-amber-200 to-amber-500 bg-[length:200%_auto] text-amber-950 px-2 py-0.5 rounded-full text-[8px] font-black border border-amber-300/50 shadow-[0_2px_8px_rgba(251,191,36,0.3)] uppercase tracking-tighter"
+                                                            >
+                                                                {plan}
+                                                            </motion.span>
+                                                        )}
+                                                    </span>
+                                                </button>
+                                            </DropdownMenuTrigger>
+                                            <DropdownMenuContent align="end" sideOffset={8} className="w-48 p-0 rounded-sm border border-slate-200 bg-white shadow-2xl text-slate-900 overflow-hidden">
+                                                <div className="flex flex-col py-2">
+                                                    <DropdownMenuItem onClick={() => navigate('/billing')} className="px-4 py-2.5 text-[13px] font-semibold cursor-pointer hover:bg-slate-900 hover:text-white rounded-none border-none transition-colors">
+                                                        Account / Billing
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => window.open('https://italostudy.com/contact', '_blank')} className="px-4 py-2.5 text-[13px] font-semibold cursor-pointer hover:bg-slate-900 hover:text-white rounded-none border-none transition-colors">
+                                                        Help Center
+                                                    </DropdownMenuItem>
+                                                    <DropdownMenuItem onClick={() => navigate('/settings')} className="px-4 py-2.5 text-[13px] font-semibold cursor-pointer hover:bg-slate-900 hover:text-white rounded-none border-none transition-colors">
+                                                        Settings
+                                                    </DropdownMenuItem>
                                                 </div>
-                                                <span className="text-[10px] font-black text-slate-900 dark:text-slate-100 uppercase tracking-widest leading-none flex items-center gap-2">
-                                                    {displayName}
-                                                    {!isExplorer && (
-                                                        <motion.span
-                                                            animate={{
-                                                                backgroundPosition: ['0% 50%', '100% 50%', '0% 50%'],
-                                                            }}
-                                                            transition={{ duration: 5, repeat: Infinity, ease: "linear" }}
-                                                            className="bg-gradient-to-r from-amber-400 via-amber-200 to-amber-500 bg-[length:200%_auto] text-amber-950 px-2 py-0.5 rounded-full text-[8px] font-black border border-amber-300/50 shadow-[0_2px_8px_rgba(251,191,36,0.3)] uppercase tracking-tighter"
-                                                        >
-                                                            {plan}
-                                                        </motion.span>
-                                                    )}
-                                                </span>
-                                            </button>
-                                        </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" sideOffset={8} className="w-48 p-0 rounded-sm border border-slate-200 bg-white shadow-2xl text-slate-900 overflow-hidden">
-                                            <div className="flex flex-col py-2">
-                                                <DropdownMenuItem onClick={() => navigate('/billing')} className="px-4 py-2.5 text-[13px] font-semibold cursor-pointer hover:bg-slate-900 hover:text-white rounded-none border-none transition-colors">
-                                                    Account / Billing
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => window.open('https://italostudy.com/contact', '_blank')} className="px-4 py-2.5 text-[13px] font-semibold cursor-pointer hover:bg-slate-900 hover:text-white rounded-none border-none transition-colors">
-                                                    Help Center
-                                                </DropdownMenuItem>
-                                                <DropdownMenuItem onClick={() => navigate('/settings')} className="px-4 py-2.5 text-[13px] font-semibold cursor-pointer hover:bg-slate-900 hover:text-white rounded-none border-none transition-colors">
-                                                    Settings
-                                                </DropdownMenuItem>
-                                            </div>
-                                            <div className="h-px w-full bg-slate-100" />
-                                            <div className="py-2">
-                                                <DropdownMenuItem onClick={handleSignOut} className="px-4 py-3 text-[13px] font-bold cursor-pointer hover:bg-slate-900 hover:text-white rounded-none border-none justify-center text-center transition-colors">
-                                                    Sign out of Italostudy
-                                                </DropdownMenuItem>
-                                            </div>
-                                        </DropdownMenuContent>
-                                    </DropdownMenu>
+                                                <div className="h-px w-full bg-slate-100" />
+                                                <div className="py-2">
+                                                    <DropdownMenuItem onClick={handleSignOut} className="px-4 py-3 text-[13px] font-bold cursor-pointer hover:bg-slate-900 hover:text-white rounded-none border-none justify-center text-center transition-colors">
+                                                        Sign out of Italostudy
+                                                    </DropdownMenuItem>
+                                                </div>
+                                            </DropdownMenuContent>
+                                        </DropdownMenu>
+                                    </div>
 
                                     <button
                                         onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
@@ -721,7 +864,7 @@ export default function Layout({
                         <button onClick={() => setIsMobileMenuOpen(false)} className="p-2"><X className="w-6 h-6" /></button>
                     </div>
                     <div className="flex flex-col gap-4">
-                        {navItems.map((item) => (
+                        {allNavItems.map((item) => (
                             <button
                                 key={item.path}
                                 onClick={() => {
@@ -734,13 +877,20 @@ export default function Layout({
                                     <item.icon className="w-5 h-5 text-indigo-600" />
                                     <span className="font-black text-xs uppercase tracking-widest leading-none">{item.label}</span>
                                 </div>
-                                {item.isSoon && (
+                                {(item as any).isSoon && (
                                     <span className="bg-indigo-600 text-white text-[7px] font-black px-1.5 py-0.5 rounded-full tracking-widest">SOON</span>
                                 )}
                             </button>
                         ))}
                     </div>
                 </div>
+            )}
+            
+            {/* Global Support Widget - Hidden on Admin and Community routes */}
+            {!isAdminPath && !location.pathname.startsWith('/community') && (
+                <Suspense fallback={null}>
+                    <SupportWidget />
+                </Suspense>
             )}
         </div>
     );

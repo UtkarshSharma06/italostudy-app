@@ -178,7 +178,14 @@ export default function AnnouncementBar({ previewData }: AnnouncementBarProps) {
     const navigate = useNavigate();
     const { activeExam } = useExam();
     const [announcements, setAnnouncements] = useState<Announcement[]>([]);
-    const [dismissedIds, setDismissedIds] = useState<string[]>([]);
+    const [dismissedIds, setDismissedIds] = useState<string[]>(() => {
+        try {
+            const stored = sessionStorage.getItem('dismissed_announcements');
+            return stored ? JSON.parse(stored) : [];
+        } catch {
+            return [];
+        }
+    });
     const [isLoading, setIsLoading] = useState(!previewData);
     const [isMobile, setIsMobile] = useState(false);
 
@@ -266,7 +273,7 @@ export default function AnnouncementBar({ previewData }: AnnouncementBarProps) {
     useEffect(() => {
         if (previewData) return;
 
-        // Use a unique channel name per-subscription to avoid collisions and "already subscribed" errors
+        // Unique channel name per-subscription to avoid collisions and "already subscribed" errors
         const channelId = `site_announcements_${Math.random().toString(36).substring(2, 9)}`;
         const channel = supabase
             .channel(channelId)
@@ -287,6 +294,11 @@ export default function AnnouncementBar({ previewData }: AnnouncementBarProps) {
         }
         const newDismissed = [...dismissedIds, id];
         setDismissedIds(newDismissed);
+        try {
+            sessionStorage.setItem('dismissed_announcements', JSON.stringify(newDismissed));
+        } catch (e) {
+            console.error('Failed to save dismissed state', e);
+        }
         setAnnouncements(prev => prev.filter(ann => ann.id !== id));
     };
 

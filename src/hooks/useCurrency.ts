@@ -20,11 +20,7 @@ const COUNTRY_TO_CURRENCY: Record<string, string> = {
 
 export const SUPPORTED_CURRENCIES = [
     { code: 'EUR', symbol: '€', name: 'Euro' },
-    { code: 'USD', symbol: '$', name: 'US Dollar' },
-    { code: 'GBP', symbol: '£', name: 'British Pound' },
-    { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
-    { code: 'NGN', symbol: '₦', name: 'Nigerian Naira' },
-    { code: 'TRY', symbol: '₺', name: 'Turkish Lira' }
+    { code: 'INR', symbol: '₹', name: 'Indian Rupee' }
 ];
 
 export function useCurrency() {
@@ -51,7 +47,22 @@ export function useCurrency() {
     useEffect(() => {
         const detectCurrency = async () => {
             try {
-                // 1. Check localStorage cache first
+                // 1. Check sessionStorage (fastest, prevents any re-fetch during active session)
+                const sessionCached = sessionStorage.getItem('userCurrency');
+                if (sessionCached) {
+                    try {
+                        const parsedCache = JSON.parse(sessionCached);
+                        if (parsedCache.data) {
+                            setCurrency(parsedCache.data);
+                            setIsLoading(false);
+                            return;
+                        }
+                    } catch (e) {
+                        console.warn('Failed to parse session cached currency');
+                    }
+                }
+
+                // 2. Check localStorage cache (prevents fetch across tabs/reloads for 24 hours)
                 const cached = localStorage.getItem('userCurrency');
                 if (cached) {
                     try {
@@ -59,15 +70,16 @@ export function useCurrency() {
                         const cacheAge = Date.now() - parsedCache.timestamp;
                         if (parsedCache.data && cacheAge < 24 * 60 * 60 * 1000) {
                             setCurrency(parsedCache.data);
+                            sessionStorage.setItem('userCurrency', JSON.stringify(parsedCache)); // upgrade to session
                             setIsLoading(false);
                             return;
                         }
                     } catch (e) {
-                        console.warn('Failed to parse cached currency');
+                        console.warn('Failed to parse local cached currency');
                     }
                 }
 
-                // 2. PRIMARY API: ipapi.co (HTTPS stable)
+                // 3. PRIMARY API: ipapi.co (HTTPS stable)
                 let data: any = null;
                 try {
                     const response = await fetch('https://ipapi.co/json/');
@@ -85,47 +97,35 @@ export function useCurrency() {
 
                 if (data && (data.status === 'success' || data.success !== false || data.status !== 'fail')) {
                     const countryCode = data.countryCode || data.country_code || data.country;
-                    const apiCurrencyCode = data.currency || data.currency_code;
+                    
+                    const isIndia = countryCode === 'IN';
+                    const currencyInfo: CurrencyInfo = {
+                        code: isIndia ? 'INR' : 'EUR',
+                        symbol: isIndia ? '₹' : '€',
+                        country: countryCode || 'XX'
+                    };
 
-                    let currencyInfo: CurrencyInfo;
-
-                    if (apiCurrencyCode && apiCurrencyCode.length === 3) {
-                        currencyInfo = {
-                            code: apiCurrencyCode,
-                            symbol: data.currency_symbol || data.symbol || '',
-                            country: countryCode || 'XX'
-                        };
-                    } else {
-                        const code = COUNTRY_TO_CURRENCY[countryCode] || 'EUR';
-                        currencyInfo = {
-                            code,
-                            symbol: '',
-                            country: countryCode || 'XX'
-                        };
-                    }
-
-                    // Cache the result
-                    localStorage.setItem('userCurrency', JSON.stringify({
+                    // Cache the result in both storages
+                    const cachePayload = JSON.stringify({
                         data: currencyInfo,
                         timestamp: Date.now(),
                         isManual: false
-                    }));
+                    });
+                    localStorage.setItem('userCurrency', cachePayload);
+                    sessionStorage.setItem('userCurrency', cachePayload);
 
                     setCurrency(currencyInfo);
                 } else {
                     // Final Guess: Navigator Language
                     const language = navigator.language;
                     const region = language.split('-')[1];
-                    if (region && COUNTRY_TO_CURRENCY[region]) {
-                        const guessedInfo = {
-                            code: COUNTRY_TO_CURRENCY[region],
-                            symbol: '',
-                            country: region
-                        };
-                        setCurrency(guessedInfo);
-                    } else {
-                        setCurrency(DEFAULT_CURRENCY);
-                    }
+                    const isIndia = region === 'IN';
+                    const guessedInfo = {
+                        code: isIndia ? 'INR' : 'EUR',
+                        symbol: isIndia ? '₹' : '€',
+                        country: region || 'XX'
+                    };
+                    setCurrency(guessedInfo);
                 }
             } catch (error) {
                 console.error('Currency detection totally failed:', error);

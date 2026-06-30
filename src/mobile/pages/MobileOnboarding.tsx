@@ -10,7 +10,8 @@ import {
     Check, X, ArrowRight, Brain, Globe,
     GraduationCap, Target, Sparkles, Zap, ChevronLeft, Loader2,
     Trophy, Clock, Coffee, BookOpen, Flame, User, Phone, Search, Stethoscope,
-    Book, Calculator, Apple, Layers, Info, Rocket, Shield, Star
+    Book, Calculator, Apple, Layers, Info, Rocket, Shield, Star,
+    Headphones, Mail, Compass, ShieldCheck
 } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { usePricing } from '@/context/PricingContext';
@@ -46,6 +47,7 @@ const LocalIconMap: any = {
     'SAT': { icon: Book, bg: 'bg-[#EBF5FF]', color: 'text-[#3182CE]' },
     'CEnT-S Entrance Exam': { icon: GraduationCap, bg: 'bg-[#FFF5F5]', color: 'text-[#E53E3E]' },
     'CENT-S': { icon: GraduationCap, bg: 'bg-[#FFF5F5]', color: 'text-[#E53E3E]' },
+    'TIL-I': { icon: Calculator, bg: 'bg-[#FFFBEB]', color: 'text-[#D97706]' },
     'TOLC-I': { icon: Calculator, bg: 'bg-[#F0FFF4]', color: 'text-[#38A169]' },
     'TOLC-E': { icon: BookOpen, bg: 'bg-[#FAF5FF]', color: 'text-[#805AD5]' },
     'IMAT (INTERNATIONAL MEDICAL ADMISSIONS TEST)': { icon: Stethoscope, bg: 'bg-[#FFF5F5]', color: 'text-[#E53E3E]' },
@@ -56,7 +58,6 @@ const LocalIconMap: any = {
     'TOLC-PSI': { icon: Brain, bg: 'bg-[#FFF5F5]', color: 'text-[#E53E3E]' },
     'TOLC-F': { icon: Sparkles, bg: 'bg-[#E6FFFA]', color: 'text-[#319795]' },
     'TIL-A': { icon: Calculator, bg: 'bg-[#F0FFF4]', color: 'text-[#38A169]' },
-    'TIL-I': { icon: Calculator, bg: 'bg-[#F0FFF4]', color: 'text-[#38A169]' },
     'TR-YÖS': { icon: GraduationCap, bg: 'bg-[#FFFAF0]', color: 'text-[#DD6B20]' },
 };
 
@@ -305,208 +306,322 @@ export default function MobileOnboarding() {
     content: "";
     position: absolute;
     inset: 0;
-    background: linear-gradient(white 10%, transparent 30%, transparent 70%, white 90%);
+    background: linear-gradient(var(--bg-color) 10%, transparent 30%, transparent 70%, var(--bg-color) 90%);
     z-index: 20;
+}
+.mob-loader-words-group {
+    animation: spin_4991 4s infinite cubic-bezier(0.68, -0.55, 0.265, 1.55);
 }
 .mob-loader-word {
     display: block;
     height: 100%;
-    padding-left: 6px;
-    color: #E67E22;
-    animation: spin_4991 4s infinite;
+    padding-bottom: 2%;
+    color: #5A32FA;
 }
 `}</style>
-                    <div style={{ color: '#64748B', fontFamily: 'Inter, sans-serif', fontWeight: 600, fontSize: '22px', display: 'flex', height: '40px', alignItems: 'center', padding: '10px' }}>
-                        <p style={{ marginRight: '8px' }}>Setting up your</p>
-                        <div className="mob-loader-words">
-                            <span className="mob-loader-word">plan...</span>
-                            <span className="mob-loader-word">exams...</span>
-                            <span className="mob-loader-word">schedule...</span>
-                            <span className="mob-loader-word">profile...</span>
-                            <span className="mob-loader-word">plan...</span>
+                    <div className="flex flex-col items-center justify-center gap-6" style={{ '--bg-color': 'white' } as any}>
+                        <div className="relative">
+                            <div className="w-20 h-20 border-[6px] border-indigo-50 border-t-[#5A32FA] rounded-full animate-spin shadow-lg" />
+                            <div className="absolute inset-0 flex items-center justify-center">
+                                <Sparkles className="w-8 h-8 text-[#5A32FA] animate-pulse" />
+                            </div>
+                        </div>
+                        <div className="flex items-center gap-3 text-2xl font-black text-slate-900 uppercase tracking-tighter">
+                            <span>Preparing</span>
+                            <div className="mob-loader-words h-[1.2em]">
+                                <span className="mob-loader-words-group">
+                                    <span className="mob-loader-word">Dashboard</span>
+                                    <span className="mob-loader-word">Journey</span>
+                                    <span className="mob-loader-word">Profile</span>
+                                    <span className="mob-loader-word">Workspace</span>
+                                    <span className="mob-loader-word">Dashboard</span>
+                                </span>
+                            </div>
                         </div>
                     </div>
                 </div>
             )}
-            <div
-                ref={scrollContainerRef}
-                className="flex flex-col min-h-[100dvh] w-full bg-[#F8FAFC] overflow-y-auto relative pb-10"
-            >
-                {!isMissingOnlyPhone && (
-                    <div className="px-6 pt-6 mb-2">
-                        <div className="h-1 w-full bg-[#F1F5F9] rounded-full overflow-hidden">
-                            <motion.div
-                                className="h-full bg-[#E67E22]"
-                                initial={{ width: 0 }}
-                                animate={{ width: `${(step === 1 ? 1/3 : (step === 4 ? 2/3 : 1)) * 100}% ` }}
-                            />
-                        </div>
+
+            <div className="h-[100dvh] w-full bg-[#FAFAFA] flex flex-col relative overflow-x-hidden overflow-y-auto font-sans">
+                {/* Header */}
+                <div className="w-full h-16 sm:h-20 px-4 sm:px-8 flex justify-between items-center bg-transparent z-50 shrink-0">
+                    <img src="/logo.webp" alt="ItaloStudy" className="h-6 sm:h-8" />
+                    <div className="flex items-center gap-4">
+                        <span className="text-sm font-medium text-slate-500 hidden sm:inline-block">Need help?</span>
+                        <Popover>
+                            <PopoverTrigger asChild>
+                                <button className="flex items-center gap-2 border border-slate-200 text-[#5A32FA] rounded-full px-4 sm:px-5 py-2 sm:py-2.5 hover:bg-slate-50 transition-colors font-bold text-xs sm:text-sm bg-white shadow-sm">
+                                    <Headphones className="w-4 h-4" />
+                                    <span className="hidden sm:inline-block">Support</span>
+                                </button>
+                            </PopoverTrigger>
+                            <PopoverContent className="w-56 p-2 rounded-xl border-slate-200 shadow-xl" align="end">
+                                <div className="flex flex-col gap-1">
+                                    <button onClick={() => { navigator.clipboard.writeText('contact@italostudy.com'); toast({ title: "Email copied", description: "contact@italostudy.com has been copied to your clipboard." }); }} className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 rounded-lg transition-colors text-slate-700 font-medium text-sm text-left"><Mail className="w-4 h-4 text-[#5A32FA]" />Email Us</button>
+                                    <a href="https://chat.whatsapp.com/CfVh7u9L6vT7ZFpZwwVa4A" target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 hover:bg-[#25D366]/10 rounded-lg transition-colors text-slate-700 font-medium text-sm">
+                                        <Phone className="w-4 h-4 text-[#25D366]" />
+                                        WhatsApp
+                                    </a>
+                                </div>
+                            </PopoverContent>
+                        </Popover>
                     </div>
-                )}
+                </div>
 
-                <div className="w-full flex flex-col items-center justify-start p-4 pt-4 gap-2">
-                    <OwlAnimation
-                        message={
-                            step === 1 ? "Choose your path!" :
-                                step === 4 ? (isMissingOnlyPhone ? "Fill out the missing step to continue using ItaloStudy" : "Tell me about you!") :
-                                    "Almost there!"
-                        }
-                    />
-                    <AnimatePresence mode="wait">
-                        <motion.div
-                            key={step}
-                            initial={{ opacity: 0, scale: 0.95 }}
-                            animate={{ opacity: 1, scale: 1 }}
-                            exit={{ opacity: 0, scale: 0.95 }}
-                            transition={{ duration: 0.3, ease: "easeOut" }}
-                            className="w-full bg-white rounded-[2rem] border border-[#F1F5F9] shadow-xl shadow-[#64748B]/5 p-5 flex flex-col min-h-0"
-                        >
-                            <h2 className={cn("text-xl font-black text-[#1E293B] uppercase tracking-tight text-center", (step === 2 || step === 3) ? "mb-4" : "mb-6")}>
-                                {step === 1 ? "Which exam are you preparing for?" :
-                                    step === 4 ? (isMissingOnlyPhone ? "Fill out the missing step" : "Can you tell me a bit about yourself?") :
-                                        "Select Access Plan"}
-                            </h2>
-
-
-                            <div className="flex-1 pb-6">
-                                {step === 1 && (
-                                    <div className="grid grid-cols-1 gap-3">
-                                        {availableExams.map((exam) => {
-                                            const theme = LocalIconMap[exam.name] || LocalIconMap[exam.name.split(' ')[0]] || { icon: Brain, bg: 'bg-[#F1F5F9]', color: 'text-[#64748B]' };
-                                            const Icon = theme.icon;
-                                            return (
-                                                <button
-                                                    key={exam.id}
-                                                    onClick={() => { setSelectedExam(exam.id); setStep(4); }}
-                                                    className={cn(
-                                                        "flex items-center gap-4 p-4 rounded-xl border-2 transition-all active:scale-[0.98]",
-                                                        selectedExam === exam.id ? "border-[#E67E22] bg-[#FFF3E0]" : cn("border-[#F1F5F9]", theme.bg)
-                                                    )}
-                                                >
-                                                    <div className={cn("w-10 h-10 rounded-lg flex items-center justify-center bg-white border border-white/50 shadow-sm", theme.color)}>
-                                                        <Icon className="w-5 h-5" />
-                                                    </div>
-                                                    <span className="font-black text-[10px] uppercase text-[#1E293B] truncate">{exam.name}</span>
-                                                    {selectedExam === exam.id && <Check className="ml-auto w-4 h-4 text-[#E67E22]" />}
-                                                </button>
-                                            );
-                                        })}
+                {/* Main Content Area */}
+                <div className="flex-1 w-full flex flex-col items-center justify-start pt-2 sm:pt-4 z-20 pb-12">
+                    <div className="w-full flex flex-col items-center origin-top px-4">
+                        
+                        {/* Progress Bar Header */}
+                        {!isMissingOnlyPhone && (
+                            <div className="w-full flex justify-center mb-4 sm:mb-6">
+                                <div className="flex items-center gap-2">
+                                    {/* Step 1 */}
+                                    <div className="flex items-center gap-1.5">
+                                        <div className={cn("w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold", step === 1 ? "bg-[#5A32FA] text-white" : (step > 1 ? "bg-[#5A32FA] text-white" : "bg-white border border-slate-200 text-slate-400"))}>
+                                            {step > 1 ? <Check className="w-3 h-3 stroke-[3]" /> : "1"}
+                                        </div>
+                                        <span className={cn("text-[10px] sm:text-xs font-bold", step === 1 ? "text-[#5A32FA]" : (step > 1 ? "text-[#5A32FA]" : "text-slate-400"))}>Start</span>
                                     </div>
-                                )}
+                                    <div className={cn("w-8 sm:w-16 h-[2px] rounded-full", step > 1 ? "bg-[#5A32FA]" : "bg-slate-200")}></div>
+                                    {/* Step 4 */}
+                                    <div className="flex items-center gap-1.5">
+                                        <div className={cn("w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold", step === 4 ? "bg-white border-2 border-[#5A32FA] text-[#5A32FA]" : (step > 4 ? "bg-[#5A32FA] text-white" : "bg-white border border-slate-200 text-slate-400"))}>
+                                            {step > 4 ? <Check className="w-3 h-3 stroke-[3]" /> : "2"}
+                                        </div>
+                                        <span className={cn("text-[10px] sm:text-xs font-bold", step === 4 ? "text-slate-900" : (step > 4 ? "text-[#5A32FA]" : "text-slate-400"))}>Profile</span>
+                                    </div>
+                                    <div className={cn("w-8 sm:w-16 h-[2px] rounded-full", step > 4 ? "bg-[#5A32FA]" : "bg-slate-200")}></div>
+                                    {/* Step 5 */}
+                                    <div className="flex items-center gap-1.5">
+                                        <div className={cn("w-5 h-5 sm:w-6 sm:h-6 rounded-full flex items-center justify-center text-[10px] sm:text-xs font-bold", step === 5 ? "bg-white border-2 border-[#5A32FA] text-[#5A32FA]" : "bg-white border border-slate-200 text-slate-400")}>
+                                            3
+                                        </div>
+                                        <span className={cn("text-[10px] sm:text-xs font-bold", step === 5 ? "text-slate-900" : "text-slate-400")}>Plan</span>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
-                                 {/* Steps 2 and 3 removed */}
+                        {/* Welcome Text */}
+                        <h1 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight text-center mb-1">
+                            Welcome! 👋
+                        </h1>
+                        <p className="text-slate-500 text-center text-xs sm:text-sm max-w-[280px] sm:max-w-lg mb-3 leading-relaxed">
+                            Let's personalize your experience to <br/>
+                            <span className="text-[#5A32FA] font-bold">learn better & achieve more.</span>
+                        </p>
+
+                        {/* Owl Image */}
+                        <img src="/onboarding.webp" alt="Owl" className="h-[12vh] min-h-[90px] max-h-[140px] object-contain -mb-6 relative z-30 drop-shadow-md" />
+
+                        {/* The Card */}
+                        <AnimatePresence mode="wait">
+                            <motion.div
+                                key={step}
+                                initial={{ opacity: 0, y: 15 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -15 }}
+                                transition={{ duration: 0.25 }}
+                                className="bg-white rounded-[1.5rem] shadow-xl shadow-indigo-900/5 border border-slate-100 p-5 sm:p-6 w-full max-w-lg relative z-20"
+                            >
+                                {step === 1 && (
+                                    <>
+                                        <div className="flex gap-3 items-start mb-5">
+                                            <div className="w-10 h-10 rounded-full bg-indigo-50 text-[#5A32FA] flex items-center justify-center shrink-0">
+                                                <Compass className="w-5 h-5" />
+                                            </div>
+                                            <div>
+                                                <h2 className="text-lg font-black text-slate-900 mb-0.5">Which exam are you preparing for?</h2>
+                                                <p className="text-slate-500 text-[11px] sm:text-xs">This helps us tailor the platform to your exam journey.</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-1 gap-3 mb-2">
+                                            {availableExams.map((exam) => {
+                                                const theme = LocalIconMap[exam.name] || LocalIconMap[exam.name.split(' ')[0]] || { icon: Brain, bg: 'bg-[#F8FAFC]', color: 'text-slate-400' };
+                                                const Icon = theme.icon;
+                                                const isSelected = selectedExam === exam.id;
+                                                
+                                                return (
+                                                    <button
+                                                        key={exam.id}
+                                                        onClick={() => setSelectedExam(exam.id)}
+                                                        className={cn(
+                                                            "flex items-center gap-3 p-3.5 rounded-[1.25rem] border transition-all text-left",
+                                                            isSelected ? "border-[#5A32FA] bg-[#F4F1FF]/50 ring-1 ring-[#5A32FA]" : "border-slate-200 bg-white active:bg-slate-50"
+                                                        )}
+                                                    >
+                                                        <div className={cn(
+                                                            "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 shadow-sm",
+                                                            isSelected ? "bg-[#F4F1FF] text-[#5A32FA]" : cn(theme.bg, theme.color)
+                                                        )}>
+                                                            <Icon className="w-6 h-6" />
+                                                        </div>
+                                                        <div className="flex-1 min-w-0 pr-1">
+                                                            <h3 className={cn("font-bold text-sm mb-0.5 truncate", isSelected ? "text-[#5A32FA]" : "text-slate-900")}>
+                                                                {exam.name}
+                                                            </h3>
+                                                            <p className="text-[10px] text-slate-500 leading-tight line-clamp-2">
+                                                                Prepare for the {exam.name} exam for universities in Italy.
+                                                            </p>
+                                                        </div>
+                                                        <div className={cn(
+                                                            "w-5 h-5 rounded-full border-2 flex items-center justify-center shrink-0 ml-1 transition-colors",
+                                                            isSelected ? "border-[#5A32FA]" : "border-slate-300 bg-white"
+                                                        )}>
+                                                            {isSelected && <div className="w-2.5 h-2.5 rounded-full bg-[#5A32FA]" />}
+                                                        </div>
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </>
+                                )}
 
                                 {step === 4 && (
-                                    <div className="space-y-4">
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest ml-1">Username <span className="text-[#E67E22]">*</span></label>
-                                            <div className="relative">
-                                                <Input
-                                                    value={username}
-                                                    onChange={(e) => setUsername(e.target.value.replace(/\s+/g, ''))}
-                                                    placeholder="Username"
-                                                    className={cn(
-                                                        "h-14 bg-[#F8FAFC] border-0 rounded-xl font-bold text-[#1E293B] pr-12",
-                                                        usernameError ? "ring-1 ring-red-400" : (isUsernameAvailable ? "ring-1 ring-green-400" : "")
-                                                    )}
-                                                />
-                                            <div className="absolute right-4 top-1/2 -translate-y-1/2">
-                                                {isCheckingUsername ? (
-                                                    <Loader2 className="w-4 h-4 text-[#94A3B8] animate-spin" />
-                                                ) : (
-                                                    <>
-                                                        {isUsernameAvailable === true && <Check className="w-4 h-4 text-green-500" />}
-                                                        {isUsernameAvailable === false && <X className="w-4 h-4 text-red-500" />}
-                                                    </>
-                                                )}
+                                    <>
+                                        <div className="flex gap-3 items-start mb-5">
+                                            <div className="w-10 h-10 rounded-full bg-indigo-50 text-[#5A32FA] flex items-center justify-center shrink-0">
+                                                <User className="w-5 h-5" />
                                             </div>
+                                            <div>
+                                                <h2 className="text-lg font-black text-slate-900 mb-0.5">
+                                                    {isMissingOnlyPhone ? "Fill out the missing step" : "Can you tell me a bit about yourself?"}
+                                                </h2>
+                                                <p className="text-slate-500 text-[11px] sm:text-xs">We use this to set up your profile and account.</p>
                                             </div>
-                                            {usernameError && <p className="text-[9px] font-bold text-red-500 mt-1 ml-2 uppercase">{usernameError}</p>}
                                         </div>
+                                        <div className="space-y-4 mb-2">
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] sm:text-[10px] font-black text-[#94A3B8] uppercase tracking-widest ml-1">Username <span className="text-[#5A32FA]">*</span></label>
+                                                <div className="relative">
+                                                    <Input
+                                                        value={username}
+                                                        onChange={(e) => setUsername(e.target.value.replace(/\s+/g, ''))}
+                                                        placeholder="Choose a unique username"
+                                                        className={cn(
+                                                            "h-12 bg-white border-slate-200 rounded-2xl font-bold focus:ring-4 focus:ring-[#5A32FA]/10 transition-all text-[#1E293B] shadow-sm pr-10 text-sm",
+                                                            usernameError ? "border-red-400 focus:border-red-400" : (isUsernameAvailable ? "border-green-400 focus:border-green-400" : "focus:border-[#5A32FA]")
+                                                        )}
+                                                    />
+                                                    <div className="absolute right-3 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                                                        {isCheckingUsername ? (
+                                                            <Loader2 className="w-4 h-4 text-[#94A3B8] animate-spin" />
+                                                        ) : (
+                                                            <>
+                                                                {isUsernameAvailable === true && <Check className="w-4 h-4 text-green-500 stroke-[3]" />}
+                                                                {isUsernameAvailable === false && <X className="w-4 h-4 text-red-500 stroke-[3]" />}
+                                                            </>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                {usernameError && <p className="text-[9px] font-bold text-red-500 ml-2 uppercase tracking-tight">{usernameError}</p>}
+                                            </div>
 
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest ml-1">First Name <span className="text-[#E67E22]">*</span></label>
-                                            <Input value={firstName} onChange={(e) => setFirstName(e.target.value)} placeholder="First Name" className="h-14 bg-[#F8FAFC] border-0 rounded-xl font-bold text-[#1E293B]" />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest ml-1">Last Name <span className="text-[#E67E22]">*</span></label>
-                                            <Input value={lastName} onChange={(e) => setLastName(e.target.value)} placeholder="Last Name" className="h-14 bg-[#F8FAFC] border-0 rounded-xl font-bold text-[#1E293B]" />
-                                        </div>
-                                        <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest ml-1">Phone Number <span className="text-[#E67E22]">*</span></label>
-                                            <div className="flex flex-col gap-2">
-                                                <div className="flex items-center bg-[#F8FAFC] rounded-xl px-4 h-14 border border-transparent focus-within:border-[#E67E22] focus-within:ring-2 focus-within:ring-[#E67E22]/10 transition-all overflow-hidden">
-                                                <Popover open={openCountryPopup} onOpenChange={setOpenCountryPopup}>
-                                                    <PopoverTrigger asChild>
-                                                        <button className="flex items-center gap-1.5 pr-2 border-r border-[#CBD5E1] shrink-0">
-                                                            <img
-                                                                src={`https://flagcdn.com/w40/${countryCode.toLowerCase()}.png`}
-                                                                alt="Flag"
-                                                                className="w-4 h-auto rounded-[2px]"
-                                                            />
-                                                            <span className="font-bold text-[#1E293B] text-xs">{countryDial}</span>
-                                                        </button >
-                                                    </PopoverTrigger >
-                                                    <PopoverContent className="p-0 w-[240px] z-[9999] bg-white border border-[#F1F5F9] shadow-2xl" align="start">
-                                                        <Command className="bg-white">
-                                                            <CommandInput placeholder="Search country..." className="text-[#1E293B] focus:ring-0 focus-visible:ring-0 focus:outline-none" />
-                                                            <CommandList className="max-h-[300px] bg-white">
-                                                                <CommandEmpty className="text-[#94A3B8]">No country found.</CommandEmpty>
-                                                                <CommandGroup className="bg-white">
-                                                                    {countries.map((c) => (
-                                                                        <CommandItem
-                                                                            key={c.code}
-                                                                            onSelect={() => {
-                                                                                setCountryDial(c.dial);
-                                                                                setCountryCode(c.code.toLowerCase());
-                                                                                setPhoneLimit(c.len || 10);
-                                                                                setOpenCountryPopup(false);
-                                                                            }}
-                                                                            className="flex items-center gap-3 p-4 cursor-pointer text-[#1E293B] data-[selected=true]:bg-[#F1F5F9] data-[selected=true]:text-[#E67E22]"
-                                                                        >
-                                                                            <img src={`https://flagcdn.com/w40/${c.code.toLowerCase()}.png`} className="w-5 h-auto rounded-[1px]" />
-                                                                            <span className="font-bold text-sm">{c.name}</span>
-                                                                            <span className="ml-auto text-[10px] opacity-40">{c.dial}</span>
-                                                                        </CommandItem>
-                                                                    ))}
-                                                                </CommandGroup>
-                                                            </CommandList>
-                                                        </Command>
-                                                    </PopoverContent>
-                                                </Popover >
-                                                <Input
-                                                    value={phoneNumber}
-                                                    onChange={(e) => {
-                                                        const formatted = formatPhoneNumber(e.target.value, countryCode.toUpperCase());
-                                                        const digits = getDigits(formatted);
-                                                        if (digits.length <= phoneLimit) setPhoneNumber(formatted);
-                                                    }}
-                                                    placeholder="Phone Number"
-                                                    className="flex-1 bg-transparent border-0 h-full font-bold text-[#1E293B] p-0 focus-visible:ring-0 focus-visible:ring-offset-0 shadow-none rounded-none ml-2 text-sm"
-                                                />
-                                            </div >
-                                                <p className="text-[9px] font-bold text-[#94A3B8] italic ml-1 uppercase tracking-tighter">
-                                                    Don't worry, we are not gonna spam you! 😉
-                                                </p>
+                                            <div className="grid grid-cols-2 gap-3">
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] sm:text-[10px] font-black text-[#94A3B8] uppercase tracking-widest ml-1">First Name <span className="text-[#5A32FA]">*</span></label>
+                                                    <Input
+                                                        value={firstName}
+                                                        onChange={(e) => setFirstName(e.target.value)}
+                                                        placeholder="First Name"
+                                                        className="h-12 bg-white border-slate-200 rounded-2xl font-bold focus:border-[#5A32FA] focus:ring-4 focus:ring-[#5A32FA]/10 transition-all text-[#1E293B] shadow-sm text-sm"
+                                                    />
+                                                </div>
+                                                <div className="space-y-1">
+                                                    <label className="text-[9px] sm:text-[10px] font-black text-[#94A3B8] uppercase tracking-widest ml-1">Last Name <span className="text-[#5A32FA]">*</span></label>
+                                                    <Input
+                                                        value={lastName}
+                                                        onChange={(e) => setLastName(e.target.value)}
+                                                        placeholder="Last Name"
+                                                        className="h-12 bg-white border-slate-200 rounded-2xl font-bold focus:border-[#5A32FA] focus:ring-4 focus:ring-[#5A32FA]/10 transition-all text-[#1E293B] shadow-sm text-sm"
+                                                    />
+                                                </div>
                                             </div>
+
+                                            <div className="space-y-1">
+                                                <label className="text-[9px] sm:text-[10px] font-black text-[#94A3B8] uppercase tracking-widest ml-1">Phone Number <span className="text-[#5A32FA]">*</span></label>
+                                                <div className="relative group flex flex-col gap-1">
+                                                    <div className="flex items-center bg-white border border-slate-200 rounded-2xl focus-within:border-[#5A32FA] focus-within:ring-4 focus-within:ring-[#5A32FA]/10 transition-all px-1 shadow-sm">
+                                                        <Popover open={openCountryPopup} onOpenChange={setOpenCountryPopup}>
+                                                            <PopoverTrigger asChild>
+                                                                <Button variant="ghost" className="h-10 px-2 font-bold flex items-center gap-1 hover:bg-[#F8FAFC]">
+                                                                    <img
+                                                                        src={`https://flagcdn.com/w40/${countryCode.toLowerCase()}.png`}
+                                                                        alt="Flag"
+                                                                        className="w-4 h-auto rounded-[2px]"
+                                                                    />
+                                                                    <span className="text-[#1E293B] opacity-40 mx-1">|</span>
+                                                                    <span className="text-xs text-[#1E293B]">{countryDial}</span>
+                                                                </Button >
+                                                            </PopoverTrigger >
+                                                            <PopoverContent className="p-0 w-[240px] z-[9999] bg-white border border-slate-200 shadow-2xl" align="start">
+                                                                <Command className="bg-white">
+                                                                    <CommandInput placeholder="Search country..." className="text-[#1E293B] focus:ring-0 focus-visible:ring-0 focus:outline-none" />
+                                                                    <CommandList className="max-h-[250px] bg-white">
+                                                                        <CommandEmpty className="text-[#94A3B8]">No country found.</CommandEmpty>
+                                                                        <CommandGroup className="bg-white">
+                                                                            {countries.map((c) => (
+                                                                                <CommandItem
+                                                                                    key={c.code}
+                                                                                    onSelect={() => {
+                                                                                        setCountryDial(c.dial);
+                                                                                        setCountryCode(c.code.toLowerCase());
+                                                                                        setPhoneLimit(c.len || 10);
+                                                                                        setOpenCountryPopup(false);
+                                                                                    }}
+                                                                                    className="flex items-center gap-2 p-3 cursor-pointer text-[#1E293B] data-[selected=true]:bg-indigo-50 data-[selected=true]:text-[#5A32FA]"
+                                                                                >
+                                                                                    <img src={`https://flagcdn.com/w40/${c.code.toLowerCase()}.png`} className="w-4 h-auto rounded-[1px]" />
+                                                                                    <span className="font-bold text-xs">{c.name}</span>
+                                                                                    <span className="ml-auto text-[9px] opacity-40">{c.dial}</span>
+                                                                                </CommandItem>
+                                                                            ))}
+                                                                        </CommandGroup>
+                                                                </CommandList>
+                                                                </Command>
+                                                            </PopoverContent>
+                                                        </Popover >
+                                                        <Input
+                                                            value={phoneNumber}
+                                                            onChange={(e) => {
+                                                                const formatted = formatPhoneNumber(e.target.value, countryCode.toUpperCase());
+                                                                const digits = getDigits(formatted);
+                                                                if (digits.length <= phoneLimit) setPhoneNumber(formatted);
+                                                            }}
+                                                            placeholder="e.g. 555 000 000"
+                                                            className="h-10 text-xs sm:text-sm bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-bold text-[#1E293B] shadow-none rounded-none px-1"
+                                                            type="tel"
+                                                        />
+                                                    </div >
+                                                    <p className="text-[9px] font-bold text-[#94A3B8] italic ml-2">
+                                                        Don't worry, we are not gonna spam you! 😉
+                                                    </p>
+                                                </div >
+                                            </div >
                                         </div>
-                                    </div >
+                                    </>
                                 )}
 
-                                {
-                                    step === 5 && (
-                                        <div className="space-y-3">
-                                            {/* View Details Button */}
-                                            <div className="flex justify-center">
-                                                <button
-                                                    onClick={() => setShowPricingHover(true)}
-                                                    className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-[#E67E22] hover:text-[#D35400] transition-colors underline underline-offset-2"
-                                                >
-                                                    <Info className="w-3.5 h-3.5" />
-                                                    View Plan Details
-                                                </button>
+                                {step === 5 && (
+                                    <>
+                                        <div className="flex gap-3 items-start mb-5">
+                                            <div className="w-10 h-10 rounded-full bg-indigo-50 text-[#5A32FA] flex items-center justify-center shrink-0">
+                                                <Shield className="w-5 h-5" />
                                             </div>
-
+                                            <div className="flex-1">
+                                                <h2 className="text-lg font-black text-slate-900 mb-0.5">Select Access Plan</h2>
+                                                <p className="text-slate-500 text-[11px] sm:text-xs">Choose the plan that fits your study needs.</p>
+                                            </div>
+                                            <button
+                                                onClick={() => setShowPricingHover(true)}
+                                                className="shrink-0 flex items-center justify-center w-8 h-8 rounded-full bg-indigo-50 text-[#5A32FA]"
+                                            >
+                                                <Info className="w-4 h-4" />
+                                            </button>
+                                        </div>
+                                        <div className="grid grid-cols-2 gap-3 mb-2">
                                             {plans.map((p) => {
                                                 const PlanIconMap: Record<string, any> = {
                                                     'explorer': Shield,
@@ -516,49 +631,72 @@ export default function MobileOnboarding() {
                                                 };
                                                 const PlanIcon = PlanIconMap[p.id] || Sparkles;
                                                 return (
-                                                    <button key={p.id} onClick={() => setSelectedPlan(p.id)} className={cn("w-full p-5 rounded-2xl border-2 flex items-center gap-4", selectedPlan === p.id ? "border-[#E67E22] bg-[#FFF3E0]" : "border-[#F1F5F9]")}>
-                                                        <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center mb-4 shadow-sm shrink-0", p.color || 'bg-[#E67E22]', !p.color?.includes('bg-') && 'bg-[#F8FAFC]')}>
-                                                            <PlanIcon className={cn("w-6 h-6", (p.color === 'bg-[#E67E22]' || !p.color) ? "text-white" : "text-[#E67E22]")} />
+                                                    <button
+                                                        key={p.id}
+                                                        onClick={() => setSelectedPlan(p.id)}
+                                                        className={cn(
+                                                            "p-4 rounded-[1.25rem] border transition-all flex flex-col items-center text-center",
+                                                            selectedPlan === p.id ? "border-[#5A32FA] bg-[#F4F1FF]/50 ring-1 ring-[#5A32FA]" : "border-slate-200 bg-white active:bg-slate-50"
+                                                        )}
+                                                    >
+                                                        <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center mb-2 shadow-sm", selectedPlan === p.id ? "bg-[#5A32FA] text-white" : "bg-indigo-50 text-[#5A32FA]")}>
+                                                            <PlanIcon className="w-5 h-5" />
                                                         </div>
-                                                        <div className="text-left">
-                                                            <h3 className="font-black text-[10px] uppercase text-[#1E293B]">{p.name}</h3>
-                                                            <span className="text-[10px] font-black text-[#E67E22]">{config.mode === 'beta' ? 'FREE ACCESS' : formatPrice(p.monthlyPrice || 0)}</span>
-                                                        </div>
+                                                        <h3 className={cn("font-black text-[11px] uppercase mb-0.5", selectedPlan === p.id ? "text-[#5A32FA]" : "text-slate-900")}>{p.name}</h3>
+                                                        <p className="text-[9px] font-black text-slate-500 uppercase tracking-widest">
+                                                            {config.mode === 'beta' ? 'FREE ACCESS' : (p.monthlyPrice === 0 ? 'FREE' : formatPrice(p.monthlyPrice || 0))}
+                                                        </p>
                                                     </button>
                                                 );
                                             })}
                                         </div>
-                                    )
-                                }
-                            </div >
-
-                            <div className="pt-4 border-t border-[#F1F5F9] flex justify-between items-center bg-white">
-                                {!isMissingOnlyPhone && step > 1 && (
-                                    <button onClick={() => setStep(step === 4 ? 1 : step - 1)} className="text-[10px] font-black uppercase tracking-widest text-[#94A3B8]">Back</button>
+                                    </>
                                 )}
-                                {isMissingOnlyPhone && <div />}
-                                <Button
-                                    disabled={
-                                        (step === 1 && !selectedExam) ||
-                                        (step === 4 && (!firstName || !lastName || !username || !isUsernameAvailable || getDigits(phoneNumber).length !== phoneLimit || isSubmitting)) ||
-                                        (step === 5 && (!selectedPlan || isSubmitting || getDigits(phoneNumber).length !== phoneLimit || !firstName || !lastName || !username || !isUsernameAvailable))
-                                    }
-                                    onClick={(step === 5 || (step === 4 && isMissingOnlyPhone)) ? handleConfirm : () => setStep(step === 1 ? 4 : step + 1)}
-                                    className="h-12 px-8 rounded-full bg-[#E67E22] text-white font-black text-[10px] uppercase tracking-widest shadow-lg shadow-[#E67E22]/20"
-                                >
-                                    {isSubmitting ? <Loader2 className="animate-spin" /> : 
-                                        (step === 5 || (step === 4 && isMissingOnlyPhone)) ? "Finish" : "Next"}
-                                </Button>
-                            </div>
-                        </motion.div >
-                    </AnimatePresence >
-                </div >
+                                
+                                <div className="flex gap-3 justify-center w-full mt-6">
+                                    {!isMissingOnlyPhone && step > 1 && (
+                                        <button
+                                            onClick={() => setStep(step === 4 ? 1 : step - 1)}
+                                            className="flex items-center gap-1.5 text-[11px] font-bold text-slate-400 active:text-slate-600 transition-colors px-3 h-12 rounded-xl active:bg-slate-50 shrink-0"
+                                        >
+                                            <ChevronLeft className="w-4 h-4" /> Back
+                                        </button>
+                                    )}
+                                    <Button
+                                        disabled={
+                                            (step === 1 && !selectedExam) ||
+                                            (step === 4 && (!firstName || !lastName || !username || !isUsernameAvailable || getDigits(phoneNumber).length !== phoneLimit || isSubmitting)) ||
+                                            (step === 5 && (!selectedPlan || isSubmitting || getDigits(phoneNumber).length !== phoneLimit || !firstName || !lastName || !username || !isUsernameAvailable))
+                                        }
+                                        onClick={(step === 5 || (step === 4 && isMissingOnlyPhone)) ? handleConfirm : () => setStep(step === 1 ? 4 : step + 1)}
+                                        className="flex-1 h-12 rounded-xl bg-[#5A32FA] text-white font-bold text-sm transition-all shadow-lg shadow-[#5A32FA]/20 active:scale-[0.98]"
+                                    >
+                                        {isSubmitting ? <Loader2 className="animate-spin w-4 h-4" /> :
+                                            (step === 5 || (step === 4 && isMissingOnlyPhone)) ? "Begin Preparation" : "Continue"}
+                                        {!isSubmitting && <ArrowRight className="ml-1.5 w-4 h-4" />}
+                                    </Button>
+                                </div>
+
+                            </motion.div>
+                        </AnimatePresence>
+                        
+                        <div className="flex items-center justify-center gap-2 mt-4 text-slate-500 text-[9px] font-medium w-fit mx-auto px-4 py-2 relative z-30">
+                            <ShieldCheck className="w-3 h-3 text-[#5A32FA]" /> Trusted by 12,000+ students worldwide
+                        </div>
+                    </div>
+                </div>
+
                 {/* Pricing Hover Details */}
-                < OnboardingPricingHover
+                <OnboardingPricingHover
                     isOpen={showPricingHover}
                     onClose={() => setShowPricingHover(false)}
                 />
-            </div >
+
+                {/* Background elements */}
+                <div className="absolute top-[-20%] left-[-20%] w-[300px] h-[300px] bg-[#5A32FA]/10 blur-[100px] rounded-full pointer-events-none z-0" />
+                <div className="absolute bottom-[-10%] right-[-20%] w-[300px] h-[300px] bg-[#5A32FA]/10 blur-[100px] rounded-full pointer-events-none z-0" />
+            </div>
         </>
     );
 }
+

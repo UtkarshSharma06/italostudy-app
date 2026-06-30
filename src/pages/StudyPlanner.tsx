@@ -23,7 +23,7 @@ import {
 // ─── Types ───────────────────────────────────────────────────────────────────
 
 export interface StudyPlanConfig {
-    exam: 'imat' | 'cent-s';
+    exam: 'imat' | 'cent-s' | 'til-i';
     examDate: string;
     hoursPerDay: number;
     targetScore: number;
@@ -48,6 +48,12 @@ export const EXAM_SUBJECTS = {
         { name: 'Biology', weight: 0.18, subject: 'biology', color: 'text-emerald-600', bg: 'bg-emerald-100 dark:bg-emerald-900/30', border: 'border-emerald-200', icon: BookOpen, topics: ['Cell Structure & Function', 'Genetics & DNA Replication', 'Bioenergetics & Metabolism', 'Chemistry of Life (Biomolecules)', 'Cellular Respiration', 'Evolutionary Mechanisms'] },
         { name: 'Chemistry', weight: 0.18, subject: 'chemistry', color: 'text-purple-600', bg: 'bg-purple-100 dark:bg-purple-900/30', border: 'border-purple-200', icon: FlaskConical, topics: ['Atomic Structure & Periodic Table', 'Ionic, Covalent & Metallic Bonds', 'Reaction Equations & Stoichiometry', 'Intro Organic Chemistry (Nomenclature)', 'Concentration & Molarity', 'Redox Reactions'] },
         { name: 'Physics', weight: 0.09, subject: 'physics', color: 'text-rose-600', bg: 'bg-rose-100 dark:bg-rose-900/30', border: 'border-rose-200', icon: Zap, topics: ['Kinematics & Newton\'s Laws', 'Work, Energy & Power', 'Thermodynamics Basics', 'Electric Charge & Ohm\'s Law', 'Magnetic Fields'] },
+    ],
+    'til-i': [
+        { name: 'Mathematics', weight: 0.38, subject: 'mathematics', color: 'text-blue-600', bg: 'bg-blue-100 dark:bg-blue-900/30', border: 'border-blue-200', icon: Binary, topics: ['Algebra', 'Functions', 'Geometry', 'Trigonometry', 'Probability', 'Exponential & Logarithmic Functions'] },
+        { name: 'Reasoning', weight: 0.24, subject: 'reasoning', color: 'text-indigo-600', bg: 'bg-indigo-100 dark:bg-indigo-900/30', border: 'border-indigo-200', icon: Brain, topics: ['Reading Comprehension', 'Logical Reasoning', 'Deduction'] },
+        { name: 'Physics', weight: 0.24, subject: 'physics', color: 'text-rose-600', bg: 'bg-rose-100 dark:bg-rose-900/30', border: 'border-rose-200', icon: Zap, topics: ['Mechanics', 'Thermodynamics', 'Electromagnetism', 'Optics'] },
+        { name: 'Technical Knowledge', weight: 0.14, subject: 'technical_knowledge', color: 'text-amber-600', bg: 'bg-amber-100 dark:bg-amber-900/30', border: 'border-amber-200', icon: Settings, topics: ['Basic Technical Knowledge', 'Applied Science'] },
     ],
 };
 
@@ -170,15 +176,15 @@ export default function StudyPlanner() {
     const navigate = useNavigate();
 
     const [step, setStep] = useState<Step>('exam');
-    const [exam, setExam] = useState<'imat' | 'cent-s' | null>(() =>
-        (activeExam?.id === 'cent-s' || activeExam?.id === 'imat') ? activeExam.id as 'imat' | 'cent-s' : null
+    const [exam, setExam] = useState<'imat' | 'cent-s' | 'til-i' | null>(() =>
+        (activeExam?.id === 'cent-s' || activeExam?.id === 'imat' || activeExam?.id === 'til-i') ? activeExam.id as 'imat' | 'cent-s' | 'til-i' : null
     );
     const [examDate, setExamDate] = useState('');
     const [hoursPerDay, setHoursPerDay] = useState(2);
     const [targetScore, setTargetScore] = useState(exam === 'imat' ? 50 : 35);
     const [levels, setLevels] = useState<Record<string, 'weak' | 'medium' | 'strong'>>(() => {
         const init: Record<string, 'weak' | 'medium' | 'strong'> = {};
-        [...EXAM_SUBJECTS.imat, ...EXAM_SUBJECTS['cent-s']].forEach(s => { init[s.subject] = 'medium'; });
+        [...EXAM_SUBJECTS.imat, ...EXAM_SUBJECTS['cent-s'], ...EXAM_SUBJECTS['til-i']].forEach(s => { init[s.subject] = 'medium'; });
         return init;
     });
     const [saving, setSaving] = useState(false);
@@ -439,6 +445,12 @@ export default function StudyPlanner() {
                                                     stats: [{ label: 'Questions', val: '55 MCQ' }, { label: 'Duration', val: '110 min' }, { label: 'Sections', val: '5 subjects' }, { label: 'Top Weight', val: '54% Logic+Math' }],
                                                     tip: '💡 Math + Reasoning = 54% of total marks. These two sections dominate your rank.',
                                                     color: 'violet'
+                                                },
+                                                {
+                                                    id: 'til-i' as const, label: 'TIL-I', subtitle: 'Test In Laib - Ingegneria',
+                                                    stats: [{ label: 'Questions', val: '42 MCQ' }, { label: 'Duration', val: '90 min' }, { label: 'Sections', val: '4 subjects' }, { label: 'Top Weight', val: '38% Math' }],
+                                                    tip: '💡 Math is 38% of total marks. Physics and Logic are also heavily weighted.',
+                                                    color: 'amber'
                                                 },
                                             ] as const).filter(e => !activeExam?.id || activeExam.id.includes(e.id)).map(e => (
                                                 <button
@@ -720,7 +732,7 @@ export default function StudyPlanner() {
                                             <h2 className="text-2xl font-black text-slate-900 dark:text-white">What's your target score?</h2>
                                         </div>
                                         <p className="text-sm text-slate-500 mb-8 ml-12">
-                                            {exam === 'imat' ? 'IMAT 2024 minimum competitive score was ~42. Top university (Sapienza) required ~58+.' : 'CENT-S average qualifying score ranges 28–38 depending on university.'}
+                                            {exam === 'imat' ? 'IMAT 2024 minimum competitive score was ~42. Top university (Sapienza) required ~58+.' : exam === 'til-i' ? 'TIL-I minimum competitive score varies but aims for 25+.' : 'CENT-S average qualifying score ranges 28–38 depending on university.'}
                                         </p>
 
                                         <div className="mb-8">
@@ -730,8 +742,8 @@ export default function StudyPlanner() {
                                             </div>
                                             <input
                                                 type="range"
-                                                min={exam === 'imat' ? 30 : 20}
-                                                max={exam === 'imat' ? 90 : 55}
+                                                min={exam === 'imat' ? 30 : exam === 'til-i' ? 15 : 20}
+                                                max={exam === 'imat' ? 90 : exam === 'til-i' ? 42 : 55}
                                                 value={targetScore}
                                                 onChange={e => setTargetScore(Number(e.target.value))}
                                                 className="w-full h-3 rounded-full accent-indigo-600"

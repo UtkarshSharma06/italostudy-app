@@ -236,6 +236,12 @@ export default function MobileMockExams() {
             }
             // Primary sort for 'all' tab: Live first, then Upcoming, then Past
             if (activeTab === 'all') {
+                // Pin Explorer accessible sessions to top for non-premium users
+                if (!hasPremiumAccess) {
+                    if (a.is_explorer_allowed && !b.is_explorer_allowed) return -1;
+                    if (!a.is_explorer_allowed && b.is_explorer_allowed) return 1;
+                }
+
                 if (a.isLive && !b.isLive) return -1;
                 if (!a.isLive && b.isLive) return 1;
                 if (a.isUpcoming && b.isPast) return -1;
@@ -498,32 +504,7 @@ export default function MobileMockExams() {
                                     <Card key={i} className="bg-secondary/20 border-border/40 rounded-[2.5rem] overflow-hidden border-b-4 shadow-xl relative"
                                         onClick={() => isLocked && setIsUpgradeModalOpen(true)}
                                     >
-                                        {isLocked && (
-                                            <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-background/20 backdrop-blur-[1px]">
-                                                <div className="bg-background/95 border border-border p-5 rounded-[2rem] shadow-2xl flex flex-col items-center gap-3 transform">
-                                                    <div className="w-12 h-12 bg-primary/10 rounded-2xl flex items-center justify-center border border-primary/20">
-                                                        <Lock className="w-6 h-6 text-primary" />
-                                                    </div>
-                                                    <div className="text-center">
-                                                        <span className="text-[10px] font-black uppercase tracking-widest text-foreground block mb-0.5">Premium Session</span>
-                                                        <p className="text-[8px] font-bold text-muted-foreground uppercase tracking-tight">Upgrade to Unlock</p>
-                                                    </div>
-                                                    <Button
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            setIsUpgradeModalOpen(true);
-                                                        }}
-                                                        className="bg-primary text-white text-[9px] font-black h-10 px-6 rounded-xl uppercase tracking-widest"
-                                                    >
-                                                        Upgrade
-                                                    </Button>
-                                                </div>
-                                            </div>
-                                        )}
-                                        <CardContent className={cn(
-                                            "p-6 space-y-6 transition-all duration-500",
-                                            isLocked && "blur-[8px] grayscale opacity-40 pointer-events-none select-none"
-                                        )}>
+                                        <CardContent className="p-6 space-y-6 transition-all duration-500">
                                             <div className="flex justify-between items-start">
                                                 <div className="flex flex-col gap-2">
                                                     {session.is_explorer_allowed && !hasPremiumAccess && (
@@ -591,7 +572,9 @@ export default function MobileMockExams() {
                                             </div>
 
                                             <div className="flex gap-2 w-full mt-2">
-                                                {(sessionAttempts[session.id] || 0) > 0 ? (
+                                                {isLocked ? (
+                                                    <Button onClick={(e) => { e.stopPropagation(); setIsUpgradeModalOpen(true); }} className="w-full h-14 rounded-2xl font-black text-[9px] sm:text-[10px] uppercase tracking-[0.2em] transition-all shadow-lg bg-gradient-to-r from-amber-400 to-orange-500 text-white hover:from-amber-500 hover:to-orange-600 shadow-orange-500/20 flex items-center justify-center gap-2 animate-pulse-subtle"><Lock className="w-4 h-4" />Upgrade to Unlock</Button>
+                                                ) : (sessionAttempts[session.id] || 0) > 0 ? (
                                                     <>
                                                         <Button
                                                             onClick={(e) => {

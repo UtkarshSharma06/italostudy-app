@@ -87,7 +87,7 @@ export function useActiveTest() {
                 
                 // Prioritize session title, then descriptive mock title, then subject fallback
                 const examType = testData.exam_type?.toUpperCase() || 'Exam';
-                const examName = examType === 'IMAT' ? 'IMAT' : (examType === 'CENT-S' ? 'CENT-S' : examType);
+                const examName = examType === 'IMAT' ? 'IMAT' : (examType === 'CENT-S' ? 'CENT-S' : (examType === 'TIL-I' ? 'TIL-I' : examType));
                 
                 let resolvedTitle = sessionTitle || testData.subject || 'All Subjects';
                 
@@ -137,9 +137,38 @@ export function useActiveTest() {
     useEffect(() => {
         checkActiveTest();
 
-        // Polling for status updates (optional, but good for dashboard accuracy)
-        const interval = setInterval(checkActiveTest, 60000); // Check every 60s
-        return () => clearInterval(interval);
+        let interval: ReturnType<typeof setInterval> | null = null;
+
+        const startPolling = () => {
+            if (!interval) {
+                interval = setInterval(checkActiveTest, 60000); // Check every 60s
+            }
+        };
+
+        const stopPolling = () => {
+            if (interval) {
+                clearInterval(interval);
+                interval = null;
+            }
+        };
+
+        const handleVisibilityChange = () => {
+            if (document.hidden) {
+                stopPolling();
+            } else {
+                // Resume immediately on tab focus, then restart interval
+                checkActiveTest();
+                startPolling();
+            }
+        };
+
+        startPolling();
+        document.addEventListener('visibilitychange', handleVisibilityChange);
+
+        return () => {
+            stopPolling();
+            document.removeEventListener('visibilitychange', handleVisibilityChange);
+        };
     }, [checkActiveTest]);
 
     return { activeTest, isLoading, refreshActiveTest: checkActiveTest };

@@ -63,6 +63,12 @@ export default function MockExams() {
                 return new Date(b.start_time).getTime() - new Date(a.start_time).getTime();
             }
             if (activeTab === 'all') {
+                // Pin Explorer accessible sessions to top for non-premium users
+                if (!hasPremiumAccess) {
+                    if (a.is_explorer_allowed && !b.is_explorer_allowed) return -1;
+                    if (!a.is_explorer_allowed && b.is_explorer_allowed) return 1;
+                }
+
                 if (a.isLive && !b.isLive) return -1;
                 if (!a.isLive && b.isLive) return 1;
                 if (a.isUpcoming && b.isPast) return -1;
@@ -368,7 +374,7 @@ export default function MockExams() {
                                             const isLocked = isRestrictedPlan && !session.is_explorer_allowed;
                                             return (
                                                 <div key={session.id} className="bg-white dark:bg-card p-6 sm:p-8 rounded-[2rem] sm:rounded-[2.5rem] border-2 border-slate-100 dark:border-border border-b-[6px] shadow-xl shadow-slate-200/50 hover:border-slate-300 hover:-translate-y-1 hover:shadow-2xl active:border-b-2 active:translate-y-1 transition-all duration-300 group relative overflow-hidden" onClick={() => isLocked && setIsUpgradeModalOpen(true)}>
-                                                    <div className={cn("transition-all duration-500", isLocked && "blur-[8px] grayscale opacity-40 pointer-events-none select-none")}>
+                                                    <div className="transition-all duration-500">
                                                         <div className="flex flex-wrap items-start justify-between gap-4 mb-6 sm:mb-8">
                                                             <div className="flex gap-2">
                                                                 {session.is_explorer_allowed && !hasPremiumAccess && <div className="px-3 py-1.5 rounded-full bg-indigo-50 border border-indigo-100 text-indigo-600 text-[8px] sm:text-[9px] font-black uppercase tracking-widest leading-none flex items-center gap-1"><Sparkles className="w-3 h-3" /> Explorer Access</div>}
@@ -390,36 +396,25 @@ export default function MockExams() {
                                                             )}
                                                         </div>
                                                         <h3 className="text-lg sm:text-xl font-black text-slate-900 dark:text-slate-100 mb-6 group-hover:text-indigo-600 transition-colors uppercase tracking-tight leading-tight">{session.title}</h3>
-                                                        <div className="flex flex-wrap items-center gap-4 sm:gap-6 mb-8 py-4 border-y border-slate-50">
+                                                        <div className="flex flex-wrap items-center gap-4 sm:gap-6 mb-8 py-4 border-y border-slate-50 dark:border-slate-800">
                                                             <div className="flex items-center gap-2 text-slate-400"><Clock className="w-3.5 h-3.5" /><span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest">{allExams[session.exam_type]?.durationMinutes || session.duration} MIN</span></div>
                                                             <div className="flex items-center gap-2 text-slate-400"><Users className="w-3.5 h-3.5" /><span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest">Global Entry</span></div>
                                                             <div className="flex items-center gap-2 text-indigo-500 font-bold"><Target className="w-3.5 h-3.5" /><span className="text-[9px] sm:text-[10px] font-black uppercase tracking-widest">{session.isPast ? 'Attempts: Unlimited' : `Attempts: ${session.max_attempts || 1}`}</span></div>
                                                         </div>
                                                     </div>
-                                                    {isLocked && (
-                                                        <div className="absolute inset-0 z-20 flex flex-col items-center justify-center bg-white/10 dark:bg-slate-900/10 backdrop-blur-[1px]">
-                                                            <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-md p-6 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-700 flex flex-col items-center gap-3 transform transition-transform group-hover:scale-105">
-                                                                <div className="w-14 h-14 bg-indigo-50 dark:bg-indigo-900/30 rounded-2xl flex items-center justify-center mb-1 border border-indigo-100 dark:border-indigo-800 shadow-inner"><Lock className="w-7 h-7 text-indigo-600 dark:text-indigo-400" /></div>
-                                                                <div className="text-center">
-                                                                    <span className="text-xs font-black uppercase tracking-widest text-slate-900 dark:text-slate-100 block mb-1">Premium Simulation</span>
-                                                                    <p className="text-[9px] font-bold text-slate-500 uppercase tracking-tight">Upgrade to Unlock this Session</p>
-                                                                </div>
-                                                                <Button onClick={(e) => { e.stopPropagation(); setIsUpgradeModalOpen(true); }} className="mt-2 bg-slate-900 text-white hover:bg-slate-800 text-[9px] font-black px-6 rounded-xl h-10 uppercase tracking-widest">Upgrade Now</Button>
-                                                            </div>
-                                                        </div>
-                                                    )}
-                                                    {!isLocked && (
-                                                        <div className="flex gap-2 w-full">
-                                                            {(sessionAttempts[session.id] || 0) > 0 ? (
-                                                                <>
-                                                                    <Button onClick={(e) => { e.stopPropagation(); if (session.isLive || session.isUpcoming) { navigate(`/waiting-room/${session.id}`); } else { handleActionWithReview(() => { const params = new URLSearchParams({ session_id: session.id, exam_type: session.exam_type }); navigate(`/mock-guidelines?${params.toString()}`); }); } }} className="flex-1 h-12 sm:h-14 font-black rounded-2xl text-[9px] sm:text-[10px] uppercase tracking-[0.15em] transition-all shadow-sm bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 hover:border-indigo-300 dark:hover:border-indigo-500/50 flex items-center justify-center gap-2"><RotateCcw className="w-3.5 h-3.5" />{session.isLive || session.isUpcoming ? 'Enter Room' : 'Reattempt'}</Button>
-                                                                    <Button onClick={(e) => { e.stopPropagation(); if (latestAttempts[session.id]) { navigate(`/results/${latestAttempts[session.id]}`); } }} className="flex-1 h-12 sm:h-14 font-black rounded-2xl text-[9px] sm:text-[10px] uppercase tracking-[0.15em] transition-all shadow-md bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-2"><Target className="w-3.5 h-3.5" />Results</Button>
-                                                                </>
-                                                            ) : (
-                                                                <Button disabled={isRegistering === session.id} onClick={(e) => { e.stopPropagation(); if (hasReachedMockLimit()) { setIsUpgradeModalOpen(true); return; } if (activeTest && !session.isLive && !session.isUpcoming) { toast({ title: "Active Test in Progress", description: `You are currently in the middle of ${activeTest.subject}. Finish it first!`, variant: "destructive", action: (<ToastAction altText="Resume Test" onClick={() => navigate(`/test/${activeTest.id}`)}>Resume</ToastAction>) }); return; } if (session.isPast) { handleActionWithReview(() => { const params = new URLSearchParams({ session_id: session.id, exam_type: session.exam_type }); navigate(`/mock-guidelines?${params.toString()}`); }); } else if (registrations.includes(session.id) || (session.isLive || session.isUpcoming)) { navigate(`/waiting-room/${session.id}`); } else { handleRegister(session.id); } }} className={`w-full h-12 sm:h-14 font-black rounded-2xl text-[9px] sm:text-[10px] uppercase tracking-[0.15em] transition-all shadow-sm flex items-center justify-center gap-2 ${hasReachedMockLimit() ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed' : session.isPast ? 'bg-indigo-600 text-white hover:bg-indigo-700' : (registrations.includes(session.id) || (session.isLive || session.isUpcoming)) ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-white dark:bg-card text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-border hover:border-slate-900'}`}>{isRegistering === session.id ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <><span>{hasReachedMockLimit() ? 'Upgrade to Unlock' : session.isPast ? 'Start Practice' : (registrations.includes(session.id) || (session.isLive || session.isUpcoming)) ? 'Enter Room' : 'Request Access'}</span>{!hasReachedMockLimit() && <ChevronRight className="w-4 h-4 shrink-0" />}</>}</Button>
-                                                            )}
-                                                        </div>
-                                                    )}
+                                                    
+                                                    <div className="flex gap-2 w-full">
+                                                        {isLocked ? (
+                                                            <Button onClick={(e) => { e.stopPropagation(); setIsUpgradeModalOpen(true); }} className="w-full h-12 sm:h-14 font-black rounded-2xl text-[9px] sm:text-[10px] uppercase tracking-[0.15em] transition-all shadow-lg bg-gradient-to-r from-amber-400 to-orange-500 text-white hover:from-amber-500 hover:to-orange-600 shadow-orange-500/20 flex items-center justify-center gap-2 animate-pulse-subtle"><Lock className="w-4 h-4" />Upgrade to Unlock</Button>
+                                                        ) : (sessionAttempts[session.id] || 0) > 0 ? (
+                                                            <>
+                                                                <Button onClick={(e) => { e.stopPropagation(); if (session.isLive || session.isUpcoming) { navigate(`/waiting-room/${session.id}`); } else { handleActionWithReview(() => { const params = new URLSearchParams({ session_id: session.id, exam_type: session.exam_type }); navigate(`/mock-guidelines?${params.toString()}`); }); } }} className="flex-1 h-12 sm:h-14 font-black rounded-2xl text-[9px] sm:text-[10px] uppercase tracking-[0.15em] transition-all shadow-sm bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-500/30 hover:bg-indigo-100 dark:hover:bg-indigo-500/20 hover:border-indigo-300 dark:hover:border-indigo-500/50 flex items-center justify-center gap-2"><RotateCcw className="w-3.5 h-3.5" />{session.isLive || session.isUpcoming ? 'Enter Room' : 'Reattempt'}</Button>
+                                                                <Button onClick={(e) => { e.stopPropagation(); if (latestAttempts[session.id]) { navigate(`/results/${latestAttempts[session.id]}`); } }} className="flex-1 h-12 sm:h-14 font-black rounded-2xl text-[9px] sm:text-[10px] uppercase tracking-[0.15em] transition-all shadow-md bg-indigo-600 text-white hover:bg-indigo-700 hover:shadow-lg hover:-translate-y-0.5 flex items-center justify-center gap-2"><Target className="w-3.5 h-3.5" />Results</Button>
+                                                            </>
+                                                        ) : (
+                                                            <Button disabled={isRegistering === session.id} onClick={(e) => { e.stopPropagation(); if (hasReachedMockLimit()) { setIsUpgradeModalOpen(true); return; } if (activeTest && !session.isLive && !session.isUpcoming) { toast({ title: "Active Test in Progress", description: `You are currently in the middle of ${activeTest.subject}. Finish it first!`, variant: "destructive", action: (<ToastAction altText="Resume Test" onClick={() => navigate(`/test/${activeTest.id}`)}>Resume</ToastAction>) }); return; } if (session.isPast) { handleActionWithReview(() => { const params = new URLSearchParams({ session_id: session.id, exam_type: session.exam_type }); navigate(`/mock-guidelines?${params.toString()}`); }); } else if (registrations.includes(session.id) || (session.isLive || session.isUpcoming)) { navigate(`/waiting-room/${session.id}`); } else { handleRegister(session.id); } }} className={`w-full h-12 sm:h-14 font-black rounded-2xl text-[9px] sm:text-[10px] uppercase tracking-[0.15em] transition-all shadow-sm flex items-center justify-center gap-2 ${hasReachedMockLimit() ? 'bg-slate-100 text-slate-400 border border-slate-200 cursor-not-allowed' : session.isPast ? 'bg-indigo-600 text-white hover:bg-indigo-700' : (registrations.includes(session.id) || (session.isLive || session.isUpcoming)) ? 'bg-slate-900 text-white hover:bg-slate-800' : 'bg-white dark:bg-card text-slate-900 dark:text-slate-100 border border-slate-200 dark:border-border hover:border-slate-900'}`}>{isRegistering === session.id ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <><span>{hasReachedMockLimit() ? 'Upgrade to Unlock' : session.isPast ? 'Start Practice' : (registrations.includes(session.id) || (session.isLive || session.isUpcoming)) ? 'Enter Room' : 'Request Access'}</span>{!hasReachedMockLimit() && <ChevronRight className="w-4 h-4 shrink-0" />}</>}</Button>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             );
                                         })}

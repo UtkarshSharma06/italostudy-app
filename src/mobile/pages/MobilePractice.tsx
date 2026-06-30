@@ -6,6 +6,7 @@ import { BookOpen, ChevronRight, Zap, Target, Clock, ArrowLeft, Trophy, Crown } 
 import { supabase } from '@/integrations/supabase/client';
 import { usePlanAccess } from '@/hooks/usePlanAccess';
 import { UpgradeModal } from '@/components/UpgradeModal';
+import { SubjectIcon } from '@/components/ui/SubjectIcon';
 import { Card, CardContent } from '@/components/ui/card';
 import { useActiveTest } from '@/hooks/useActiveTest';
 import { useToast } from '@/hooks/use-toast';
@@ -198,62 +199,75 @@ export default function MobilePractice() {
                         {/* Progress Bar Section */}
                         <div className="mb-4">
                             {isExplorer ? (
-                                <div className="bg-secondary/30 rounded-[2rem] p-6 border border-border/50 shadow-sm backdrop-blur-sm">
-                                    <div className="flex items-center justify-between mb-4">
-                                        <span className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Daily Basic Limit</span>
-                                        <span className="text-sm font-black text-foreground">
-                                            {totalPracticeCount}/{practiceLimit}
+                                <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.03)] border border-slate-100 dark:border-slate-800 flex flex-col gap-4">
+                                    <div className="flex flex-col gap-3 w-full">
+                                        <span className="text-[13px] font-bold text-slate-800 dark:text-slate-200 flex items-center gap-2">
+                                            Daily Practice Limit <Info className="w-3.5 h-3.5 text-indigo-400" />
                                         </span>
+                                        
+                                        <div className="flex items-center gap-4 w-full">
+                                            <div className="h-2 w-full bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                                <div
+                                                    className="h-full bg-indigo-600 dark:bg-indigo-500 rounded-full transition-all duration-500"
+                                                    style={{ width: `${Math.min(100, (totalPracticeCount / practiceLimit) * 100)}%` }}
+                                                />
+                                            </div>
+                                            <span className="text-[13px] font-bold text-slate-900 dark:text-white shrink-0">
+                                                <span className="text-indigo-600 dark:text-indigo-400">{totalPracticeCount}</span> <span className="text-slate-400 font-medium">/ {practiceLimit}</span>
+                                            </span>
+                                        </div>
                                     </div>
-                                    <div className="h-3 w-full bg-secondary rounded-full overflow-hidden mb-6">
-                                        <div
-                                            className="h-full bg-primary rounded-full transition-all duration-500"
-                                            style={{ width: `${Math.min(100, (totalPracticeCount / practiceLimit) * 100)}%` }}
-                                        />
-                                    </div>
-                                    <Button
-                                        onClick={openPricingModal}
-                                        className="w-full bg-background hover:bg-secondary text-foreground border border-border/50 font-black uppercase tracking-widest text-[10px] h-12 rounded-xl shadow-sm"
-                                    >
-                                        <Zap className="w-4 h-4 mr-2 text-primary" /> Upgrade to Remove Limits
-                                    </Button>
+                                    <button onClick={openPricingModal} className="w-full bg-orange-50 dark:bg-orange-500/10 hover:bg-orange-100 dark:hover:bg-orange-500/20 transition-colors rounded-2xl px-6 py-3 flex items-center justify-center gap-4 group mt-2">
+                                        <Zap className="w-5 h-5 text-orange-500 fill-orange-500 group-hover:scale-110 transition-transform" />
+                                        <div className="flex flex-col text-left">
+                                            <span className="text-[13px] font-bold text-slate-900 dark:text-white leading-tight">Remove Limits</span>
+                                            <span className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Upgrade to Premium</span>
+                                        </div>
+                                    </button>
                                 </div>
                             ) : (
-                                <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-[2rem] p-8 text-white shadow-xl shadow-indigo-500/20 flex items-center justify-between">
-                                    <div>
-                                        <h2 className="text-lg font-black uppercase tracking-tight mb-1 flex items-center gap-2">
-                                            <Crown className="w-5 h-5 text-yellow-300" /> Unlimited Practice
-                                        </h2>
-                                        <p className="text-[10px] font-bold text-indigo-100 uppercase tracking-widest opacity-80">You are a Premium User</p>
-                                    </div>
-                                    <div className="h-10 w-10 bg-white/10 rounded-full flex items-center justify-center backdrop-blur-sm">
-                                        <Zap className="w-5 h-5 text-yellow-300" />
+                                <div className="w-full bg-indigo-50 dark:bg-indigo-500/10 rounded-[2rem] px-6 py-5 flex items-center gap-4">
+                                    <Crown className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
+                                    <div className="flex flex-col text-left">
+                                        <span className="text-[15px] font-bold text-slate-900 dark:text-white leading-tight mb-0.5">Unlimited Practice</span>
+                                        <span className="text-[12px] text-slate-500 dark:text-slate-400 font-medium">You are a Premium User</span>
                                     </div>
                                 </div>
                             )}
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                            {subjects.map((subject) => (
+                        <div className="flex flex-col items-center mb-6 mt-4">
+                            <div className="w-12 h-12 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl flex items-center justify-center mb-4 text-indigo-600 dark:text-indigo-400 shadow-sm border border-indigo-100/50 dark:border-indigo-500/20">
+                                <BookOpen className="w-6 h-6" />
+                            </div>
+                            <h2 className="text-2xl font-black text-[#0f172a] dark:text-white tracking-tight text-center mb-1">Select a Subject</h2>
+                            <p className="text-slate-500 font-medium text-sm text-center">Choose a subject to start practicing</p>
+                        </div>
+
+                        <div className="flex flex-col gap-4 animate-in fade-in slide-in-from-bottom-4 duration-500">
+                            {subjects.map((subject) => {
+                                const isLimitReached = isExplorer && totalPracticeCount >= practiceLimit;
+                                return (
                                 <button
                                     key={subject.name}
                                     onClick={() => handleSubjectSelect(subject.name)}
-                                    className="group relative flex flex-col items-center p-6 bg-secondary/30 backdrop-blur-sm border border-border/50 rounded-[2.5rem] transition-all hover:bg-secondary/50 active:scale-95 overflow-hidden"
+                                    className={`w-full p-4 rounded-[1.5rem] bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] dark:shadow-none active:scale-[0.98] transition-all duration-300 text-left flex items-center gap-4 group ${isLimitReached ? 'opacity-50 grayscale cursor-not-allowed' : ''}`}
                                 >
-                                    <div className="text-4xl mb-4 group-hover:scale-125 transition-transform duration-500 drop-shadow-md">
-                                        {subject.icon}
+                                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 bg-secondary group-hover:scale-105 transition-transform duration-300 shadow-sm border border-white dark:border-transparent`}>
+                                        <SubjectIcon subjectName={subject.name} fallbackIcon={subject.icon} className="w-6 h-6" />
                                     </div>
-                                    <h3 className="font-bold text-foreground text-xs uppercase tracking-wider text-center line-clamp-2">
-                                        {subject.name}
-                                    </h3>
-                                    <div className="mt-3 text-[10px] font-black text-muted-foreground uppercase opacity-60">
-                                        {getSubjectCount(subject.name)}/{subject.total} <span className="text-[8px]">DONE</span>
+                                    <div className="flex-1 min-w-0">
+                                        <h3 className="font-bold text-[#0f172a] dark:text-white text-[15px] mb-1 truncate">{subject.name}</h3>
+                                        <p className="text-[11px] font-medium text-slate-400">
+                                            <span className="text-[#0f172a] dark:text-slate-300 font-bold">{getSubjectCount(subject.name)}</span> / {subject.total} questions
+                                        </p>
                                     </div>
-                                    <div className="absolute top-0 right-0 p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                        <ChevronRight className="w-4 h-4 text-primary" />
+                                    <div className="w-8 h-8 rounded-full border border-slate-100 dark:border-slate-700 flex items-center justify-center shrink-0 group-hover:border-indigo-100 group-hover:bg-indigo-50 transition-colors">
+                                        <ChevronRight className="w-4 h-4 text-slate-400" />
                                     </div>
                                 </button>
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 ) : step === 2 ? (
@@ -266,23 +280,62 @@ export default function MobilePractice() {
                             <p className="text-muted-foreground text-sm font-bold uppercase tracking-widest opacity-60">Targeting {selectedSubject}</p>
                         </div>
 
-                        <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto">
-                            {[5, 10, 15, 20].map((count) => {
-                                const isDisabled = isExplorer && count > remaining;
+                        <div className="flex flex-col gap-4 max-w-sm mx-auto">
+                            {[5, 10, 15, 20].map((num) => {
+                                const isDisabled = isExplorer && num > remaining;
+                                let iconContent;
+                                let colorCls;
+                                if (num === 5) {
+                                    colorCls = "bg-purple-50 dark:bg-purple-500/10";
+                                    iconContent = <span className="text-[32px] drop-shadow-sm leading-none">📝</span>;
+                                } else if (num === 10) {
+                                    colorCls = "bg-green-50 dark:bg-green-500/10";
+                                    iconContent = <span className="text-[32px] drop-shadow-sm leading-none">📖</span>;
+                                } else if (num === 15) {
+                                    colorCls = "bg-orange-50 dark:bg-orange-500/10";
+                                    iconContent = <span className="text-[32px] drop-shadow-sm leading-none">🎯</span>;
+                                } else {
+                                    colorCls = "bg-purple-50 dark:bg-purple-500/10";
+                                    iconContent = <span className="text-[32px] drop-shadow-sm leading-none">🏆</span>;
+                                }
+
                                 return (
                                     <button
-                                        key={count}
+                                        key={num}
+                                        onClick={() => handleStartPractice(num)}
                                         disabled={isDisabled}
-                                        onClick={() => handleStartPractice(count)}
-                                        className={`group relative p-8 rounded-[2rem] border-2 transition-all duration-300 active:scale-95 flex flex-col items-center justify-center gap-1 ${isDisabled
-                                            ? 'bg-secondary/20 border-border/50 opacity-40 grayscale cursor-not-allowed'
-                                            : 'bg-secondary/40 border-border/50 hover:bg-secondary/60 hover:border-primary/50 text-foreground'
-                                            }`}
+                                        className={`relative w-full p-5 rounded-[1.5rem] border bg-white dark:bg-slate-900 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] dark:shadow-none active:scale-[0.98] transition-all duration-300 text-left flex items-center justify-between overflow-hidden ${
+                                            isDisabled
+                                                ? 'border-slate-100 dark:border-slate-800 opacity-50 cursor-not-allowed'
+                                                : 'border-slate-100 dark:border-slate-800 hover:border-indigo-500 hover:shadow-[0_8px_30px_-4px_rgba(99,102,241,0.15)]'
+                                        }`}
                                     >
-                                        <span className="text-4xl font-black tracking-tighter">{count}</span>
-                                        <span className="text-[10px] font-black uppercase tracking-widest opacity-60 group-hover:text-primary transition-colors">Tasks</span>
-                                        {!isDisabled && (
-                                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-primary rounded-full animate-pulse blur-[2px]" />
+                                        {/* Left Content */}
+                                        <div className="flex flex-col relative z-10">
+                                            <div className="flex items-baseline gap-2 mb-1">
+                                                <span className="text-3xl font-black text-[#0f172a] dark:text-white tracking-tighter">{num}</span>
+                                            </div>
+                                            <span className="text-[9px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-3">QUESTIONS</span>
+                                            
+                                            <div className="flex items-center gap-1.5 text-[11px] font-medium text-slate-500">
+                                                <Clock className="w-3.5 h-3.5 text-green-500" />
+                                                Est. {num} mins
+                                            </div>
+                                        </div>
+
+                                        {/* Right Icon Radial Background */}
+                                        <div className={`absolute right-[-20px] w-28 h-28 rounded-full flex items-center justify-center shrink-0 ${colorCls} transition-transform duration-500`}>
+                                            <div className="mr-2">
+                                                {iconContent}
+                                            </div>
+                                        </div>
+
+                                        {/* Premium Overlay */}
+                                        {isDisabled && (
+                                            <div className="absolute inset-0 bg-white/60 dark:bg-slate-900/60 backdrop-blur-[2px] flex flex-col items-center justify-center z-20">
+                                                <Crown className="w-5 h-5 text-yellow-500 mb-1.5" />
+                                                <span className="text-[9px] font-black text-slate-900 dark:text-white uppercase tracking-widest text-center">Premium</span>
+                                            </div>
                                         )}
                                     </button>
                                 );

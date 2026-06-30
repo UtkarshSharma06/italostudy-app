@@ -15,6 +15,7 @@ import {
 } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { SubjectsGridSkeleton } from '@/components/SkeletonLoader';
+import { SubjectIcon, getSubjectColorClass } from '@/components/ui/SubjectIcon';
 import MobileLayout from '../components/MobileLayout';
 
 export default function MobileSubjects() {
@@ -191,8 +192,8 @@ export default function MobileSubjects() {
                                 >
                                     <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                                     <CardContent className="p-6 flex items-center gap-5 relative z-10">
-                                        <div className="w-16 h-16 rounded-2xl bg-secondary/50 flex items-center justify-center text-3xl shadow-sm group-hover:rotate-6 transition-transform">
-                                            {stat.icon}
+                                        <div className={`w-16 h-16 rounded-2xl ${getSubjectColorClass(stat.subject)} flex items-center justify-center text-3xl shadow-sm group-hover:rotate-6 transition-transform`}>
+                                            <SubjectIcon subjectName={stat.subject} fallbackIcon={stat.icon} className="w-8 h-8" />
                                         </div>
                                         <div className="flex-1">
                                             <div className="flex items-center justify-between mb-2">
@@ -229,8 +230,8 @@ export default function MobileSubjects() {
                             <DialogContent className="w-[95vw] max-w-[95vw] bg-background border border-border/10 rounded-[2rem] p-0 overflow-hidden shadow-2xl">
                                 <div className="p-6 overflow-y-auto max-h-[85vh] no-scrollbar">
                                     <div className="flex items-center gap-4 mb-8">
-                                        <div className="w-14 h-14 bg-secondary/50 rounded-2xl flex items-center justify-center text-3xl">
-                                            {stat.icon}
+                                        <div className={`w-14 h-14 ${getSubjectColorClass(stat.subject)} rounded-2xl flex items-center justify-center text-3xl`}>
+                                            <SubjectIcon subjectName={stat.subject} fallbackIcon={stat.icon} className="w-7 h-7" />
                                         </div>
                                         <div className="flex-1">
                                             <DialogTitle className="text-xl font-black uppercase tracking-tight mb-1">{stat.subject}</DialogTitle>

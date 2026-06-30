@@ -23,6 +23,8 @@ import {
   Target,
   X,
   ShieldCheck,
+  Zap,
+  Lock,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useExam } from '@/context/ExamContext';
@@ -34,6 +36,7 @@ import TrustpilotReviewModal from '@/components/TrustpilotReviewModal';
 import SolutionsViewer from '@/components/SolutionsViewer';
 import { generateResultReportPDF } from '@/utils/resultReportGenerator';
 import { cn } from '@/lib/utils';
+import { usePricing } from '@/context/PricingContext';
 
 interface Question {
   id: string;
@@ -128,6 +131,7 @@ export default function Results({ hideLayout = false }: { hideLayout?: boolean }
   const { activeExam, allExams } = useExam();
   const { toast } = useToast();
   const { hasPremiumAccess } = usePlanAccess();
+  const { openPricingModal } = usePricing();
 
   const [test, setTest] = useState<TestResult | null>(null);
   const [questions, setQuestions] = useState<Question[]>([]);
@@ -176,14 +180,9 @@ export default function Results({ hideLayout = false }: { hideLayout?: boolean }
     return () => { if (interval) clearInterval(interval); };
   }, [test, user]);
 
-  useEffect(() => {
-    const checkExpertAccess = async () => {
-      if (!user) { setCanViewExplanations(false); return; }
-      const { data } = await (supabase as any).rpc('can_view_expert_explanations', { user_uuid: user.id });
-      if (data && data.length > 0) setCanViewExplanations(data[0].allowed);
-    };
-    checkExpertAccess();
-  }, [user]);
+  // checkExpertAccess logic moved into fetchResults to ensure it runs before fetching questions
+  // to properly gate the data fetch
+
 
   const checkReviewEligibility = async () => {
     if (!user) return;
@@ -330,9 +329,28 @@ export default function Results({ hideLayout = false }: { hideLayout?: boolean }
 
     setSessionTitle(resolvedTitle);
 
+    // ── Security Fix: Check expert access BEFORE fetching questions ──
+    let canViewExpert = false;
+    if (user) {
+      const { data: expertData } = await (supabase as any).rpc('can_view_expert_explanations', { user_uuid: user.id });
+      if (expertData && expertData.length > 0) {
+        canViewExpert = expertData[0].allowed;
+        setCanViewExplanations(canViewExpert); // Sync state for UI to use
+      }
+    } else {
+      setCanViewExplanations(false);
+    }
+
+    // Only fetch explanation if the user actually has access. 
+    // This prevents free users from seeing explanations via React DevTools.
+    // Note: We strictly match the Supabase table schema to avoid 400 Bad Request errors.
+    const columns = canViewExpert 
+      ? '*' 
+      : 'answered_at, correct_index, created_at, diagram, difficulty, exam_type, id, image_description, is_corrected, is_marked, master_question_id, media, options, passage, practice_question_id, question_number, question_text, section_name, section_number, source_table, stage, subject, test_id, time_spent_seconds, topic, user_answer';
+
     // Fetch questions
     const { data: questionsData } = await (supabase as any)
-      .from('questions').select('*').eq('test_id', effectiveTestId).order('question_number');
+      .from('questions').select(columns).eq('test_id', effectiveTestId).order('question_number');
 
     if (questionsData) {
       let finalQs = questionsData;
@@ -751,6 +769,48 @@ export default function Results({ hideLayout = false }: { hideLayout?: boolean }
                 )}
               </div>
 
+              {/* ── Premium Upgrade Nudge (Free users only) ──────────── */}
+              {!hasPremiumAccess && (
+                <div className="relative overflow-hidden rounded-2xl border border-indigo-200 dark:border-indigo-500/30 bg-gradient-to-br from-indigo-50 via-white to-purple-50 dark:from-indigo-950/40 dark:via-slate-900 dark:to-purple-950/30 shadow-sm p-5">
+                  {/* Background glow */}
+                  <div className="absolute -right-8 -top-8 w-32 h-32 rounded-full bg-indigo-300/20 dark:bg-indigo-500/10 blur-2xl pointer-events-none" />
+                  <div className="absolute -left-4 -bottom-4 w-24 h-24 rounded-full bg-purple-300/20 dark:bg-purple-500/10 blur-xl pointer-events-none" />
+                  <div className="relative z-10 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shrink-0 shadow-md shadow-indigo-200 dark:shadow-indigo-900">
+                        <Zap className="w-5 h-5 text-white fill-white" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-black text-slate-900 dark:text-white mb-0.5">
+                          Premium students score <span className="text-indigo-600 dark:text-indigo-400">18+ points higher</span>
+                        </p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">
+                          Unlock step-by-step explanations, advanced analytics & unlimited mocks to pinpoint exactly where you're losing marks.
+                        </p>
+                        <div className="flex items-center gap-3 mt-2">
+                          <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                            <CheckCircle2 className="w-3 h-3" /> Detailed Explanations
+                          </span>
+                          <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                            <CheckCircle2 className="w-3 h-3" /> Advanced Analytics
+                          </span>
+                          <span className="flex items-center gap-1 text-[10px] font-bold text-emerald-600 dark:text-emerald-400">
+                            <CheckCircle2 className="w-3 h-3" /> Unlimited Mocks
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                    <button
+                      onClick={openPricingModal}
+                      className="shrink-0 flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-black text-xs px-5 py-3 rounded-xl shadow-md shadow-indigo-200 dark:shadow-indigo-900/50 transition-all whitespace-nowrap"
+                    >
+                      <Lock className="w-3.5 h-3.5" />
+                      Unlock Premium
+                    </button>
+                  </div>
+                </div>
+              )}
+
               {/* ── Your Progress ─────────────────────────────────────── */}
               <div className="bg-white dark:bg-card rounded-2xl border border-slate-200 dark:border-border shadow-sm p-5">
                 <h3 className="text-sm font-black text-slate-700 dark:text-slate-200 mb-4">Your Progress</h3>
@@ -822,9 +882,17 @@ export default function Results({ hideLayout = false }: { hideLayout?: boolean }
 
                             {/* ── Section Wise Performance ─────────────────── */}
               {sectionPerf.length > 0 && (
-                <div className="bg-white dark:bg-card rounded-2xl border border-slate-200 dark:border-border shadow-sm p-5">
-                  <h3 className="text-sm font-black text-slate-700 dark:text-slate-200 mb-4">Section Wise Performance</h3>
-                  <div className="overflow-x-auto">
+                <div className="bg-white dark:bg-card rounded-2xl border border-slate-200 dark:border-border shadow-sm p-5 relative overflow-hidden">
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-sm font-black text-slate-700 dark:text-slate-200">Section Wise Performance</h3>
+                    {!hasPremiumAccess && (
+                      <span className="flex items-center gap-1 text-[10px] font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-1 rounded-lg">
+                        <Lock className="w-3 h-3" /> Premium
+                      </span>
+                    )}
+                  </div>
+                  {/* Blurred overlay for free users */}
+                  <div className={cn("overflow-x-auto", !hasPremiumAccess && "select-none pointer-events-none blur-[5px] opacity-60")}>
                     <table className="w-full text-left text-xs sm:text-sm">
                       <thead>
                         <tr className="text-slate-400 font-black uppercase tracking-widest text-[10px] border-b border-slate-50 dark:border-slate-800">
@@ -853,15 +921,39 @@ export default function Results({ hideLayout = false }: { hideLayout?: boolean }
                     </table>
                   </div>
 
-                  <div className="mt-5 flex justify-center">
-                    <Button
-                      onClick={() => navigate(`${hideLayout ? '/mobile' : ''}/detailed-analysis/${effectiveTestId}`)}
-                      className="bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs rounded-xl px-6 shadow-sm"
-                    >
-                      Detailed Analysis <ChevronRight className="w-4 h-4 ml-1" />
-                    </Button>
-                  </div>
+                  {/* Lock overlay for free users */}
+                  {!hasPremiumAccess && (
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-white/60 dark:bg-slate-900/60 backdrop-blur-[2px] rounded-2xl z-10">
+                      <div className="flex flex-col items-center gap-2 text-center px-4">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-600 flex items-center justify-center shadow-md shadow-indigo-200 dark:shadow-indigo-900">
+                          <Lock className="w-5 h-5 text-white" />
+                        </div>
+                        <p className="text-sm font-black text-slate-900 dark:text-white">Section Analysis is Premium</p>
+                        <p className="text-xs text-slate-500 dark:text-slate-400 max-w-[220px] leading-relaxed">
+                          See exactly which subjects are costing you marks — section by section.
+                        </p>
+                        <button
+                          onClick={openPricingModal}
+                          className="mt-1 flex items-center gap-2 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white font-black text-xs px-5 py-2.5 rounded-xl shadow-md shadow-indigo-200 dark:shadow-indigo-900/50 transition-all"
+                        >
+                          <Zap className="w-3.5 h-3.5 fill-white" /> Unlock Now
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {hasPremiumAccess && (
+                    <div className="mt-5 flex justify-center">
+                      <Button
+                        onClick={() => navigate(`${hideLayout ? '/mobile' : ''}/detailed-analysis/${effectiveTestId}`)}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs rounded-xl px-6 shadow-sm"
+                      >
+                        Detailed Analysis <ChevronRight className="w-4 h-4 ml-1" />
+                      </Button>
+                    </div>
+                  )}
                 </div>
+
               )}
 
               {(rankings || avgData) && ( <div> <h3 className="text-sm font-black text-slate-700 dark:text-slate-200 mb-3">Performance Comparison</h3>

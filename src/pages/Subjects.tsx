@@ -14,6 +14,7 @@ import {
     DialogTrigger,
 } from "@/components/ui/dialog"
 import { SubjectsGridSkeleton } from '@/components/SkeletonLoader';
+import { SubjectIcon, getSubjectColorClass } from '@/components/ui/SubjectIcon';
 
 interface SubjectStats {
     subject: string;
@@ -243,8 +244,8 @@ export default function Subjects() {
                                         </div>
 
                                         <div className="mb-4">
-                                            <div className="w-10 h-10 bg-slate-50 dark:bg-muted rounded-xl border border-slate-100 dark:border-border flex items-center justify-center text-xl group-hover:bg-white dark:bg-card group-hover:border-slate-300 transition-all mb-3">
-                                                {stat.icon}
+                                            <div className={`w-10 h-10 ${getSubjectColorClass(stat.subject)} rounded-xl border border-slate-100 dark:border-border flex items-center justify-center text-xl group-hover:bg-white dark:bg-card group-hover:border-slate-300 transition-all mb-3`}>
+                                                <SubjectIcon subjectName={stat.subject} fallbackIcon={stat.icon} className="w-5 h-5" />
                                             </div>
                                             <h2 className="text-lg sm:text-xl font-black text-slate-900 dark:text-slate-100 mb-2 tracking-tight">{stat.subject}</h2>
                                             <p className="text-[11px] sm:text-xs font-bold text-slate-400 leading-relaxed min-h-[3rem]">
@@ -280,8 +281,8 @@ export default function Subjects() {
                                 <DialogContent className="w-[95vw] sm:max-w-2xl bg-white dark:bg-card border border-slate-200 dark:border-border rounded-[1.5rem] sm:rounded-[2.5rem] shadow-2xl p-0 overflow-hidden ring-0">
                                     <div className="relative p-6 sm:p-10 max-h-[90vh] overflow-y-auto no-scrollbar">
                                         <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4 sm:gap-6 mb-8 sm:mb-10 text-center sm:text-left">
-                                            <div className="w-16 h-16 bg-slate-50 dark:bg-muted rounded-2xl border border-slate-100 dark:border-border flex items-center justify-center text-4xl shrink-0">
-                                                {stat.icon}
+                                            <div className={`w-16 h-16 ${getSubjectColorClass(stat.subject)} rounded-2xl border border-slate-100 dark:border-border flex items-center justify-center text-4xl shrink-0`}>
+                                                <SubjectIcon subjectName={stat.subject} fallbackIcon={stat.icon} className="w-8 h-8" />
                                             </div>
                                             <div className="flex-1">
                                                 <DialogTitle className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight leading-none mb-3">{stat.subject}</DialogTitle>

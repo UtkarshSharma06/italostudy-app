@@ -10,14 +10,13 @@ import {
     Check, X, ArrowRight, Brain, Globe, GraduationCap, Target,
     Zap, Sparkles, Loader2, Trophy, Clock, Coffee, BookOpen, Flame,
     ChevronLeft, User, Phone, Mail, Search, Stethoscope, Book, Calculator, Apple, Info,
-    Rocket, Shield, Star, Layers, Layout
+    Rocket, Shield, Star, Layers, Layout, Headphones, Compass, ShieldCheck
 } from 'lucide-react';
 import { useCurrency } from '@/hooks/useCurrency';
 import { usePricing } from '@/context/PricingContext';
 import { cn } from '@/lib/utils';
 import { Slider } from '@/components/ui/slider';
 import { Input } from '@/components/ui/input';
-import OwlAnimation from '@/components/animations/OwlAnimation';
 import {
     Popover,
     PopoverContent,
@@ -46,6 +45,7 @@ const LocalIconMap: any = {
     'SAT': { icon: Book, bg: 'bg-[#EBF5FF]', color: 'text-[#3182CE]' },
     'CEnT-S Entrance Exam': { icon: GraduationCap, bg: 'bg-[#FFF5F5]', color: 'text-[#E53E3E]' },
     'CENT-S': { icon: GraduationCap, bg: 'bg-[#FFF5F5]', color: 'text-[#E53E3E]' },
+    'TIL-I': { icon: Calculator, bg: 'bg-[#FFFBEB]', color: 'text-[#D97706]' },
     'TOLC-I': { icon: Calculator, bg: 'bg-[#F0FFF4]', color: 'text-[#38A169]' },
     'TOLC-E': { icon: BookOpen, bg: 'bg-[#FAF5FF]', color: 'text-[#805AD5]' },
     'IMAT (INTERNATIONAL MEDICAL ADMISSIONS TEST)': { icon: Stethoscope, bg: 'bg-[#FFF5F5]', color: 'text-[#E53E3E]' },
@@ -56,7 +56,6 @@ const LocalIconMap: any = {
     'TOLC-PSI': { icon: Brain, bg: 'bg-[#FFF5F5]', color: 'text-[#E53E3E]' },
     'TOLC-F': { icon: Sparkles, bg: 'bg-[#E6FFFA]', color: 'text-[#319795]' },
     'TIL-A': { icon: Calculator, bg: 'bg-[#F0FFF4]', color: 'text-[#38A169]' },
-    'TIL-I': { icon: Calculator, bg: 'bg-[#F0FFF4]', color: 'text-[#38A169]' },
     'TR-YÖS': { icon: GraduationCap, bg: 'bg-[#FFFAF0]', color: 'text-[#DD6B20]' },
 };
 
@@ -335,350 +334,370 @@ export default function Onboarding() {
     }
 
     return (
-        <>
-            {/* Word-spin loading overlay */}
-            {isRedirecting && (
-                <div style={{
-                    position: 'fixed', inset: 0, zIndex: 9999,
-                    background: 'white',
-                    display: 'flex', alignItems: 'center', justifyContent: 'center'
-                }}>
-                    <style>{`
-@keyframes spin_4991 {
-    10% { transform: translateY(-102%); }
-    25% { transform: translateY(-100%); }
-    35% { transform: translateY(-202%); }
-    50% { transform: translateY(-200%); }
-    60% { transform: translateY(-302%); }
-    75% { transform: translateY(-300%); }
-    85% { transform: translateY(-402%); }
-    100% { transform: translateY(-400%); }
-}
-.ob-loader-words {
-    overflow: hidden;
-    position: relative;
-}
-.ob-loader-words::after {
-    content: "";
-    position: absolute;
-    inset: 0;
-    background: linear-gradient(white 10%, transparent 30%, transparent 70%, white 90%);
-    z-index: 20;
-}
-.ob-loader-word {
-    display: block;
-    height: 100%;
-    padding-left: 6px;
-    color: #E67E22;
-    animation: spin_4991 4s infinite;
-}
-`}</style>
-                    <div style={{
-                        color: '#64748B',
-                        fontFamily: 'Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-                        fontWeight: 600,
-                        fontSize: '26px',
-                        display: 'flex',
-                        height: '40px',
-                        alignItems: 'center',
-                        padding: '10px'
-                    }}>
-                        <p style={{ marginRight: '8px' }}>Setting up your</p>
-                        <div className="ob-loader-words">
-                            <span className="ob-loader-word">plan...</span>
-                            <span className="ob-loader-word">exams...</span>
-                            <span className="ob-loader-word">schedule...</span>
-                            <span className="ob-loader-word">profile...</span>
-                            <span className="ob-loader-word">plan...</span>
+        <div className="h-[100dvh] w-full bg-[#FAFAFA] flex flex-col relative overflow-x-hidden overflow-y-auto font-sans">
+            {/* Header */}
+            <div className="w-full h-20 px-8 flex justify-between items-center bg-transparent z-50">
+                <img src="/logo.webp" alt="ItaloStudy" className="h-8 md:h-10" />
+                <div className="flex items-center gap-4">
+                    <span className="text-sm font-medium text-slate-500 hidden sm:inline-block">Need help?</span>
+                    <Popover>
+    <PopoverTrigger asChild>
+        <button className="flex items-center gap-2 border border-slate-200 text-[#5A32FA] rounded-full px-4 sm:px-5 py-2 sm:py-2.5 hover:bg-slate-50 transition-colors font-bold text-xs sm:text-sm bg-white shadow-sm">
+            <Headphones className="w-4 h-4" />
+            <span className="hidden sm:inline-block">Contact Support</span>
+        </button>
+    </PopoverTrigger>
+    <PopoverContent className="w-56 p-2 rounded-xl border-slate-200 shadow-xl" align="end">
+        <div className="flex flex-col gap-1">
+                                    <button onClick={() => {
+                                        navigator.clipboard.writeText('contact@italostudy.com');
+                                        toast({ title: "Email copied", description: "contact@italostudy.com copied to clipboard." });
+                                    }} className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 rounded-lg transition-colors text-slate-700 font-medium text-sm text-left">
+                                        <Mail className="w-4 h-4 text-[#5A32FA]" />
+                                        Email Us
+                                    </button>
+            <a href="https://chat.whatsapp.com/CfVh7u9L6vT7ZFpZwwVa4A" target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 hover:bg-[#25D366]/10 rounded-lg transition-colors text-slate-700 font-medium text-sm">
+                <Phone className="w-4 h-4 text-[#25D366]" />
+                WhatsApp
+            </a>
+        </div>
+    </PopoverContent>
+</Popover>
+                </div>
+            </div>
+
+            {/* Progress Bar Header */}
+            {!isMissingOnlyPhone && (
+                <div className="w-full flex justify-center mt-4 z-20 px-4">
+                    <div className="flex items-center gap-2 sm:gap-3">
+                        {/* Step 1 */}
+                        <div className="flex items-center gap-2">
+                            <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold", step === 1 ? "bg-[#5A32FA] text-white" : (step > 1 ? "bg-[#5A32FA] text-white" : "bg-white border border-slate-200 text-slate-400"))}>
+                                {step > 1 ? <Check className="w-4 h-4 stroke-[3]" /> : "1"}
+                            </div>
+                            <span className={cn("text-xs sm:text-sm font-bold hidden sm:inline-block", step === 1 ? "text-[#5A32FA]" : (step > 1 ? "text-[#5A32FA]" : "text-slate-400"))}>Getting Started</span>
+                        </div>
+                        <div className={cn("w-12 sm:w-24 h-px", step > 1 ? "bg-[#5A32FA]" : "bg-slate-200")}></div>
+                        {/* Step 2 (Actually step 4 in our logic) */}
+                        <div className="flex items-center gap-2">
+                            <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold", step === 4 ? "bg-white border-2 border-[#5A32FA] text-[#5A32FA]" : (step > 4 ? "bg-[#5A32FA] text-white" : "bg-white border border-slate-200 text-slate-400"))}>
+                                {step > 4 ? <Check className="w-4 h-4 stroke-[3]" /> : "2"}
+                            </div>
+                            <span className={cn("text-xs sm:text-sm font-medium hidden sm:inline-block", step === 4 ? "text-slate-900 font-bold" : (step > 4 ? "text-[#5A32FA]" : "text-slate-400"))}>Personalize</span>
+                        </div>
+                        <div className={cn("w-12 sm:w-24 h-px", step > 4 ? "bg-[#5A32FA]" : "bg-slate-200")}></div>
+                        {/* Step 3 (Actually step 5 in our logic) */}
+                        <div className="flex items-center gap-2">
+                            <div className={cn("w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold", step === 5 ? "bg-white border-2 border-[#5A32FA] text-[#5A32FA]" : "bg-white border border-slate-200 text-slate-400")}>
+                                3
+                            </div>
+                            <span className={cn("text-xs sm:text-sm font-medium hidden sm:inline-block", step === 5 ? "text-slate-900 font-bold" : "text-slate-400")}>All Set</span>
                         </div>
                     </div>
                 </div>
             )}
 
-            <div
-                ref={scrollContainerRef}
-                className="h-screen w-full bg-[#F8FAFC] flex flex-col items-center justify-center overflow-hidden relative"
-            >
-                <div className="w-full flex flex-col items-center gap-0 z-10 scale-90 md:scale-[0.82] origin-center px-4">
-                    {!isMissingOnlyPhone && (
-                        <div className="w-full max-w-4xl px-8 mb-3">
-                            <div className="h-1.5 w-full bg-[#F1F5F9] rounded-full overflow-hidden shadow-sm">
-                                <motion.div
-                                    className="h-full bg-gradient-to-r from-[#E67E22] to-[#D35400]"
-                                    initial={{ width: 0 }}
-                                    animate={{ width: `${(step === 1 ? 1/3 : (step === 4 ? 2/3 : 1)) * 100}%` }}
-                                    transition={{ duration: 0.5, ease: "easeOut" }}
-                                />
-                            </div>
-                        </div>
-                    )}
+            {/* Main Content Area */}
+            <div className="flex-1 w-full flex flex-col items-center justify-start pt-4 z-20">
+                <div className="w-full flex flex-col items-center scale-[0.80] sm:scale-[0.85] md:scale-90 xl:scale-100 origin-top px-4 pb-12">
+                {/* Welcome Text */}
+                <h1 className="text-3xl md:text-[2.75rem] font-black text-slate-900 tracking-tight text-center mb-2">
+                    Welcome to ItaloStudy! 👋
+                </h1>
+                <p className="text-slate-500 text-center text-xs md:text-sm max-w-lg mb-3 leading-relaxed">
+                    Let's personalize your experience so we can help you <br/>
+                    <span className="text-[#5A32FA] font-bold">learn better and achieve more.</span>
+                </p>
 
-                    <OwlAnimation
-                        message={
-                            step === 1 ? "Choose your path to success!" :
-                                step === 4 ? (isMissingOnlyPhone ? "Fill out the missing step to continue using ItaloStudy" : "Let's personalize your experience!") :
-                                    "Almost there! Select your plan."
-                        }
-                    />
-                    <AnimatePresence mode="wait">
-                        <motion.div
-                            key={step}
-                            initial={{ opacity: 0, scale: 0.95, y: 10 }}
-                            animate={{ opacity: 1, scale: 1, y: 0 }}
-                            exit={{ opacity: 0, scale: 0.95, y: -10 }}
-                            transition={{ duration: 0.3, ease: "easeOut" }}
-                            className={cn(
-                                "w-full bg-white rounded-[2.5rem] border border-[#F1F5F9] shadow-2xl shadow-[#64748B]/10 flex flex-col items-center relative transition-all duration-300",
-                                step === 1 ? "max-w-4xl p-5 md:p-6" : "max-w-2xl p-5 md:p-6"
-                            )}
-                        >
-                            {/* Header Content */}
-                            <div className={cn("text-center", (step === 2 || step === 3) ? "mb-4" : "mb-6")}>
-                                <h2 className="text-2xl font-black text-[#1E293B] uppercase tracking-tight">
-                                    {step === 1 ? "Which exam are you preparing for?" :
-                                        step === 4 ? (isMissingOnlyPhone ? "Fill out the missing step" : "Can you tell me a bit about yourself?") :
-                                            "Select Access Plan"}
-                                </h2>
-                            </div>
+                {/* Owl Image */}
+                <img src="/onboarding.webp" alt="Owl" className="h-40 md:h-52 object-contain -mb-10 relative z-30" />
 
-                            {/* Step Body */}
-                            <div className="w-full flex-1 max-h-[60vh] overflow-y-auto no-scrollbar scroll-smooth">
-                                {step === 1 && (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                        {availableExams.map((exam) => {
-                                            const theme = LocalIconMap[exam.name] || LocalIconMap[exam.name.split(' ')[0]] || { icon: Brain, bg: 'bg-[#F1F5F9]', color: 'text-[#64748B]' };
-                                            const Icon = theme.icon;
-                                            return (
-                                                <button
-                                                    key={exam.id}
-                                                    onClick={() => setSelectedExam(exam.id)}
-                                                    className={cn(
-                                                        "flex items-center gap-4 p-4 rounded-2xl border-2 transition-all active:scale-[0.98] group relative",
-                                                        selectedExam === exam.id ? "border-[#E67E22] bg-[#FFF3E0]" : cn("border-[#F1F5F9]", theme.bg)
-                                                    )}
-                                                >
-                                                    <div className={cn(
-                                                        "w-12 h-12 rounded-xl flex items-center justify-center shrink-0 border border-white/50 shadow-sm transition-transform group-hover:scale-105",
-                                                        theme.color,
-                                                        "bg-white"
-                                                    )}>
-                                                        <Icon className="w-6 h-6" />
-                                                    </div>
-                                                    <div className="flex-1 text-left">
-                                                        <h3 className="font-black text-xs uppercase text-[#1E293B] tracking-tight truncate">{exam.name}</h3>
-                                                    </div>
-                                                    {selectedExam === exam.id && (
-                                                        <div className="absolute top-2 right-2 w-5 h-5 bg-[#E67E22] rounded-full flex items-center justify-center shadow-md scale-110">
-                                                            <Check className="text-white w-3 h-3 stroke-[4]" />
-                                                        </div>
-                                                    )}
-                                                </button>
-                                            );
-                                        })}
+                {/* The Card */}
+                <AnimatePresence mode="wait">
+                    <motion.div
+                        key={step}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        exit={{ opacity: 0, y: -20 }}
+                        transition={{ duration: 0.3 }}
+                        className="bg-white rounded-3xl md:rounded-[2rem] shadow-xl shadow-indigo-900/5 border border-slate-100 p-6 md:p-10 w-full max-w-3xl relative z-20"
+                    >
+                        {step === 1 && (
+                            <>
+                                <div className="flex gap-4 items-start mb-4">
+                                    <div className="w-12 h-12 rounded-full bg-indigo-50 text-[#5A32FA] flex items-center justify-center shrink-0">
+                                        <Compass className="w-6 h-6" />
                                     </div>
-                                )}
-
-                                 {/* Steps 2 and 3 removed */}
-
-                                {step === 4 && (
-                                    <div className="space-y-6">
-                                         <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest ml-1">Username <span className="text-[#E67E22]">*</span></label>
-                                            <div className="relative">
-                                                <Input
-                                                    value={username}
-                                                    onChange={(e) => setUsername(e.target.value.replace(/\s+/g, ''))}
-                                                    placeholder="Choose a unique username"
-                                                    className={cn(
-                                                        "h-14 bg-white border-[#F1F5F9] rounded-2xl font-bold focus:ring-4 focus:ring-[#E67E22]/5 transition-all text-[#1E293B] shadow-sm pr-12",
-                                                        usernameError ? "border-red-400 focus:border-red-400" : (isUsernameAvailable ? "border-green-400 focus:border-green-400" : "focus:border-[#E67E22]")
-                                                    )}
-                                                />
-                                                <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                                                    {isCheckingUsername ? (
-                                                        <Loader2 className="w-4 h-4 text-[#94A3B8] animate-spin" />
-                                                    ) : (
-                                                        <>
-                                                            {isUsernameAvailable === true && <Check className="w-4 h-4 text-green-500 stroke-[3]" />}
-                                                            {isUsernameAvailable === false && <X className="w-4 h-4 text-red-500 stroke-[3]" />}
-                                                        </>
-                                                    )}
+                                    <div>
+                                        <h2 className="text-xl md:text-2xl font-black text-slate-900 mb-1">Which exam are you preparing for?</h2>
+                                        <p className="text-slate-500 text-sm">This helps us tailor the platform to your exam journey.</p>
+                                    </div>
+                                </div>
+                                
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                    {availableExams.map((exam) => {
+                                        const theme = LocalIconMap[exam.name] || LocalIconMap[exam.name.split(' ')[0]] || { icon: Brain, bg: 'bg-[#F8FAFC]', color: 'text-slate-400' };
+                                        const Icon = theme.icon;
+                                        const isSelected = selectedExam === exam.id;
+                                        
+                                        return (
+                                            <button
+                                                key={exam.id}
+                                                onClick={() => setSelectedExam(exam.id)}
+                                                className={cn(
+                                                    "flex items-center gap-4 p-5 rounded-2xl border transition-all text-left group",
+                                                    isSelected ? "border-[#5A32FA] bg-[#F4F1FF]/50 ring-1 ring-[#5A32FA]" : "border-slate-200 hover:border-[#5A32FA]/30 bg-white hover:bg-slate-50"
+                                                )}
+                                            >
+                                                <div className={cn(
+                                                    "w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 shadow-sm transition-transform group-hover:scale-105",
+                                                    isSelected ? "bg-[#F4F1FF] text-[#5A32FA]" : cn(theme.bg, theme.color)
+                                                )}>
+                                                    <Icon className="w-7 h-7" />
                                                 </div>
-                                            </div>
-                                            {usernameError && <p className="text-[9px] font-bold text-red-500 ml-2 uppercase tracking-tight">{usernameError}</p>}
-                                        </div>
+                                                <div className="flex-1 min-w-0 pr-2">
+                                                    <h3 className={cn("font-bold text-sm mb-1 truncate", isSelected ? "text-[#5A32FA]" : "text-slate-900")}>
+                                                        {exam.name}
+                                                    </h3>
+                                                    <p className="text-xs text-slate-500 leading-snug line-clamp-2">
+                                                        Prepare for the {exam.name} exam for universities in Italy.
+                                                    </p>
+                                                </div>
+                                                <div className={cn(
+                                                    "w-6 h-6 rounded-full border-2 flex items-center justify-center shrink-0 ml-1 transition-colors",
+                                                    isSelected ? "border-[#5A32FA]" : "border-slate-300 bg-white"
+                                                )}>
+                                                    {isSelected && <div className="w-3 h-3 rounded-full bg-[#5A32FA]" />}
+                                                </div>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </>
+                        )}
 
-                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                            <div className="space-y-1.5">
-                                                <label className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest ml-1">First Name <span className="text-[#E67E22]">*</span></label>
-                                                <Input
-                                                    value={firstName}
-                                                    onChange={(e) => setFirstName(e.target.value)}
-                                                    placeholder="Enter first name"
-                                                    className="h-14 bg-white border-[#F1F5F9] rounded-2xl font-bold focus:border-[#E67E22] focus:ring-4 focus:ring-[#E67E22]/5 transition-all text-[#1E293B] shadow-sm"
-                                                />
-                                            </div>
-                                            <div className="space-y-1.5">
-                                                <label className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest ml-1">Last Name <span className="text-[#E67E22]">*</span></label>
-                                                <Input
-                                                    value={lastName}
-                                                    onChange={(e) => setLastName(e.target.value)}
-                                                    placeholder="Enter last name"
-                                                    className="h-14 bg-white border-[#F1F5F9] rounded-2xl font-bold focus:border-[#E67E22] focus:ring-4 focus:ring-[#E67E22]/5 transition-all text-[#1E293B] shadow-sm"
-                                                />
+                        {step === 4 && (
+                            <>
+                                <div className="flex gap-4 items-start mb-4">
+                                    <div className="w-12 h-12 rounded-full bg-indigo-50 text-[#5A32FA] flex items-center justify-center shrink-0">
+                                        <User className="w-6 h-6" />
+                                    </div>
+                                    <div>
+                                        <h2 className="text-xl md:text-2xl font-black text-slate-900 mb-1">
+                                            {isMissingOnlyPhone ? "Fill out the missing step" : "Can you tell me a bit about yourself?"}
+                                        </h2>
+                                        <p className="text-slate-500 text-sm">We use this to set up your profile and account.</p>
+                                    </div>
+                                </div>
+                                <div className="space-y-6 mb-4">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest ml-1">Username <span className="text-[#5A32FA]">*</span></label>
+                                        <div className="relative">
+                                            <Input
+                                                value={username}
+                                                onChange={(e) => setUsername(e.target.value.replace(/\s+/g, ''))}
+                                                placeholder="Choose a unique username"
+                                                className={cn(
+                                                    "h-14 bg-white border-slate-200 rounded-2xl font-bold focus:ring-4 focus:ring-[#5A32FA]/10 transition-all text-[#1E293B] shadow-sm pr-12",
+                                                    usernameError ? "border-red-400 focus:border-red-400" : (isUsernameAvailable ? "border-green-400 focus:border-green-400" : "focus:border-[#5A32FA]")
+                                                )}
+                                            />
+                                            <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
+                                                {isCheckingUsername ? (
+                                                    <Loader2 className="w-4 h-4 text-[#94A3B8] animate-spin" />
+                                                ) : (
+                                                    <>
+                                                        {isUsernameAvailable === true && <Check className="w-4 h-4 text-green-500 stroke-[3]" />}
+                                                        {isUsernameAvailable === false && <X className="w-4 h-4 text-red-500 stroke-[3]" />}
+                                                    </>
+                                                )}
                                             </div>
                                         </div>
+                                        {usernameError && <p className="text-[9px] font-bold text-red-500 ml-2 uppercase tracking-tight">{usernameError}</p>}
+                                    </div>
 
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         <div className="space-y-1.5">
-                                            <label className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest ml-1">Phone Number <span className="text-[#E67E22]">*</span></label>
-                                            <div className="relative group flex flex-col gap-2">
-                                                <div className="flex items-center bg-white border-2 border-[#F1F5F9] rounded-2xl focus-within:border-[#E67E22] focus-within:ring-4 focus-within:ring-[#E67E22]/5 transition-all px-1 shadow-sm">
-                                                    <Popover open={openCountryPopup} onOpenChange={setOpenCountryPopup}>
-                                                        <PopoverTrigger asChild>
-                                                            <Button variant="ghost" className="h-12 px-3 font-bold flex items-center gap-2 hover:bg-[#F8FAFC]">
-                                                                <img
-                                                                    src={`https://flagcdn.com/w40/${countryCode.toLowerCase()}.png`}
-                                                                    alt="Flag"
-                                                                    className="w-5 h-auto rounded-[2px]"
-                                                                />
-                                                                <span className="text-[#1E293B] opacity-40">|</span>
-                                                                <span className="text-sm text-[#1E293B]">{countryDial}</span>
-                                                            </Button >
-                                                        </PopoverTrigger >
-                                                        <PopoverContent className="p-0 w-[240px] z-[9999] bg-white border border-[#F1F5F9] shadow-2xl" align="start">
-                                                            <Command className="bg-white">
-                                                                <CommandInput placeholder="Search country..." className="text-[#1E293B] focus:ring-0 focus-visible:ring-0 focus:outline-none" />
-                                                                <CommandList className="max-h-[300px] bg-white">
-                                                                    <CommandEmpty className="text-[#94A3B8]">No country found.</CommandEmpty>
-                                                                    <CommandGroup className="bg-white">
-                                                                        {countries.map((c) => (
-                                                                            <CommandItem
-                                                                                key={c.code}
-                                                                                onSelect={() => {
-                                                                                    setCountryDial(c.dial);
-                                                                                    setCountryCode(c.code.toLowerCase());
-                                                                                    setPhoneLimit(c.len || 10);
-                                                                                    setOpenCountryPopup(false);
-                                                                                }}
-                                                                                className="flex items-center gap-3 p-4 cursor-pointer text-[#1E293B] data-[selected=true]:bg-[#F1F5F9] data-[selected=true]:text-[#E67E22]"
-                                                                            >
-                                                                                <img src={`https://flagcdn.com/w40/${c.code.toLowerCase()}.png`} className="w-5 h-auto rounded-[1px]" />
-                                                                                <span className="font-bold text-sm">{c.name}</span>
-                                                                                <span className="ml-auto text-[10px] opacity-40">{c.dial}</span>
-                                                                            </CommandItem>
-                                                                        ))}
-                                                                    </CommandGroup>
-                                                                </CommandList>
-                                                            </Command>
-                                                        </PopoverContent>
-                                                    </Popover >
-                                                    <Input
-                                                        value={phoneNumber}
-                                                        onChange={(e) => {
-                                                            const formatted = formatPhoneNumber(e.target.value, countryCode.toUpperCase());
-                                                            const digits = getDigits(formatted);
-                                                            if (digits.length <= phoneLimit) setPhoneNumber(formatted);
-                                                        }}
-                                                        placeholder="e.g. 555 000 000"
-                                                        className="h-12 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-bold text-[#1E293B] shadow-none rounded-none"
-                                                    />
-                                                </div >
-                                                <p className="text-[10px] font-bold text-[#94A3B8] italic ml-2">
-                                                    Don't worry, we are not gonna spam you! 😉
-                                                </p>
+                                            <label className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest ml-1">First Name <span className="text-[#5A32FA]">*</span></label>
+                                            <Input
+                                                value={firstName}
+                                                onChange={(e) => setFirstName(e.target.value)}
+                                                placeholder="Enter first name"
+                                                className="h-14 bg-white border-slate-200 rounded-2xl font-bold focus:border-[#5A32FA] focus:ring-4 focus:ring-[#5A32FA]/10 transition-all text-[#1E293B] shadow-sm"
+                                            />
+                                        </div>
+                                        <div className="space-y-1.5">
+                                            <label className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest ml-1">Last Name <span className="text-[#5A32FA]">*</span></label>
+                                            <Input
+                                                value={lastName}
+                                                onChange={(e) => setLastName(e.target.value)}
+                                                placeholder="Enter last name"
+                                                className="h-14 bg-white border-slate-200 rounded-2xl font-bold focus:border-[#5A32FA] focus:ring-4 focus:ring-[#5A32FA]/10 transition-all text-[#1E293B] shadow-sm"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] font-black text-[#94A3B8] uppercase tracking-widest ml-1">Phone Number <span className="text-[#5A32FA]">*</span></label>
+                                        <div className="relative group flex flex-col gap-2">
+                                            <div className="flex items-center bg-white border border-slate-200 rounded-2xl focus-within:border-[#5A32FA] focus-within:ring-4 focus-within:ring-[#5A32FA]/10 transition-all px-1 shadow-sm">
+                                                <Popover open={openCountryPopup} onOpenChange={setOpenCountryPopup}>
+                                                    <PopoverTrigger asChild>
+                                                        <Button variant="ghost" className="h-12 px-3 font-bold flex items-center gap-2 hover:bg-[#F8FAFC]">
+                                                            <img
+                                                                src={`https://flagcdn.com/w40/${countryCode.toLowerCase()}.png`}
+                                                                alt="Flag"
+                                                                className="w-5 h-auto rounded-[2px]"
+                                                            />
+                                                            <span className="text-[#1E293B] opacity-40">|</span>
+                                                            <span className="text-sm text-[#1E293B]">{countryDial}</span>
+                                                        </Button >
+                                                    </PopoverTrigger >
+                                                    <PopoverContent className="p-0 w-[240px] z-[9999] bg-white border border-slate-200 shadow-2xl" align="start">
+                                                        <Command className="bg-white">
+                                                            <CommandInput placeholder="Search country..." className="text-[#1E293B] focus:ring-0 focus-visible:ring-0 focus:outline-none" />
+                                                            <CommandList className="max-h-[300px] bg-white">
+                                                                <CommandEmpty className="text-[#94A3B8]">No country found.</CommandEmpty>
+                                                                <CommandGroup className="bg-white">
+                                                                    {countries.map((c) => (
+                                                                        <CommandItem
+                                                                            key={c.code}
+                                                                            onSelect={() => {
+                                                                                setCountryDial(c.dial);
+                                                                                setCountryCode(c.code.toLowerCase());
+                                                                                setPhoneLimit(c.len || 10);
+                                                                                setOpenCountryPopup(false);
+                                                                            }}
+                                                                            className="flex items-center gap-3 p-4 cursor-pointer text-[#1E293B] data-[selected=true]:bg-indigo-50 data-[selected=true]:text-[#5A32FA]"
+                                                                        >
+                                                                            <img src={`https://flagcdn.com/w40/${c.code.toLowerCase()}.png`} className="w-5 h-auto rounded-[1px]" />
+                                                                            <span className="font-bold text-sm">{c.name}</span>
+                                                                            <span className="ml-auto text-[10px] opacity-40">{c.dial}</span>
+                                                                        </CommandItem>
+                                                                    ))}
+                                                                </CommandGroup>
+                                                            </CommandList>
+                                                        </Command>
+                                                    </PopoverContent>
+                                                </Popover >
+                                                <Input
+                                                    value={phoneNumber}
+                                                    onChange={(e) => {
+                                                        const formatted = formatPhoneNumber(e.target.value, countryCode.toUpperCase());
+                                                        const digits = getDigits(formatted);
+                                                        if (digits.length <= phoneLimit) setPhoneNumber(formatted);
+                                                    }}
+                                                    placeholder="e.g. 555 000 000"
+                                                    className="h-12 bg-transparent border-0 focus-visible:ring-0 focus-visible:ring-offset-0 font-bold text-[#1E293B] shadow-none rounded-none"
+                                                />
                                             </div >
+                                            <p className="text-[10px] font-bold text-[#94A3B8] italic ml-2">
+                                                Don't worry, we are not gonna spam you! 😉
+                                            </p>
                                         </div >
                                     </div >
-                                )
-                                }
+                                </div>
+                            </>
+                        )}
 
-                                {
-                                    step === 5 && (
-                                        <div className="space-y-4">
-                                            {/* View Details Button */}
-                                            <button
-                                                onClick={() => setShowPricingHover(true)}
-                                                className="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-widest text-[#E67E22] hover:text-[#D35400] transition-colors underline underline-offset-2"
-                                            >
-                                                <Info className="w-3.5 h-3.5" />
-                                                View Plan Details
-                                            </button>
-
-                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                {plans.map((p) => {
-                                                    const PlanIconMap: Record<string, any> = {
-                                                        'explorer': Shield,
-                                                        'pro': Rocket,
-                                                        'elite': Star,
-                                                        'global': Globe,
-                                                    };
-                                                    const PlanIcon = PlanIconMap[p.id] || Sparkles;
-                                                    return (
-                                                        <button
-                                                            key={p.id}
-                                                            onClick={() => setSelectedPlan(p.id)}
-                                                            className={cn(
-                                                                "p-5 rounded-[2rem] border-2 transition-all flex flex-col items-center text-center active:scale-[0.98]",
-                                                                selectedPlan === p.id ? "border-[#E67E22] bg-[#FFF3E0]" : "border-[#F1F5F9] shadow-sm"
-                                                            )}
-                                                        >
-                                                            <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center mb-4 shadow-sm", p.color || 'bg-[#E67E22]', !p.color?.includes('bg-') && 'bg-[#F8FAFC]')}>
-                                                                <PlanIcon className={cn("w-6 h-6", (p.color === 'bg-[#E67E22]' || !p.color) ? "text-white" : "text-[#E67E22]")} />
-                                                            </div>
-                                                            <h3 className="font-black text-xs uppercase text-[#1E293B] mb-1">{p.name}</h3>
-                                                            <p className="text-[10px] font-black text-[#E67E22] uppercase tracking-widest">
-                                                                {config.mode === 'beta' ? 'FREE ACCESS' : (p.monthlyPrice === 0 ? 'FREE' : formatPrice(p.monthlyPrice || 0))}
-                                                            </p>
-                                                        </button>
-                                                    );
-                                                })}
-                                            </div>
+                        {step === 5 && (
+                            <>
+                                <div className="flex gap-4 items-start mb-4 flex-col md:flex-row md:items-center md:justify-between w-full">
+                                    <div className="flex gap-4 items-center">
+                                        <div className="w-12 h-12 rounded-full bg-indigo-50 text-[#5A32FA] flex items-center justify-center shrink-0">
+                                            <Shield className="w-6 h-6" />
                                         </div>
-                                    )
-                                }
-                            </div >
-
-                            {/* Footer Navigation */}
-                            < div className="w-full mt-6 pt-6 border-t border-[#F1F5F9] flex justify-between items-center" >
-                                {!isMissingOnlyPhone && step > 1 && (
+                                        <div>
+                                            <h2 className="text-xl md:text-2xl font-black text-slate-900 mb-1">Select Access Plan</h2>
+                                            <p className="text-slate-500 text-sm">Choose the plan that fits your study needs.</p>
+                                        </div>
+                                    </div>
                                     <button
-                                        onClick={handleBack}
-                                        className={cn(
-                                            "flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-[#94A3B8] hover:text-[#E67E22] transition-colors py-3 px-6 rounded-full",
-                                            "hover:bg-[#F8FAFC]"
-                                        )}
+                                        onClick={() => setShowPricingHover(true)}
+                                        className="flex items-center gap-1.5 text-[11px] font-black uppercase tracking-widest text-[#5A32FA] hover:text-[#4a26d8] transition-colors bg-indigo-50 px-4 py-2 rounded-full"
                                     >
-                                        <ChevronLeft className="w-4 h-4" /> Back
+                                        <Info className="w-3.5 h-3.5" />
+                                        View Plan Details
                                     </button>
-                                )}
-                                <Button
-                                    disabled={
-                                        (step === 1 && !selectedExam) ||
-                                        (step === 4 && (!firstName || !lastName || !username || !isUsernameAvailable || getDigits(phoneNumber).length !== phoneLimit || isSubmitting)) ||
-                                        (step === 5 && (!selectedPlan || isSubmitting || getDigits(phoneNumber).length !== phoneLimit || !firstName || !lastName || !username || !isUsernameAvailable))
-                                    }
-                                    onClick={step === 5 ? handleConfirm : handleNextStep}
-                                    className="h-14 px-10 rounded-full bg-[#E67E22] hover:bg-[#D35400] text-white font-black text-xs uppercase tracking-widest shadow-xl shadow-[#E67E22]/20 active:scale-95 transition-all"
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                                    {plans.map((p) => {
+                                        const PlanIconMap: Record<string, any> = {
+                                            'explorer': Shield,
+                                            'pro': Rocket,
+                                            'elite': Star,
+                                            'global': Globe,
+                                        };
+                                        const PlanIcon = PlanIconMap[p.id] || Sparkles;
+                                        return (
+                                            <button
+                                                key={p.id}
+                                                onClick={() => setSelectedPlan(p.id)}
+                                                className={cn(
+                                                    "p-5 rounded-[2rem] border transition-all flex flex-col items-center text-center group",
+                                                    selectedPlan === p.id ? "border-[#5A32FA] bg-[#F4F1FF]/50 ring-1 ring-[#5A32FA]" : "border-slate-200 hover:border-[#5A32FA]/30 bg-white hover:bg-slate-50"
+                                                )}
+                                            >
+                                                <div className={cn("w-12 h-12 rounded-2xl flex items-center justify-center mb-4 shadow-sm", selectedPlan === p.id ? "bg-[#5A32FA] text-white" : "bg-indigo-50 text-[#5A32FA]")}>
+                                                    <PlanIcon className="w-6 h-6" />
+                                                </div>
+                                                <h3 className={cn("font-black text-xs uppercase mb-1", selectedPlan === p.id ? "text-[#5A32FA]" : "text-slate-900")}>{p.name}</h3>
+                                                <p className="text-[10px] font-black text-slate-500 uppercase tracking-widest">
+                                                    {config.mode === 'beta' ? 'FREE ACCESS' : (p.monthlyPrice === 0 ? 'FREE' : formatPrice(p.monthlyPrice || 0))}
+                                                </p>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </>
+                        )}
+                        
+                        <div className="flex gap-4 justify-center w-full">
+                            {!isMissingOnlyPhone && step > 1 && (
+                                <button
+                                    onClick={handleBack}
+                                    className="flex items-center gap-2 text-[12px] font-bold text-slate-400 hover:text-slate-600 transition-colors px-6 h-12 rounded-xl hover:bg-slate-50"
                                 >
-                                    {isSubmitting ? <Loader2 className="animate-spin" /> :
-                                        (step === 5 || (step === 4 && isMissingOnlyPhone)) ? "Begin Preparation" : "Continue"}
-                                    <ArrowRight className="ml-2 w-4 h-4" />
-                                </Button>
-                            </div >
-                        </motion.div>
-                    </AnimatePresence>
+                                    <ChevronLeft className="w-4 h-4" /> Back
+                                </button>
+                            )}
+                            <Button
+                                disabled={
+                                    (step === 1 && !selectedExam) ||
+                                    (step === 4 && (!firstName || !lastName || !username || !isUsernameAvailable || getDigits(phoneNumber).length !== phoneLimit || isSubmitting)) ||
+                                    (step === 5 && (!selectedPlan || isSubmitting || getDigits(phoneNumber).length !== phoneLimit || !firstName || !lastName || !username || !isUsernameAvailable))
+                                }
+                                onClick={step === 5 ? handleConfirm : handleNextStep}
+                                className="w-full md:w-auto md:min-w-[200px] h-12 rounded-xl bg-[#5A32FA] hover:bg-[#4a26d8] text-white font-bold text-sm transition-all shadow-lg shadow-[#5A32FA]/20"
+                            >
+                                {isSubmitting ? <Loader2 className="animate-spin w-4 h-4" /> :
+                                    (step === 5 || (step === 4 && isMissingOnlyPhone)) ? "Begin Preparation" : "Continue"}
+                                {!isSubmitting && <ArrowRight className="ml-2 w-4 h-4" />}
+                            </Button>
+                        </div>
+
+                    </motion.div>
+                </AnimatePresence>
+                
+                <div className="flex items-center justify-center gap-2 mt-4 text-slate-500 text-xs font-medium w-fit mx-auto px-4 py-2 relative z-30">
+                    <ShieldCheck className="w-4 h-4 text-[#5A32FA]" /> Trusted by 12,000+ students worldwide
                 </div>
-
-                {/* Pricing Hover Details */}
-                <OnboardingPricingHover
-                    isOpen={showPricingHover}
-                    onClose={() => setShowPricingHover(false)}
-                />
-
-                {/* Background elements */}
-                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-[#E67E22]/5 blur-[120px] rounded-full -mr-64 -mt-64" />
-                <div className="absolute bottom-0 left-0 w-[500px] h-[500px] bg-[#3B82F6]/5 blur-[120px] rounded-full -ml-64 -mb-64" />
             </div>
-        </>
+        </div>
+
+            {/* Background elements */}
+            <div className="absolute top-[-20%] left-[-10%] w-[800px] h-[800px] bg-[#5A32FA]/5 blur-[120px] rounded-full pointer-events-none z-0" />
+            <div className="absolute bottom-[-20%] right-[-10%] w-[600px] h-[600px] bg-[#5A32FA]/5 blur-[120px] rounded-full pointer-events-none z-0" />
+        </div>
     );
 }
+
+
+
+
+
+
+
+
+
+

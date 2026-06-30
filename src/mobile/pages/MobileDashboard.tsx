@@ -1,4 +1,4 @@
-﻿
+
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -9,7 +9,7 @@ import {
     BarChart3, Bookmark, FlaskConical, GraduationCap,
     Award, ChevronRight, Bell, Dna, Brain, Calculator, FileText,
     Languages, Database, Microscope, ClipboardList,
-    Headphones, PenTool, Mic, MessageSquare, MessageCircle, CheckCircle2, X, ShieldCheck, Flame, Crown, Calendar
+    Headphones, PenTool, Mic, MessageSquare, MessageCircle, CheckCircle2, X, ShieldCheck, Flame, Crown, Calendar, LayoutGrid, BookMarked, ExternalLink, Newspaper, Globe
 } from 'lucide-react';
 import { format, subDays } from 'date-fns';
 import { useAuth } from '@/lib/auth';
@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import { useTranslation } from 'react-i18next';
 import MobileLayout from '../components/MobileLayout';
 import { useActiveTest } from '@/hooks/useActiveTest';
+import { DynamicStoreAd } from '@/components/store/DynamicStoreAd';
 import { usePlanAccess } from '@/hooks/usePlanAccess';
 import { lazy, Suspense } from 'react';
 import { Capacitor } from '@capacitor/core';
@@ -233,7 +234,7 @@ const MobileDashboard: React.FC = () => {
     };
     const writeMobileDashCache = (data: any) => {
         if (!MOBILE_DASH_CACHE_KEY) return;
-        try { localStorage.setItem(MOBILE_DASH_CACHE_KEY, JSON.stringify(data)); } catch {}
+        try { localStorage.setItem(MOBILE_DASH_CACHE_KEY, JSON.stringify(data)); } catch { }
     };
 
     const [isLoading, setIsLoading] = useState(() => {
@@ -243,7 +244,7 @@ const MobileDashboard: React.FC = () => {
                 const key = `mobile_dash_cache_${user.id}`;
                 const cached = localStorage.getItem(key);
                 if (cached) return false; // instant â€” no skeleton for returning users
-            } catch {}
+            } catch { }
         }
         return true;
     });
@@ -259,7 +260,7 @@ const MobileDashboard: React.FC = () => {
     useEffect(() => {
         if (!user || !activeExam?.id) return;
         let shouldShowPlan = false;
-        
+
         const planRaw = localStorage.getItem(`study_plan_${activeExam.id}_${user.id}`);
         if (planRaw) {
             try {
@@ -267,9 +268,9 @@ const MobileDashboard: React.FC = () => {
                 if (activeExam.id.includes(plan.exam)) {
                     shouldShowPlan = true;
                 }
-            } catch (_) {}
+            } catch (_) { }
         }
-        
+
         setHasStudyPlan(shouldShowPlan);
     }, [user, activeExam?.id]);
 
@@ -369,8 +370,38 @@ const MobileDashboard: React.FC = () => {
     useEffect(() => {
         if (rankingView === 'live') {
             fetchLiveRankings();
-            const interval = setInterval(fetchLiveRankings, 30000);
-            return () => clearInterval(interval);
+
+            let interval: ReturnType<typeof setInterval> | null = null;
+
+            const startPolling = () => {
+                if (!interval) {
+                    interval = setInterval(fetchLiveRankings, 30000);
+                }
+            };
+
+            const stopPolling = () => {
+                if (interval) {
+                    clearInterval(interval);
+                    interval = null;
+                }
+            };
+
+            const handleVisibilityChange = () => {
+                if (document.hidden) {
+                    stopPolling();
+                } else {
+                    fetchLiveRankings();
+                    startPolling();
+                }
+            };
+
+            startPolling();
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+
+            return () => {
+                stopPolling();
+                document.removeEventListener('visibilitychange', handleVisibilityChange);
+            };
         }
     }, [rankingView, activeExam?.id]);
 
@@ -529,6 +560,10 @@ const MobileDashboard: React.FC = () => {
         if (cached) {
             setStats(cached.stats);
             setSubjectMastery(cached.subjectMastery || []);
+            // Restore activeDates Set from cached array
+            if (cached.activeDates) {
+                setActiveDates(new Set(cached.activeDates));
+            }
             setIsLoading(false); // hide skeleton immediately with cached data
         } else {
             setIsLoading(true);
@@ -536,19 +571,23 @@ const MobileDashboard: React.FC = () => {
 
         try {
             // Stage 1: Parallel Fetch (Optimized RPCs)
-            const [testsRes, mockSubmissionsRes, learningProgressRes, summaryStatsRes, subjectStatsRes] = await Promise.all([
-                (supabase as any).from('tests').select('total_questions, correct_answers, created_at, test_type, status, is_mock').eq('exam_type', activeExam.id).eq('user_id', user.id),
-                supabase.from('mock_exam_submissions').select('id').eq('user_id', user.id),
-                supabase.from('learning_progress').select('last_accessed_at').eq('user_id', user.id),
-                (supabase as any).rpc('get_student_summary_stats_secure', {
-                    user_uuid: String(user.id),
-                    exam_type_id: String(activeExam.id)
-                }),
-                (supabase as any).rpc('get_analytics_subjects_secure', {
-                    user_uuid: String(user.id),
-                    exam_type_id: String(activeExam.id)
-                })
-            ]);
+            const { data: dashboardData, error } = await (supabase as any).rpc('get_full_dashboard_data', {
+                p_user_uuid: String(user.id),
+                p_exam_type_id: String(activeExam.id)
+            });
+
+            if (error || !dashboardData) {
+                console.error("Error fetching consolidated dashboard data:", error);
+                setIsLoading(false);
+                return;
+            }
+
+            // Map the consolidated RPC output to the existing data structure format
+            const testsRes = { data: dashboardData.tests };
+            const mockSubmissionsRes = { data: dashboardData.mockSubmissions };
+            const learningProgressRes = { data: dashboardData.learningProgress };
+            const summaryStatsRes = { data: dashboardData.summaryStats };
+            const subjectStatsRes = { data: dashboardData.subjectStats };
 
             // â”€â”€ PROCESS DATES & STREAK â”€â”€
             const learningProgress = learningProgressRes.data || [];
@@ -606,7 +645,7 @@ const MobileDashboard: React.FC = () => {
             const subjectStats = (subjectStatsRes.data as any[]) || [];
             const mockSubmissions = mockSubmissionsRes?.data || [];
             const mockSolved = tests.filter((t: any) => t.is_mock || t.test_type === 'mock').length + mockSubmissions.length;
-            
+
             const practiceTotal = summary.total_solved || 0;
             const globalAccuracy = Math.round(summary.accuracy_percent || 0);
             const totalQuestionsInTests = tests.reduce((acc: number, t: any) => acc + (t.total_questions || 0), 0);
@@ -615,7 +654,7 @@ const MobileDashboard: React.FC = () => {
             // â”€â”€ FETCH TODAY'S PRACTICE SPECIFICALLY â”€â”€
             const todayStart = new Date();
             todayStart.setHours(0, 0, 0, 0);
-            
+
             const { count: todayPracticeCount } = await supabase
                 .from('user_practice_responses')
                 .select('*', { count: 'exact', head: true })
@@ -648,7 +687,7 @@ const MobileDashboard: React.FC = () => {
             });
             setSubjectMastery(mastery);
 
-            // âœ… Write fresh data to cache for next reload (stale-while-revalidate)
+            // ✅ Write fresh data to cache for next reload (stale-while-revalidate)
             writeMobileDashCache({
                 stats: {
                     streak, bestStreak, totalActiveDays: activeDatesSet.size,
@@ -657,6 +696,8 @@ const MobileDashboard: React.FC = () => {
                     todayPracticeMinutes: todayPracticeCount || 0
                 },
                 subjectMastery: mastery,
+                // Serialize Set as array so cache restoration works
+                activeDates: Array.from(activeDatesSet),
                 cachedAt: Date.now(),
             });
 
@@ -736,95 +777,148 @@ const MobileDashboard: React.FC = () => {
 
     // Removed: if (isLoading) return <DashboardSkeleton />;
 
+    // Compute overall progress percentage (used in Getting Started card)
+    const overallProgress = React.useMemo(() => {
+        let progressScore = 0;
+        if (stats.solved > 0) progressScore += 25;
+        if (stats.streak > 0) progressScore += 25;
+        if (stats.mockSolved > 0) progressScore += 25;
+        if (lastProgress) progressScore += 25;
+        return progressScore;
+    }, [stats.solved, stats.streak, stats.mockSolved, lastProgress]);
+
     return (
         <MobileLayout isLoading={isLoading}>
-            <div className="flex flex-col min-h-full bg-background animate-in fade-in duration-700 overflow-y-auto">
-            {/* Active Test Notification Banner - Dismissible */}
-            {activeTest && !isTestNotificationDismissed && (
-                <div className="sticky top-0 z-50 bg-primary/95 backdrop-blur-sm border-b border-primary/20 shadow-lg">
-                    <div className="px-5 py-3 flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3 flex-1 min-w-0">
-                            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
-                                <Clock className="w-5 h-5 text-white" />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                                <p className="text-xs font-black uppercase tracking-tight text-white truncate">
-                                    {activeTest.subject}
-                                </p>
-                                {activeTest.is_mock && activeTest.current_section && (
-                                    <p className="text-[9px] font-bold text-white/90 uppercase tracking-widest mt-0.5">
-                                        Resuming: {(() => {
-                                            const cfg = allExams[activeTest.exam_type];
-                                            return cfg?.sections[activeTest.current_section - 1]?.name || `Section ${activeTest.current_section} `;
-                                        })()}
+            <div className="flex flex-col min-h-full bg-[#F4F6FB] dark:bg-background animate-in fade-in duration-700 overflow-y-auto">
+                {/* Active Test Notification Banner - Dismissible */}
+                {activeTest && !isTestNotificationDismissed && (
+                    <div className="sticky top-0 z-50 bg-primary/95 backdrop-blur-sm border-b border-primary/20 shadow-lg">
+                        <div className="px-5 py-3 flex items-center justify-between gap-3">
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center flex-shrink-0">
+                                    <Clock className="w-5 h-5 text-white" />
+                                </div>
+                                <div className="flex-1 min-w-0">
+                                    <p className="text-xs font-black uppercase tracking-tight text-white truncate">
+                                        {activeTest.subject}
                                     </p>
-                                )}
-                                <p className="text-[10px] font-bold text-white/70 uppercase tracking-wider mt-0.5">
-                                    {Math.floor(activeTest.time_remaining_seconds / 60)}m remaining
-                                </p>
+                                    {activeTest.is_mock && activeTest.current_section && (
+                                        <p className="text-[9px] font-bold text-white/90 uppercase tracking-widest mt-0.5">
+                                            Resuming: {(() => {
+                                                const cfg = allExams[activeTest.exam_type];
+                                                return cfg?.sections[activeTest.current_section - 1]?.name || `Section ${activeTest.current_section} `;
+                                            })()}
+                                        </p>
+                                    )}
+                                    <p className="text-[10px] font-bold text-white/70 uppercase tracking-wider mt-0.5">
+                                        {Math.floor(activeTest.time_remaining_seconds / 60)}m remaining
+                                    </p>
+                                </div>
                             </div>
-                        </div>
-                        <div className="flex items-center gap-2 flex-shrink-0">
-                            <Button
-                                onClick={() => {
-                                    const examConfig = allExams[activeTest.exam_type];
-                                    const isSectioned = !!(examConfig && examConfig.sections && examConfig.sections.length > 1);
-                                    navigate(isSectioned ? `/mobile/sectioned-test/${activeTest.id}` : `/mobile/test/${activeTest.id}`);
-                                }}
-                                size="sm"
-                                className="h-9 bg-white text-primary hover:bg-white/90 font-black text-[9px] uppercase tracking-widest rounded-lg px-3"
-                            >
-                                <Play size={12} className="mr-1.5 fill-current" />
-                                Resume
-                            </Button>
-                            <button
-                                onClick={() => setIsTestNotificationDismissed(true)}
-                                className="w-8 h-8 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
-                            >
-                                <X size={16} />
-                            </button>
+                            <div className="flex items-center gap-2 flex-shrink-0">
+                                <Button
+                                    onClick={() => {
+                                        const examConfig = allExams[activeTest.exam_type];
+                                        const isSectioned = !!(examConfig && examConfig.sections && examConfig.sections.length > 1);
+                                        navigate(isSectioned ? `/mobile/sectioned-test/${activeTest.id}` : `/mobile/test/${activeTest.id}`);
+                                    }}
+                                    size="sm"
+                                    className="h-9 bg-white text-primary hover:bg-white/90 font-black text-[9px] uppercase tracking-widest rounded-lg px-3"
+                                >
+                                    <Play size={12} className="mr-1.5 fill-current" />
+                                    Resume
+                                </Button>
+                                <button
+                                    onClick={() => setIsTestNotificationDismissed(true)}
+                                    className="w-8 h-8 flex items-center justify-center text-white/70 hover:text-white hover:bg-white/10 rounded-lg transition-colors"
+                                >
+                                    <X size={16} />
+                                </button>
+                            </div>
                         </div>
                     </div>
-                </div>
-            )}
+                )}
 
-            {/* Resolved Question Notifications */}
-            {resolvedReports.length > 0 && (
-                <div className="px-6 pt-6 space-y-3">
-                    {resolvedReports.length === 1 ? (
-                        resolvedReports.map((report) => (
-                            <div
-                                key={report.id}
-                                className="group relative bg-white dark:bg-slate-900 rounded-2xl p-4 border-2 border-amber-500 shadow-xl shadow-amber-500/10 animate-in slide-in-from-top-4 duration-700 overflow-hidden"
-                            >
+                {/* Resolved Question Notifications */}
+                {resolvedReports.length > 0 && (
+                    <div className="px-6 pt-6 space-y-3">
+                        {resolvedReports.length === 1 ? (
+                            resolvedReports.map((report) => (
+                                <div
+                                    key={report.id}
+                                    className="group relative bg-white dark:bg-slate-900 rounded-2xl p-4 border-2 border-amber-500 shadow-xl shadow-amber-500/10 animate-in slide-in-from-top-4 duration-700 overflow-hidden"
+                                >
+                                    <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-600 animate-pulse" />
+                                    <div className="relative z-10 flex flex-col gap-4">
+                                        <div className="flex items-center gap-4">
+                                            <div className="relative shrink-0">
+                                                <div className="w-12 h-12 bg-amber-50 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center text-amber-600 border border-amber-100 shadow-sm">
+                                                    <ShieldCheck size={24} className="animate-bounce" />
+                                                </div>
+                                                <div className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full border-2 border-white dark:border-slate-900 animate-ping" />
+                                            </div>
+                                            <div>
+                                                <div className="flex items-center gap-2 mb-1">
+                                                    <span className="px-2 py-0.5 bg-amber-500 text-white text-[8px] font-black uppercase tracking-widest rounded-md">Urgent Alert</span>
+                                                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-600 dark:text-amber-400">Intelligence Update</p>
+                                                </div>
+                                                <h3 className="text-sm font-black tracking-tight leading-tight text-slate-900 dark:text-white">Reported Question Resolved</h3>
+                                                {report.admin_message && (
+                                                    <p className="text-[11px] font-bold mt-1 text-slate-500 dark:text-slate-400 leading-tight line-clamp-2 italic">
+                                                        "{report.admin_message}"
+                                                    </p>
+                                                )}
+                                            </div>
+                                        </div>
+                                        <div className="flex items-center justify-between gap-3">
+                                            <Button
+                                                onClick={() => navigate('/mobile/bookmarks')}
+                                                className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] uppercase tracking-widest h-12 rounded-xl shadow-lg shadow-amber-500/20 active:scale-95 transition-all"
+                                            >
+                                                Inspect Fix
+                                            </Button>
+                                            <button
+                                                onClick={() => dismissAllReports()}
+                                                className="p-3 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors shrink-0 border border-slate-100 dark:border-slate-800"
+                                            >
+                                                <X size={18} className="text-slate-400" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))
+                        ) : (
+                            <div className="group relative bg-white dark:bg-slate-900 rounded-2xl p-4 border-2 border-amber-500 shadow-xl shadow-amber-500/10 animate-in slide-in-from-top-4 duration-700 overflow-hidden">
                                 <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-600 animate-pulse" />
                                 <div className="relative z-10 flex flex-col gap-4">
                                     <div className="flex items-center gap-4">
                                         <div className="relative shrink-0">
-                                            <div className="w-12 h-12 bg-amber-50 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center text-amber-600 border border-amber-100 shadow-sm">
+                                            <div className="w-12 h-12 bg-amber-50 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center text-amber-600 border border-amber-100">
                                                 <ShieldCheck size={24} className="animate-bounce" />
                                             </div>
-                                            <div className="absolute -top-1 -right-1 w-3 h-3 bg-amber-500 rounded-full border-2 border-white dark:border-slate-900 animate-ping" />
+                                            <div className="absolute -top-1 -right-1 px-1.5 py-0.5 bg-amber-500 text-white text-[10px] font-black rounded-lg border-2 border-white dark:border-slate-900 shadow-sm">
+                                                {resolvedReports.length}
+                                            </div>
                                         </div>
                                         <div>
                                             <div className="flex items-center gap-2 mb-1">
-                                                <span className="px-2 py-0.5 bg-amber-500 text-white text-[8px] font-black uppercase tracking-widest rounded-md">Urgent Alert</span>
-                                                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-600 dark:text-amber-400">Intelligence Update</p>
+                                                <span className="px-2 py-0.5 bg-amber-600 text-white text-[8px] font-black uppercase tracking-widest rounded-md animate-pulse">Bulk Update</span>
+                                                <p className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-600 dark:text-amber-400">Intelligence Success</p>
                                             </div>
-                                            <h3 className="text-sm font-black tracking-tight leading-tight text-slate-900 dark:text-white">Reported Question Resolved</h3>
-                                            {report.admin_message && (
-                                                <p className="text-[11px] font-bold mt-1 text-slate-500 dark:text-slate-400 leading-tight line-clamp-2 italic">
-                                                    "{report.admin_message}"
-                                                </p>
-                                            )}
+                                            <h3 className="text-sm font-black tracking-tight leading-tight text-slate-900 dark:text-white">
+                                                {resolvedReports.length} Questions Fixed
+                                            </h3>
+                                            <p className="text-[11px] font-bold mt-1 text-slate-500 dark:text-slate-400 leading-tight italic opacity-80">
+                                                Admins have processed your recent reports.
+                                            </p>
                                         </div>
                                     </div>
                                     <div className="flex items-center justify-between gap-3">
                                         <Button
-                                            onClick={() => navigate('/mobile/bookmarks')}
-                                            className="flex-1 bg-amber-500 hover:bg-amber-600 text-white font-black text-[10px] uppercase tracking-widest h-12 rounded-xl shadow-lg shadow-amber-500/20 active:scale-95 transition-all"
+                                            onClick={() => navigate('/bookmarks')}
+                                            className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-black text-[10px] uppercase tracking-widest h-12 rounded-xl shadow-lg shadow-amber-600/20 active:scale-95 transition-all"
                                         >
-                                            Inspect Fix
+                                            Inspect All
                                         </Button>
                                         <button
                                             onClick={() => dismissAllReports()}
@@ -835,636 +929,491 @@ const MobileDashboard: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
-                        ))
-                    ) : (
-                        <div className="group relative bg-white dark:bg-slate-900 rounded-2xl p-4 border-2 border-amber-500 shadow-xl shadow-amber-500/10 animate-in slide-in-from-top-4 duration-700 overflow-hidden">
-                            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-400 via-yellow-500 to-amber-600 animate-pulse" />
-                            <div className="relative z-10 flex flex-col gap-4">
-                                <div className="flex items-center gap-4">
-                                    <div className="relative shrink-0">
-                                        <div className="w-12 h-12 bg-amber-50 dark:bg-amber-900/30 rounded-2xl flex items-center justify-center text-amber-600 border border-amber-100">
-                                            <ShieldCheck size={24} className="animate-bounce" />
-                                        </div>
-                                        <div className="absolute -top-1 -right-1 px-1.5 py-0.5 bg-amber-500 text-white text-[10px] font-black rounded-lg border-2 border-white dark:border-slate-900 shadow-sm">
-                                            {resolvedReports.length}
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="px-2 py-0.5 bg-amber-600 text-white text-[8px] font-black uppercase tracking-widest rounded-md animate-pulse">Bulk Update</span>
-                                            <p className="text-[9px] font-black uppercase tracking-[0.2em] text-amber-600 dark:text-amber-400">Intelligence Success</p>
-                                        </div>
-                                        <h3 className="text-sm font-black tracking-tight leading-tight text-slate-900 dark:text-white">
-                                            {resolvedReports.length} Questions Fixed
-                                        </h3>
-                                        <p className="text-[11px] font-bold mt-1 text-slate-500 dark:text-slate-400 leading-tight italic opacity-80">
-                                            Admins have processed your recent reports.
-                                        </p>
-                                    </div>
-                                </div>
-                                <div className="flex items-center justify-between gap-3">
-                                    <Button
-                                        onClick={() => navigate('/bookmarks')}
-                                        className="flex-1 bg-amber-600 hover:bg-amber-700 text-white font-black text-[10px] uppercase tracking-widest h-12 rounded-xl shadow-lg shadow-amber-600/20 active:scale-95 transition-all"
-                                    >
-                                        Inspect All
-                                    </Button>
-                                    <button
-                                        onClick={() => dismissAllReports()}
-                                        className="p-3 bg-slate-50 dark:bg-slate-800 hover:bg-slate-100 dark:hover:bg-slate-700 rounded-xl transition-colors shrink-0 border border-slate-100 dark:border-slate-800"
-                                    >
-                                        <X size={18} className="text-slate-400" />
-                                    </button>
-                                </div>
-                            </div>
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* Reference-Matched Hero Section */}
-            <motion.header 
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="relative w-full bg-[#FBFCFF] dark:bg-background px-6 pt-10 pb-4 overflow-hidden transition-colors duration-500"
-            >
-                <div className="max-w-lg mx-auto relative md:max-w-none md:mx-0 lg:px-6">
-                    <div className="md:grid md:grid-cols-[1fr_minmax(auto,350px)] lg:grid-cols-[1fr_minmax(auto,450px)] md:gap-8 lg:gap-12 md:items-end">
-                        <div className="flex flex-col relative w-full">
-                            {/* Greeting & Character Row */}
-                    <div className="flex justify-between items-start mb-8 relative">
-                        <div className="space-y-1 relative z-10">
-                            <p className="text-slate-400 dark:text-slate-500 text-base font-medium">{getGreeting()},</p>
-                            <h1 className="text-5xl font-extrabold text-[#1A1F36] dark:text-white flex items-center gap-2 tracking-tight">
-                                {firstName.split(' ')[0]} 
-                                <motion.span 
-                                    animate={{ rotate: [0, 20, 0, 20, 0] }}
-                                    transition={{ duration: 2, repeat: Infinity, repeatDelay: 1 }}
-                                >
-                                    ðŸ‘‹
-                                </motion.span>
-                            </h1>
-                            <p className="text-slate-400 text-sm font-medium mt-2">Let's continue your learning journey!</p>
-                        </div>
-                        
-                        {/* 3D Character Image */}
-                        <div className="absolute -right-4 md:-right-6 lg:-right-4 -top-4 md:-top-8 lg:-top-4 w-48 h-48 md:w-36 md:h-36 lg:w-52 lg:h-52 pointer-events-none opacity-90 md:opacity-100 z-0">
-                            <img 
-                                src="/kid-with-laptop.webp" 
-                                alt="Student"
-                                className="w-full h-full object-contain"
-                            />
-                        </div>
+                        )}
                     </div>
+                )}
 
-                    {/* Next Lesson Card (Large) */}
-                    <motion.div 
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        transition={{ delay: 0.1 }}
-                        className="mb-6 md:mb-0"
-                    >
-                        <button
-                            onClick={() => toast({
-                                title: "Under Development",
-                                description: "The Learning Portal is currently under development.",
-                            })}
-                            className="w-full bg-white dark:bg-slate-900 rounded-[2.5rem] p-6 shadow-[0_15px_45px_rgba(0,0,0,0.04)] border border-slate-50 dark:border-slate-800 flex items-center justify-between active:scale-[0.98] transition-all group"
-                        >
-                            <div className="flex items-center gap-5">
-                                <div className="w-16 h-16 rounded-[1.5rem] bg-[#EEF2FF] dark:bg-indigo-950/30 flex items-center justify-center">
-                                    <Play size={24} className="text-[#4F46E5] dark:text-indigo-400 fill-[#4F46E5] dark:fill-indigo-400" />
-                                </div>
-                                <div className="text-left">
-                                    <p className="text-[10px] font-black text-[#4F46E5] uppercase tracking-widest mb-1">Next Lesson</p>
-                                    <p className="text-lg font-bold text-[#1A1F36] dark:text-white leading-tight">
-                                        {lastProgress?.content?.title || 'Converting repeating decimals'}
-                                    </p>
-                                    <p className="text-xs text-slate-400 font-medium mt-0.5">Up next in your learning path</p>
-                                </div>
-                            </div>
-                            <div className="w-10 h-10 rounded-full bg-[#F8FAFF] dark:bg-black flex items-center justify-center">
-                                <ChevronRight size={20} className="text-indigo-600 dark:text-white" />
-                            </div>
-                        </button>
-                    </motion.div>
-                        </div>
-
-                    {/* Bottom Two Cards */}
-                    <div className="grid grid-cols-2 gap-4 mt-6 md:mt-0">
-                        {/* Daily Goal Card */}
-                        <motion.button
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.2 }}
-                            onClick={() => navigate('/mobile/practice')}
-                            className="bg-[#FFFBEB] dark:bg-amber-950/40 rounded-[2.2rem] p-6 shadow-[0_10px_35px_rgba(0,0,0,0.03)] border border-amber-100/50 dark:border-amber-900/30 flex flex-col items-start gap-4 active:scale-[0.98] transition-all text-left relative overflow-hidden"
-                        >
-                            <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center">
-                                <Zap size={18} className="text-amber-600 dark:text-amber-400 fill-current" />
-                            </div>
-                            
-                            <div className="space-y-0.5">
-                                <p className="text-base font-bold text-slate-900 dark:text-white">Daily Goal</p>
-                                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">15 min session</p>
-                            </div>
-
-                            {/* Real Progress Bar */}
-                            <div className="w-full mt-2">
-                                <div className="flex justify-between items-center mb-1.5">
-                                    <span className="text-[10px] font-bold text-slate-400">
-                                        {Math.min(15, stats.todayPracticeMinutes)} / 15 min
-                                    </span>
-                                    {stats.todayPracticeMinutes >= 15 && (
-                                        <div className="bg-emerald-500 rounded-full p-0.5">
-                                            <CheckCircle2 size={10} className="text-white font-black" />
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
-                                    <motion.div 
-                                        initial={{ width: 0 }}
-                                        animate={{ width: `${Math.min(100, (stats.todayPracticeMinutes / 15) * 100)}%` }}
-                                        className={`h-full rounded-full ${stats.todayPracticeMinutes >= 15 ? 'bg-emerald-500' : 'bg-amber-500'}`}
-                                    />
-                                </div>
-                            </div>
-                            
-                            {/* Subtle background decoration */}
-                            <div className="absolute -right-2 -bottom-2 opacity-[0.03] scale-150 rotate-12">
-                                <Zap size={60} />
-                            </div>
-                            
-                            <div className="absolute top-4 right-4 w-7 h-7 rounded-full bg-[#F8FAFF] dark:bg-black flex items-center justify-center">
-                                <ChevronRight size={14} className="text-slate-300 dark:text-white" />
-                            </div>
-                        </motion.button>
-
-                        {/* Exam Mode Card */}
-                        <motion.button
-                            initial={{ opacity: 0, y: 20 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            transition={{ delay: 0.3 }}
-                            onClick={() => navigate('/mock-exams')}
-                            className="bg-[#FFF1F2] dark:bg-rose-950/40 rounded-[2.2rem] p-6 shadow-[0_10px_35px_rgba(0,0,0,0.03)] border border-rose-100/50 dark:border-rose-900/30 flex flex-col items-start gap-4 active:scale-[0.98] transition-all text-left relative overflow-hidden"
-                        >
-                            <div className="w-10 h-10 rounded-full bg-rose-100 dark:bg-rose-500/20 flex items-center justify-center">
-                                <Trophy size={18} className="text-rose-600 dark:text-rose-400" />
-                            </div>
-                            
-                            <div className="space-y-0.5">
-                                <p className="text-base font-bold text-slate-900 dark:text-white">Exam Mode</p>
-                                <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">Practice Simulation</p>
-                            </div>
-
-                            <div className="mt-auto pt-4 opacity-10">
-                                <FileText size={40} />
-                            </div>
-
-                            <div className="absolute top-4 right-4 w-7 h-7 rounded-full bg-[#F8FAFF] dark:bg-black flex items-center justify-center">
-                                <ChevronRight size={14} className="text-slate-300 dark:text-white" />
-                            </div>
-                        </motion.button>
-                    </div>
-                    </div>
-                </div>
-            </motion.header>
-
-            {/* Quick Stats Row - Softened design */}
-            <div className="px-5 mt-4 relative z-30 space-y-6 md:grid md:grid-cols-2 md:gap-6 md:space-y-0 lg:px-12">
-                <div className="flex items-center justify-between gap-2 md:col-span-2 lg:max-w-4xl lg:mx-auto lg:w-full">
-                    <MiniStat icon={Target} val={`${stats.accuracy}%`} label="Acc" color="text-emerald-500" />
-                    <MiniStat icon={Zap} val={`${stats.streak}d`} label="Streak" color="text-amber-500" />
-                    <MiniStat icon={Play} val={stats.solved} label="Solved" color="text-indigo-500" />
-                    <MiniStat icon={ClipboardList} val={stats.mockSolved} label="Mocks" color="text-rose-500" />
-                    <MiniStat icon={HistoryIcon} val={stats.totalQuestions} label="Total" color="text-cyan-500" />
-                </div>
-
-                {/* Seat Tracker / IMAT Updates Card - Refined */}
-                <button
-                    onClick={() => {
-                        if (activeExam?.id === 'imat-prep' || activeExam?.id === 'imat') {
-                            openExternalUrl('https://chat.whatsapp.com/CfVh7u9L6vT7ZFpZwwVa4A');
-                        } else {
-                            setIsTrackerModalOpen(true);
-                        }
-                    }}
-                    className="w-full bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-[2.5rem] p-5 flex items-center justify-between group active:scale-[0.98] transition-all"
+                {/* ─── NEW HERO BANNER ─── */}
+                <motion.section
+                    initial={{ opacity: 0, y: -10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className="mx-4 mt-4 rounded-3xl overflow-hidden relative"
+                    style={{ background: 'linear-gradient(135deg, #F97316 0%, #EC4899 50%, #7C3AED 100%)' }}
                 >
-                    <div className="flex items-center gap-4">
-                        <div className={cn(
-                            "w-12 h-12 rounded-[1.2rem] flex items-center justify-center",
-                            (activeExam?.id === 'imat-prep' || activeExam?.id === 'imat') ? "bg-emerald-50" : "bg-cyan-50"
-                        )}>
-                            {(activeExam?.id === 'imat-prep' || activeExam?.id === 'imat') ? (
-                                <MessageCircle className="w-6 h-6 text-emerald-600" />
-                            ) : (
-                                <Zap className="w-6 h-6 text-cyan-600" />
-                            )}
-                        </div>
-                        <div className="text-left">
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-0.5">
-                                {(activeExam?.id === 'imat-prep' || activeExam?.id === 'imat') ? "IMAT Updates" : "Live Tracker"}
-                            </p>
-                                <p className="text-sm font-bold text-slate-800 dark:text-white">
-                                    {(activeExam?.id === 'imat-prep' || activeExam?.id === 'imat') ? "Join Student Group" : "CENT-S Seat Monitor"}
-                            </p>
-                        </div>
-                    </div>
-                    <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-black flex items-center justify-center">
-                        <ChevronRight className="w-4 h-4 text-slate-300 dark:text-white" />
-                    </div>
-                </button>
+                    {/* Decorative blobs */}
+                    <div className="absolute top-0 right-0 w-40 h-40 bg-white/10 rounded-full -translate-y-12 translate-x-12" />
+                    <div className="absolute bottom-0 left-0 w-24 h-24 bg-white/10 rounded-full translate-y-8 -translate-x-8" />
 
-                {/* Weekly Streak Calendar */}
-                <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 p-5 shadow-sm">
-                    <div className="flex items-center gap-2 mb-5">
-                        <div className="w-8 h-8 bg-blue-100 dark:bg-blue-900/30 rounded-xl flex items-center justify-center">
-                            <Calendar className="w-4 h-4 text-blue-600" />
+                    <div className="relative z-10 px-5 pt-5 pb-4">
+                        {/* Greeting */}
+                        <p className="text-[10px] font-black uppercase tracking-widest text-white/80 mb-1">
+                            {getGreeting()}, {firstName.toUpperCase()} 🌟
+                        </p>
+                        <h1 className="text-2xl font-black text-white leading-tight mb-4">
+                            Great things never<br />come from comfort zones.
+                        </h1>
+
+                        {/* Stat Pills — same values as desktop hero */}
+                        <div className="flex gap-2">
+                            <div className="flex-1 bg-white/20 backdrop-blur-sm rounded-2xl px-3 py-2 flex items-center gap-1.5 border border-white/20">
+                                <span className="text-base">⚡</span>
+                                <div>
+                                    <p className="text-[9px] font-black text-white/70 uppercase tracking-wider">XP</p>
+                                    <p className="text-sm font-black text-white leading-none">{stats.solved}</p>
+                                </div>
+                            </div>
+                            <div className="flex-1 bg-white/20 backdrop-blur-sm rounded-2xl px-3 py-2 flex items-center gap-1.5 border border-white/20">
+                                <span className="text-base">🏆</span>
+                                <div>
+                                    <p className="text-[9px] font-black text-white/70 uppercase tracking-wider">Stars</p>
+                                    <p className="text-sm font-black text-white leading-none">{stats.mockSolved}</p>
+                                </div>
+                            </div>
+                            <div className="flex-1 bg-white/20 backdrop-blur-sm rounded-2xl px-3 py-2 flex items-center gap-1.5 border border-white/20">
+                                <span className="text-base">🔥</span>
+                                <div>
+                                    <p className="text-[9px] font-black text-white/70 uppercase tracking-wider">Days</p>
+                                    <p className="text-sm font-black text-white leading-none">{stats.streak}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </motion.section>
+
+                {/* ─── GETTING STARTED CARD ─── */}
+                <motion.div
+                    initial={{ opacity: 0, y: 16 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
+                    className="mx-4 mt-3 bg-white dark:bg-slate-900 rounded-3xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm"
+                >
+                    <div className="flex items-center gap-3 mb-3">
+                        <div className="w-9 h-9 rounded-2xl bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center text-xl">
+                            🏅
                         </div>
                         <div>
-                            <h3 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-wider">Weekly Streak</h3>
+                            <p className="text-[9px] font-black text-primary uppercase tracking-widest">Getting Started</p>
+                            <h3 className="text-sm font-black text-slate-900 dark:text-white leading-tight">Your guided path to mastering ItaloStudy</h3>
                         </div>
                     </div>
 
-                    <div className="flex justify-between gap-1 mb-5">
-                        {(() => {
-                            return Array.from({ length: 7 }, (_, i) => {
+                    {/* Progress bar */}
+                    <div className="flex items-center justify-between mb-1">
+                        <div className="flex-1 h-2 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden mr-3">
+                            <motion.div
+                                initial={{ width: 0 }}
+                                animate={{ width: `${overallProgress}%` }}
+                                transition={{ duration: 1.2, ease: 'easeOut', delay: 0.3 }}
+                                className="h-full rounded-full bg-primary"
+                            />
+                        </div>
+                        <span className="text-xs font-black text-slate-600 dark:text-slate-300 shrink-0">{overallProgress}%</span>
+                    </div>
+
+                    {/* CTA Buttons */}
+                    <div className="flex gap-2 mt-3">
+                        <button
+                            onClick={() => navigate('/mobile/practice')}
+                            className="flex-1 bg-primary text-white font-black text-[11px] uppercase tracking-widest rounded-xl py-3 active:scale-95 transition-all"
+                        >
+                            Start Practice
+                        </button>
+                        <button
+                            onClick={() => navigate('/mobile/mock-exams')}
+                            className="flex-1 bg-slate-100 dark:bg-slate-800 text-slate-800 dark:text-white font-black text-[11px] uppercase tracking-widest rounded-xl py-3 active:scale-95 transition-all"
+                        >
+                            Take a Mock
+                        </button>
+                    </div>
+                </motion.div>
+
+                {/* ─── WEEKLY STREAK + UPCOMING EXAMS (2-column) ─── */}
+                <div className="mx-4 mt-3 grid grid-cols-2 gap-3">
+                    {/* Weekly Streak */}
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm">
+                        <div className="flex items-center gap-1.5 mb-3">
+                            <Calendar className="w-4 h-4 text-blue-500" />
+                            <p className="text-[10px] font-black text-slate-800 dark:text-white uppercase tracking-wider">Weekly Streak</p>
+                        </div>
+                        {/* Days grid: S M T W T F S */}
+                        <div className="flex justify-between gap-1 mb-3">
+                            {Array.from({ length: 7 }, (_, i) => {
                                 const d = new Date();
                                 d.setDate(d.getDate() - (6 - i));
                                 const dateStr = format(d, 'yyyy-MM-dd');
-                                const label = ['S','M','T','W','T','F','S'][d.getDay()];
+                                const dayLabels = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+                                const label = dayLabels[d.getDay()];
                                 const isToday = i === 6;
                                 const didPractice = activeDates.has(dateStr);
                                 return (
-                                    <div key={i} className="flex flex-col items-center gap-2 flex-1 min-w-0">
-                                        <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest truncate">{label}</span>
-                                        <div className={cn(
-                                            "aspect-square w-full max-w-[36px] rounded-2xl flex items-center justify-center text-xs font-black transition-all",
+                                    <div key={i} className="flex flex-col items-center gap-1 flex-1">
+                                        <span className="text-[10px] font-black text-slate-400 uppercase block text-center leading-none mb-0.5">{label}</span>
+                                        <div className={`aspect-square w-full max-w-[22px] rounded-full flex items-center justify-center text-[9px] font-black transition-all ${
                                             isToday
                                                 ? didPractice
-                                                    ? 'bg-emerald-500 text-white shadow-lg shadow-emerald-200 dark:shadow-emerald-900'
-                                                    : 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 dark:shadow-indigo-900'
+                                                    ? 'bg-emerald-500 text-white shadow-md shadow-emerald-200 dark:shadow-emerald-900'
+                                                    : 'bg-primary text-white shadow-md shadow-primary/20'
                                                 : didPractice
                                                     ? 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600'
                                                     : 'bg-red-100 dark:bg-red-900/20 text-red-400'
-                                        )}>
-                                            {didPractice ? 'âœ“' : 'âœ—'}
+                                        }`}>
+                                            {didPractice ? '✓' : isToday ? '→' : '✗'}
                                         </div>
                                     </div>
                                 );
-                            });
-                        })()}
-                    </div>
-
-                    <div className="flex items-center justify-center gap-3 pt-2 border-t border-slate-50 dark:border-slate-800">
-                        <div className="text-center">
-                            <p className="text-base font-black text-slate-900 dark:text-white">{stats.streak}</p>
-                            <p className="text-[7px] font-black text-slate-400 uppercase tracking-[0.2em]">Current Streak</p>
+                            })}
                         </div>
-                        <div className="w-px h-6 bg-slate-100 dark:bg-slate-800" />
-                        <div className="text-center">
-                            <p className="text-base font-black text-slate-900 dark:text-white">{stats.bestStreak}</p>
-                            <p className="text-[7px] font-black text-slate-400 uppercase tracking-[0.2em]">Best Streak</p>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Upcoming Exam Card - Refined */}
-                {upcomingSession && (
-                    <div className="bg-white rounded-[2.5rem] p-6 border border-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] relative overflow-hidden md:col-span-2">
-                        <div className="absolute top-0 right-0 p-6 opacity-5 rotate-12">
-                            <Bell size={80} className="text-indigo-600" />
-                        </div>
-                        <div className="relative z-10 flex flex-col gap-6">
-                            <div className="flex items-center gap-4">
-                                <div className="w-14 h-14 bg-indigo-50 rounded-[1.5rem] flex items-center justify-center">
-                                    <Calendar className="w-7 h-7 text-indigo-600" />
-                                </div>
-                                <div className="flex-1 min-w-0">
-                                    <p className="text-[10px] font-bold text-indigo-600 uppercase tracking-widest mb-1">Live Event</p>
-                                    <h3 className="text-base font-bold text-slate-900 tracking-tight leading-tight truncate">{upcomingSession.title || 'Mock Exam Session'}</h3>
-                                    <p className="text-[11px] font-medium text-slate-400 mt-1">
-                                        {format(new Date(upcomingSession.start_time), 'MMM d Â· h:mm a')}
-                                    </p>
-                                </div>
+                        {/* Stats */}
+                        <div className="flex justify-between border-t border-slate-50 dark:border-slate-800 pt-3">
+                            <div className="text-center flex-1">
+                                <p className="text-sm font-black text-slate-900 dark:text-white leading-none mb-1">{stats.streak}</p>
+                                <p className="text-[7px] font-black text-slate-400 uppercase tracking-wider leading-none">Current</p>
                             </div>
-                            <Button 
-                                onClick={() => navigate('/mock-exams')}
-                                className="w-full bg-slate-900 text-white hover:bg-slate-800 font-bold text-[11px] uppercase tracking-widest h-14 rounded-2xl active:scale-95 transition-all shadow-lg"
-                            >
-                                View Details
-                            </Button>
+                            <div className="text-center flex-1 border-x border-slate-50 dark:border-slate-800">
+                                <p className="text-sm font-black text-slate-900 dark:text-white leading-none mb-1">{stats.bestStreak}</p>
+                                <p className="text-[7px] font-black text-slate-400 uppercase tracking-wider leading-none">Best</p>
+                            </div>
+                            <div className="text-center flex-1">
+                                <p className="text-sm font-black text-slate-900 dark:text-white leading-none mb-1">{stats.totalActiveDays}</p>
+                                <p className="text-[7px] font-black text-slate-400 uppercase tracking-wider leading-none">Total</p>
+                            </div>
                         </div>
                     </div>
-                )}
-            </div>
 
-            <Suspense fallback={null}>
-                <SeatTrackerModal
-                    isOpen={isTrackerModalOpen}
-                    onClose={() => setIsTrackerModalOpen(false)}
-                    isGlobal={isGlobal}
-                />
-            </Suspense>
-            {/* Horizontal Scroll: Trending / Champions */}
-            <section className="mt-10 space-y-4">
-                <div className="px-6 flex items-center justify-between">
-                    <h2 className="font-black text-xs uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
-                        <Trophy size={14} className="text-amber-500" /> {isWeeklyData ? 'Weekly Top' : 'Top Students'}
-                    </h2>
+                    {/* Upcoming Exams */}
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between">
+                        <div className="flex items-center gap-1.5 mb-3">
+                            <Bell className="w-4 h-4 text-primary" />
+                            <p className="text-[10px] font-black text-slate-800 dark:text-white uppercase tracking-wider">Upcoming Exams</p>
+                        </div>
 
-                    {/* View Toggle */}
-                    <div className="flex bg-slate-100 dark:bg-slate-800/50 p-1 rounded-full border border-slate-200 dark:border-white/5">
-                        <button
-                            onClick={() => setRankingView('all-time')}
-                            className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${rankingView === 'all-time'
-                                ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
-                                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
-                                }`}
-                        >
-                            {isWeeklyData ? 'This Week' : 'All Time'}
-                        </button>
-                        <button
-                            onClick={() => setRankingView('live')}
-                            className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1.5 ${rankingView === 'live'
-                                ? 'bg-rose-500 text-white shadow-sm'
-                                : 'text-slate-400 hover:text-slate-600 dark:hover:text-slate-300'
-                                }`}
-                        >
-                            Mock
-                            <div className={cn(
-                                "flex items-center gap-1 px-1 py-0.5 rounded-[4px] transition-colors",
-                                rankingView === 'live' ? "bg-white/20 border border-white/30" : "bg-rose-500/10 border border-rose-500/20"
-                            )}>
-                                <div className={cn("w-1 h-1 rounded-full animate-pulse", rankingView === 'live' ? "bg-white" : "bg-rose-500")} />
-                                <span className={cn("text-[6px] font-black", rankingView === 'live' ? "text-white" : "text-rose-500")}>LIVE</span>
-                            </div>
-                        </button>
-                    </div>
-                </div>
-
-                <style>{`
-                    @keyframes dash {
-                        to {
-                            stroke-dashoffset: -160;
-                        }
-                    }
-                `}</style>
-                <div className="flex gap-4 overflow-x-auto no-scrollbar px-6 pb-4 snap-x items-center relative">
-                    {(rankingView === 'all-time' ? topStudents : liveRankings).length > 0 ? (
-                        (rankingView === 'all-time' ? topStudents : liveRankings).map((student, i) => {
-                            const isMock = rankingView === 'live';
-                            const isTop3 = i < 3;
-                            const isTop1 = i === 0;
-
-                            // Minimalistic theme for top 3
-                            const rankStyle = i === 0 ? "border-amber-400 bg-amber-500" : 
-                                            i === 1 ? "border-slate-300 bg-slate-400" : 
-                                            i === 2 ? "border-orange-400 bg-orange-500" : 
-                                            "border-transparent bg-slate-700";
-
-                            return (
-                                <div
-                                    key={student.id}
-                                    onClick={() => navigate(`/mobile/student/${student.id}`)}
-                                    className="snap-start shrink-0 w-28 aspect-square rounded-2xl relative group overflow-hidden border border-border/10 active:scale-95 transition-all shadow-sm"
-                                >
-                                    <div className="w-full h-full relative">
-                                        <StudentAvatar student={student} />
-                                        
-                                        {/* Rank Badge */}
-                                        <div className={cn(
-                                            "absolute top-1.5 left-1.5 w-5 h-5 rounded-lg flex items-center justify-center text-[10px] font-black text-white z-20 border border-white/20 shadow-lg",
-                                            rankStyle
-                                        )}>
-                                            {i + 1}
+                        {upcomingSession ? (
+                            <>
+                                <div className="bg-indigo-50 dark:bg-indigo-950/40 rounded-2xl p-3 mb-3">
+                                    <div className="flex items-start gap-2">
+                                        <div className="w-7 h-7 bg-primary/10 rounded-xl flex items-center justify-center shrink-0">
+                                            <Calendar className="w-3.5 h-3.5 text-primary" />
                                         </div>
-
-                                        {/* Score Tag */}
-                                        <div className="absolute top-1.5 right-1.5 px-1.5 py-0.5 bg-black/40 backdrop-blur-md rounded-md border border-white/10 z-20">
-                                            <span className="text-[8px] font-black text-white">{student.total_score} pts</span>
-                                        </div>
-
-                                        {/* Name Overlay */}
-                                        <div className="absolute inset-x-0 bottom-0 p-2 bg-gradient-to-t from-black/80 via-black/40 to-transparent z-10">
-                                            <p className="text-[10px] font-bold text-white truncate leading-none">
-                                                {student.display_name}
+                                        <div className="min-w-0">
+                                            <h4 className="text-[11px] font-black text-slate-900 dark:text-white leading-tight line-clamp-2">
+                                                {upcomingSession.title || 'Mock Exam Session'}
+                                            </h4>
+                                            <p className="text-[9px] font-bold text-primary mt-0.5">
+                                                {format(new Date(upcomingSession.start_time), 'MMM d · h:mm a')}
+                                            </p>
+                                            <p className="text-[8px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">
+                                                {activeExam?.id?.toUpperCase()?.replace('-PREP', '')} PREP
                                             </p>
                                         </div>
                                     </div>
                                 </div>
-                            );
-                        })
-                    ) : (
-                        <div className="w-full py-8 text-center bg-card/50 rounded-[2rem] border border-dashed border-border/50">
-                            {rankingView === 'live' ? (
-                                <div className="flex flex-col items-center">
-                                    <div className="w-12 h-12 rounded-full bg-rose-50 dark:bg-rose-900/20 flex items-center justify-center mb-3 animate-pulse">
-                                        <Clock className="w-6 h-6 text-rose-400" />
-                                    </div>
-                                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-400">No Mock Session Active</p>
-                                    <p className="text-[8px] font-bold text-muted-foreground uppercase mt-1">Rankings appear during live mocks</p>
+                                <button
+                                    onClick={() => navigate('/mobile/mock-exams')}
+                                    className="w-full bg-primary text-white font-black text-[9px] uppercase tracking-widest rounded-xl py-2.5 active:scale-95 transition-all"
+                                >
+                                    View Exam →
+                                </button>
+                            </>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center flex-1 py-4">
+                                <Bell className="w-8 h-8 text-slate-200 dark:text-slate-700 mb-2" />
+                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider text-center">No upcoming sessions</p>
+                                <button
+                                    onClick={() => navigate('/mobile/mock-exams')}
+                                    className="mt-2 w-full bg-primary text-white font-black text-[9px] uppercase tracking-widest rounded-xl py-2 active:scale-95 transition-all"
+                                >
+                                    View Mocks →
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </div>
+
+                {/* ─── RECOMMENDED FOR YOU (Store Products) ─── */}
+                <section className="mt-5">
+                    <div className="flex items-center justify-between px-4 mb-3">
+                        <div className="flex items-center gap-2">
+                            <div className="w-5 h-5 bg-primary/10 rounded-lg flex items-center justify-center">
+                                <Bookmark className="w-3 h-3 text-primary" />
+                            </div>
+                            <h2 className="text-sm font-black text-slate-900 dark:text-white">Recommended For You</h2>
+                        </div>
+                        <button
+                            onClick={() => navigate('/mobile/store')}
+                            className="text-[10px] font-black text-primary uppercase tracking-widest flex items-center gap-0.5"
+                        >
+                            View All <ChevronRight size={12} />
+                        </button>
+                    </div>
+                    <DynamicStoreAd placementId="dashboard-bottom" />
+                </section>
+
+
+
+                {/* ─── LEADERBOARD ─── */}
+                <section className="mt-6 px-4">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
+                        {/* Header */}
+                        <div className="flex items-center justify-between px-4 pt-4 pb-3 border-b border-slate-50 dark:border-slate-800">
+                            <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 bg-amber-100 dark:bg-amber-900/30 rounded-lg flex items-center justify-center">
+                                    <Trophy size={12} className="text-amber-500" />
                                 </div>
+                                <h2 className="text-sm font-black text-slate-900 dark:text-white">{isWeeklyData ? 'Weekly Top' : 'Top Students'}</h2>
+                            </div>
+                            <div className="flex bg-slate-100 dark:bg-slate-800 p-0.5 rounded-full">
+                                <button
+                                    onClick={() => setRankingView('all-time')}
+                                    className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all ${
+                                        rankingView === 'all-time'
+                                            ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-white shadow-sm'
+                                            : 'text-slate-400'
+                                    }`}
+                                >
+                                    {isWeeklyData ? 'This Week' : 'All Time'}
+                                </button>
+                                <button
+                                    onClick={() => setRankingView('live')}
+                                    className={`px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest transition-all flex items-center gap-1 ${
+                                        rankingView === 'live' ? 'bg-rose-500 text-white shadow-sm' : 'text-slate-400'
+                                    }`}
+                                >
+                                    Mock
+                                    <span className={cn("w-1.5 h-1.5 rounded-full animate-pulse ml-0.5", rankingView === 'live' ? 'bg-white' : 'bg-rose-400')} />
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* List */}
+                        <div className="divide-y divide-slate-50 dark:divide-slate-800/50">
+                            {(rankingView === 'all-time' ? topStudents : liveRankings).length > 0 ? (
+                                (rankingView === 'all-time' ? topStudents : liveRankings).slice(0, 7).map((student, i) => (
+                                    <div
+                                        key={student.id}
+                                        onClick={() => navigate(`/mobile/student/${student.id}`)}
+                                        className="flex items-center gap-3 px-4 py-2.5 active:bg-slate-50 dark:active:bg-slate-800/50 transition-colors"
+                                    >
+                                        {/* Rank badge */}
+                                        <div className={cn(
+                                            "w-6 h-6 rounded-lg flex items-center justify-center text-[10px] font-black shrink-0",
+                                            i === 0 ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-600' :
+                                            i === 1 ? 'bg-slate-100 dark:bg-slate-800 text-slate-500' :
+                                            i === 2 ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-600' :
+                                            'bg-slate-50 dark:bg-slate-800/50 text-slate-400'
+                                        )}>
+                                            {i === 0 ? '👑' : i + 1}
+                                        </div>
+
+                                        {/* Avatar */}
+                                        <div className={cn(
+                                            "w-8 h-8 rounded-xl overflow-hidden border shrink-0",
+                                            i === 0 ? 'border-amber-300/50' : i === 1 ? 'border-slate-200' : i === 2 ? 'border-orange-200' : 'border-slate-100 dark:border-slate-700'
+                                        )}>
+                                            <StudentAvatar student={student} />
+                                        </div>
+
+                                        {/* Name */}
+                                        <div className="flex-1 min-w-0">
+                                            <p className="text-xs font-black text-slate-900 dark:text-white truncate">{student.display_name.split(' ')[0]}</p>
+                                            {i < 3 && (
+                                                <p className={cn("text-[8px] font-black uppercase tracking-widest",
+                                                    i === 0 ? 'text-amber-500' : i === 1 ? 'text-slate-400' : 'text-orange-500'
+                                                )}>
+                                                    {i === 0 ? 'Supreme' : i === 1 ? 'Elite' : 'Noble'}
+                                                </p>
+                                            )}
+                                        </div>
+
+                                        {/* Score */}
+                                        <div className="text-right shrink-0">
+                                            <p className={cn("text-sm font-black leading-none", i === 0 ? 'text-amber-600' : 'text-slate-900 dark:text-white')}>{student.total_score}</p>
+                                            <p className="text-[8px] font-black text-slate-400 uppercase">pts</p>
+                                        </div>
+                                    </div>
+                                ))
                             ) : (
-                                <>
-                                    <Sparkles className="w-8 h-8 mx-auto text-primary/30 mb-2 animate-pulse" />
-                                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-muted-foreground">No weekly champions yet</p>
-                                    <p className="text-[8px] font-bold text-muted-foreground/60 uppercase mt-1">Solve questions this week to appear here</p>
-                                </>
+                                <div className="py-10 text-center">
+                                    {rankingView === 'live' ? (
+                                        <>
+                                            <div className="w-10 h-10 rounded-full bg-rose-50 dark:bg-rose-900/20 flex items-center justify-center mb-2 mx-auto animate-pulse">
+                                                <Clock className="w-5 h-5 text-rose-400" />
+                                            </div>
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-rose-400">No Mock Session Active</p>
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Sparkles className="w-7 h-7 mx-auto text-primary/30 mb-2 animate-pulse" />
+                                            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">No weekly champions yet</p>
+                                        </>
+                                    )}
+                                </div>
                             )}
-                        </div>
-                    )}
-                </div>
-            </section>
-
-            {/* Horizontal Scroll: Subject Mastery (Netflix Categories) */}
-            <section className="mt-4 space-y-4">
-                <div className="flex justify-between items-center px-6">
-                    <h2 className="font-black text-xs uppercase tracking-[0.2em] text-muted-foreground">Learning Progress</h2>
-                    <button onClick={() => navigate('/mobile/subjects')} className="text-[9px] font-bold text-primary uppercase tracking-widest hover:text-primary/80 transition-colors">View All</button>
-                </div>
-
-                <div className="flex gap-4 overflow-x-auto no-scrollbar px-6 pb-4 snap-x">
-                    {subjectMastery.map((sub, i) => (
-                        <div key={i} onClick={() => navigate('/mobile/subjects')} className="snap-start shrink-0 w-64 bg-card p-5 rounded-3xl border border-border/5 active:scale-95 transition-all relative overflow-hidden group">
-                            <div className="absolute inset-0 bg-gradient-to-br from-primary/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                            <div className="flex justify-between items-start mb-4 relative z-10">
-                                {getSubjectIcon(sub.subject)}
-                                <span className={cn("text-xl font-black", sub.accuracy >= 80 ? "text-emerald-500" : sub.accuracy >= 50 ? "text-amber-500" : "text-rose-500")}>{sub.accuracy}%</span>
-                            </div>
-                            <h4 className="font-bold text-[13px] text-foreground uppercase tracking-tight mb-1 relative z-10">{sub.subject}</h4>
-                            <div className="w-full bg-muted h-1 rounded-full overflow-hidden relative z-10">
-                                <motion.div
-                                    initial={{ width: 0 }}
-                                    animate={{ width: `${sub.accuracy}%` }}
-                                    transition={{ duration: 1.5, ease: "easeOut", delay: i * 0.1 }}
-                                    className={cn("h-full", sub.accuracy >= 80 ? "bg-emerald-500" : sub.accuracy >= 50 ? "bg-amber-500" : "bg-rose-500")}
-                                />
-                            </div>
-                            <p className="text-[8px] text-muted-foreground font-bold uppercase tracking-widest mt-2">{sub.solved} Solved</p>
-                        </div>
-                    ))}
-                </div>
-            </section>
-
-            {/* Notification Request moved to header */}
-
-
-            {/* Premium Upsell for Explorer Users */}
-            {isExplorer && (
-                <section className="mt-8 px-6">
-                    <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-[2.5rem] p-8 text-white relative overflow-hidden shadow-xl shadow-indigo-500/20 active:scale-[0.98] transition-all" onClick={() => setIsUpgradeModalOpen(true)}>
-                        <div className="absolute top-0 right-0 p-8 opacity-20 rotate-12"><Sparkles size={100} /></div>
-                        <div className="relative z-10 space-y-4">
-                            <div className="w-12 h-12 bg-white/20 rounded-2xl flex items-center justify-center backdrop-blur-md border border-white/20">
-                                <Zap className="text-white w-6 h-6 animate-pulse" />
-                            </div>
-                            <div>
-                                <h3 className="text-xl font-black uppercase tracking-tight leading-none">Upgrade to <span className="text-amber-400">PRO</span></h3>
-                                <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest mt-2">Unlock unlimited practice & expert insights.</p>
-                            </div>
-                            <Button className="w-full bg-white text-indigo-600 hover:bg-white/90 font-black text-[10px] uppercase tracking-widest h-12 rounded-xl">
-                                Unlock Premium Access
-                            </Button>
                         </div>
                     </div>
                 </section>
-            )}
 
-            {/* Latest Blog Post Section */}
-            {latestBlogPost && (
-                <section className="mt-10 px-6">
-                    <div className="flex items-center justify-between mb-4 px-1">
-                        <h2 className="font-black text-xs uppercase tracking-[0.2em] text-muted-foreground flex items-center gap-2">
-                            <BookOpen size={14} className="text-indigo-500" /> Latest Blog Post
-                        </h2>
-                        <a href="https://italostudy.com/blog" target="_blank" rel="noopener noreferrer" className="text-[9px] font-black text-indigo-600 uppercase tracking-widest flex items-center gap-1">
-                            Browse All <ChevronRight size={12} />
-                        </a>
-                    </div>
-
-                    <a href={`https://italostudy.com/blog/${latestBlogPost.slug}`} target="_blank" rel="noopener noreferrer" className="block group">
-                        <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] overflow-hidden border border-slate-100 dark:border-slate-800 shadow-sm active:scale-[0.98] transition-all">
-                            {latestBlogPost.featured_image && (
-                                <div className="aspect-[16/9] w-full relative overflow-hidden bg-slate-100 dark:bg-slate-800">
-                                    <img 
-                                        src={latestBlogPost.featured_image} 
-                                        alt={latestBlogPost.title}
-                                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-700"
-                                    />
-                                    <div className="absolute top-4 left-4">
-                                        <span className="px-3 py-1 bg-white/90 dark:bg-slate-900/90 backdrop-blur-md rounded-full text-[8px] font-black text-indigo-600 uppercase tracking-widest border border-white/20">
-                                            Latest News
-                                        </span>
+                {/* ─── LEARNING PROGRESS ─── */}
+                <section className="mt-5 px-4">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
+                        <div className="flex justify-between items-center px-4 pt-4 pb-3 border-b border-slate-50 dark:border-slate-800">
+                            <div className="flex items-center gap-2">
+                                <div className="w-6 h-6 bg-indigo-100 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center">
+                                    <BarChart3 size={12} className="text-indigo-500" />
+                                </div>
+                                <h2 className="text-sm font-black text-slate-900 dark:text-white">Learning Progress</h2>
+                            </div>
+                            <button onClick={() => navigate('/mobile/subjects')} className="text-[10px] font-black text-primary uppercase tracking-widest flex items-center gap-0.5">
+                                View All <ChevronRight size={12} />
+                            </button>
+                        </div>
+                        <div className="p-4 space-y-4">
+                            {subjectMastery.length > 0 ? subjectMastery.map((sub, i) => (
+                                <div key={i} onClick={() => navigate('/mobile/subjects')} className="group active:opacity-70 transition-opacity">
+                                    <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2.5">
+                                            {getSubjectIcon(sub.subject)}
+                                            <span className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-tight">{sub.subject}</span>
+                                        </div>
+                                        <div className="text-right">
+                                            <span className="text-base font-black text-slate-900 dark:text-white leading-none">{sub.accuracy}%</span>
+                                            <p className="text-[8px] font-bold text-slate-400 uppercase">Accuracy</p>
+                                        </div>
                                     </div>
+                                    <div className="h-1.5 bg-slate-100 dark:bg-slate-800 rounded-full overflow-hidden">
+                                        <motion.div
+                                            initial={{ width: 0 }}
+                                            animate={{ width: `${sub.accuracy}%` }}
+                                            transition={{ duration: 1.5, ease: 'easeOut', delay: i * 0.1 }}
+                                            className="h-full bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full"
+                                        />
+                                    </div>
+                                    <p className="text-[8px] text-slate-400 font-bold uppercase tracking-widest mt-1">{sub.solved} solved</p>
+                                </div>
+                            )) : (
+                                <div className="py-6 text-center">
+                                    <BarChart3 className="w-8 h-8 mx-auto text-slate-200 dark:text-slate-700 mb-2" />
+                                    <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">Start practicing to see progress</p>
                                 </div>
                             )}
-                            <div className="p-6 space-y-3">
-                                <div className="flex items-center gap-2">
-                                    <span className="text-[9px] font-black text-slate-400 uppercase tracking-widest">
-                                        {latestBlogPost.published_at ? format(new Date(latestBlogPost.published_at), 'MMM d, yyyy') : format(new Date(latestBlogPost.created_at), 'MMM d, yyyy')}
-                                    </span>
-                                </div>
-                                <h3 className="text-lg font-black text-slate-900 dark:text-white leading-tight line-clamp-2 group-hover:text-indigo-600 transition-colors">
-                                    {latestBlogPost.title}
-                                </h3>
-                                <div className="flex items-center gap-2 text-indigo-600 pt-1">
-                                    <span className="text-[10px] font-black uppercase tracking-widest">Read Article</span>
-                                    <ArrowRight size={14} className="group-hover:translate-x-1 transition-transform" />
-                                </div>
-                            </div>
                         </div>
-                    </a>
+                    </div>
                 </section>
-            )}
 
-            {/* Quick Grid Tools */}
-            <section className="mt-10 px-4 space-y-4">
-                <h2 className="px-2 font-black text-xs uppercase tracking-[0.2em] text-muted-foreground">Tools</h2>
-                <div className="grid grid-cols-2 gap-3">
-                    <HubItem
-                        icon={<HistoryIcon size={18} />}
-                        label={t('menu.history')}
-                        sub="Records"
-                        onClick={() => navigate('/mobile/history')}
-                        color="bg-emerald-500/20 text-emerald-500"
-                    />
-                    <HubItem
-                        icon={<BarChart3 size={18} />}
-                        label="Analytics"
-                        sub="Data"
-                        onClick={() => navigate('/mobile/analytics')}
-                        color="bg-rose-500/20 text-rose-500"
-                    />
-                    <HubItem
-                        icon={<FileText size={18} />}
-                        label="Resources"
-                        sub="Library"
-                        onClick={() => openExternalUrl('https://italostudy.com/resources')}
-                        color="bg-cyan-500/20 text-cyan-500"
-                    />
-                    <HubItem
-                        icon={<Bookmark size={18} />}
-                        label={t('menu.bookmarks')}
-                        sub="Saved"
-                        onClick={() => navigate('/mobile/bookmarks')}
-                        color="bg-amber-500/20 text-amber-500"
-                    />
-                </div>
-            </section>
-
-            {/* WhatsApp Community (Mobile) */}
-            <section className="mt-10 px-4 pb-10">
-                <div
-                    onClick={() => openExternalUrl('https://chat.whatsapp.com/CfVh7u9L6vT7ZFpZwwVa4A')}
-                    className="group relative flex items-center justify-between p-5 rounded-3xl bg-[#25D366] text-white cursor-pointer shadow-xl shadow-emerald-900/10 active:scale-[0.98] transition-all border border-white/10 overflow-hidden"
-                >
-                    <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-400/10 blur-2xl rounded-full -mr-12 -mt-12" />
-
-                    <div className="relative z-10 flex items-center gap-4">
-                        <div className="shrink-0 w-11 h-11 rounded-2xl bg-white text-[#25D366] flex items-center justify-center shadow-lg group-active:rotate-12 transition-transform">
-                            <MessageCircle size={22} />
-                        </div>
-
-                        <div className="flex-1 min-w-0">
-                            <div className="flex items-center gap-1.5 mb-0.5">
-                                <h4 className="text-sm font-black uppercase tracking-tight">WhatsApp Squad</h4>
-                                <div className="h-1 w-1 rounded-full bg-emerald-400 animate-pulse" />
+                {/* ─── PREMIUM UPSELL ─── */}
+                {isExplorer && (
+                    <section className="mt-6 mx-4">
+                        <div className="bg-gradient-to-br from-indigo-600 to-purple-700 rounded-3xl p-6 text-white relative overflow-hidden shadow-xl shadow-indigo-500/20 active:scale-[0.98] transition-all" onClick={() => setIsUpgradeModalOpen(true)}>
+                            <div className="absolute top-0 right-0 p-6 opacity-20 rotate-12"><Sparkles size={80} /></div>
+                            <div className="relative z-10 space-y-3">
+                                <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+                                    <Zap className="text-white w-5 h-5 animate-pulse" />
+                                </div>
+                                <div>
+                                    <h3 className="text-lg font-black uppercase tracking-tight leading-none">Upgrade to <span className="text-amber-400">PRO</span></h3>
+                                    <p className="text-[10px] font-bold text-white/70 uppercase tracking-widest mt-1">Unlock unlimited practice & expert insights.</p>
+                                </div>
+                                <Button className="w-full bg-white text-indigo-600 hover:bg-white/90 font-black text-[10px] uppercase tracking-widest h-11 rounded-xl">
+                                    Unlock Premium Access
+                                </Button>
                             </div>
-                            <p className="text-[10px] font-bold text-emerald-100/60 uppercase tracking-widest truncate">
-                                2000+ Students Preparing ðŸŽ’
-                            </p>
+                        </div>
+                    </section>
+                )}
+
+                {/* ─── TOOLS GRID ─── */}
+                <section className="mt-5 px-4">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
+                        <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b border-slate-50 dark:border-slate-800">
+                            <div className="w-6 h-6 bg-primary/10 rounded-lg flex items-center justify-center">
+                                <LayoutGrid size={12} className="text-primary" />
+                            </div>
+                            <h2 className="text-sm font-black text-slate-900 dark:text-white">Tools</h2>
+                        </div>
+                        <div className="grid grid-cols-2 divide-x divide-y divide-slate-50 dark:divide-slate-800">
+                            <HubItem icon={<GraduationCap size={18} />} label="Courses" sub="Video Learning" onClick={() => navigate('/mobile/learning')} color="bg-violet-500/20 text-violet-500" />
+                            <HubItem icon={<Target size={18} />} label="Mock Exams" sub="Full Tests" onClick={() => navigate('/mobile/mock-exams')} color="bg-rose-500/20 text-rose-500" />
+                            <HubItem icon={<Bookmark size={18} />} label={t('menu.bookmarks')} sub="Saved" onClick={() => navigate('/mobile/bookmarks')} color="bg-amber-500/20 text-amber-500" />
+                            <HubItem icon={<FileText size={18} />} label="Resources" sub="Library" onClick={() => openExternalUrl('https://italostudy.com/resources')} color="bg-cyan-500/20 text-cyan-500" />
+                            <HubItem icon={<HistoryIcon size={18} />} label={t('menu.history')} sub="Records" onClick={() => navigate('/mobile/history')} color="bg-emerald-500/20 text-emerald-500" />
+                            <HubItem icon={<BarChart3 size={18} />} label="Analytics" sub="My Data" onClick={() => navigate('/mobile/analytics')} color="bg-indigo-500/20 text-indigo-500" />
+                            <HubItem icon={<MessageCircle size={18} />} label="Community" sub="Chat" onClick={() => navigate('/mobile/community')} color="bg-sky-500/20 text-sky-500" />
+                            <HubItem icon={<Globe size={18} />} label="Blogs" sub="Articles" onClick={() => openExternalUrl('https://italostudy.com/blog')} color="bg-pink-500/20 text-pink-500" />
                         </div>
                     </div>
+                </section>
 
-                    <div className="relative z-10 shrink-0 w-8 h-8 rounded-full bg-white/10 flex items-center justify-center">
-                        <ArrowRight size={16} className="group-hover:translate-x-1 transition-transform" />
+                {/* ─── STUDY PLANNER ─── */}
+                <section className="mt-5 px-4 mb-6">
+                    <div className="bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800 overflow-hidden shadow-sm">
+                        <div className="flex items-center gap-2 px-4 pt-4 pb-3 border-b border-slate-50 dark:border-slate-800">
+                            <div className="w-6 h-6 bg-violet-100 dark:bg-violet-900/30 rounded-lg flex items-center justify-center">
+                                <Calendar size={12} className="text-violet-500" />
+                            </div>
+                            <h2 className="text-sm font-black text-slate-900 dark:text-white">Create Your Study Plan</h2>
+                        </div>
+                        <div className="p-3">
+                            <StudyPlannerWidget examType={activeExam?.id} />
+                        </div>
                     </div>
-                </div>
-            </section>
+                </section>
 
-            {/* Study Planner Widget - Mobile End Position */}
-            <div className="px-5 mb-10">
-                <StudyPlannerWidget examType={activeExam?.id} />
-            </div>
+                {/* ─── LATEST BLOG & WHATSAPP (2-column) ─── */}
+                <section className="mt-6 mx-4 pb-10 grid grid-cols-2 gap-3">
+                    {/* Latest Blog Half */}
+                    <div
+                        onClick={() => openExternalUrl(latestBlogPost ? `https://italostudy.com/blog/${latestBlogPost.slug}` : 'https://italostudy.com/blog')}
+                        className="bg-white dark:bg-slate-900 rounded-3xl p-4 border border-slate-100 dark:border-slate-800 shadow-sm flex flex-col justify-between cursor-pointer active:scale-[0.98] transition-all"
+                    >
+                        <div className="flex items-center gap-1.5 mb-2">
+                            <BookOpen className="w-4 h-4 text-indigo-500" />
+                            <p className="text-[10px] font-black text-slate-800 dark:text-white uppercase tracking-wider">Latest Blog</p>
+                        </div>
+                        {latestBlogPost ? (
+                            <div>
+                                <h4 className="text-[11px] font-bold text-slate-900 dark:text-white leading-tight line-clamp-2">{latestBlogPost.title}</h4>
+                                <p className="text-[8px] font-black text-indigo-500 uppercase tracking-widest mt-2 flex items-center gap-0.5">Read Now <ChevronRight size={10} /></p>
+                            </div>
+                        ) : (
+                            <div className="flex flex-col items-center justify-center py-2 opacity-50">
+                                <Loader2 className="w-5 h-5 text-indigo-500 animate-spin mb-1" />
+                                <p className="text-[8px] font-bold uppercase tracking-widest text-slate-400">Loading...</p>
+                            </div>
+                        )}
+                    </div>
 
-            <Suspense fallback={null}>
-                <UpgradeModal
-                    isOpen={isUpgradeModalOpen}
-                    onClose={() => setIsUpgradeModalOpen(false)}
-                    title="Premium Platform"
-                    description="Your current access level is Explorer. Upgrade to PRO to access full performance analysis and unlimited practice sessions."
-                    feature="Full Platform Access"
-                />
-                <SeatTrackerModal isOpen={isTrackerModalOpen} onClose={() => setIsTrackerModalOpen(false)} isGlobal={isGlobal} />
-                <TrustpilotReviewModal
-                    isOpen={showReviewModal}
-                    onClose={() => setShowReviewModal(false)}
-                    onSuccess={() => setShowReviewModal(false)}
-                />
-                <LatestNotificationPopup />
-            </Suspense>
+                    {/* WhatsApp Half */}
+                    <div
+                        onClick={() => openExternalUrl('https://chat.whatsapp.com/CfVh7u9L6vT7ZFpZwwVa4A')}
+                        className="bg-[#25D366] text-white rounded-3xl p-4 shadow-sm flex flex-col justify-between cursor-pointer active:scale-[0.98] transition-all relative overflow-hidden"
+                    >
+                        <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 blur-xl rounded-full -mr-10 -mt-10" />
+                        <div className="relative z-10 flex items-center gap-1.5 mb-2">
+                            <MessageCircle className="w-4 h-4 text-white" />
+                            <p className="text-[10px] font-black uppercase tracking-wider text-white">Join Squad</p>
+                        </div>
+                        <div className="relative z-10">
+                            <h4 className="text-[11px] font-bold text-white leading-tight">2000+ Students Preparing 🚀</h4>
+                            <p className="text-[8px] font-black text-emerald-100 uppercase tracking-widest mt-2 flex items-center gap-0.5">Join Now <ArrowRight size={10} /></p>
+                        </div>
+                    </div>
+                </section>
+
+                <Suspense fallback={null}>
+                    <UpgradeModal
+                        isOpen={isUpgradeModalOpen}
+                        onClose={() => setIsUpgradeModalOpen(false)}
+                        title="Premium Platform"
+                        description="Your current access level is Explorer. Upgrade to PRO to access full performance analysis and unlimited practice sessions."
+                        feature="Full Platform Access"
+                    />
+                    <SeatTrackerModal isOpen={isTrackerModalOpen} onClose={() => setIsTrackerModalOpen(false)} isGlobal={isGlobal} />
+                    <TrustpilotReviewModal
+                        isOpen={showReviewModal}
+                        onClose={() => setShowReviewModal(false)}
+                        onSuccess={() => setShowReviewModal(false)}
+                    />
+                    <LatestNotificationPopup />
+                </Suspense>
             </div>
             <PWAPrompt />
         </MobileLayout>
@@ -1482,16 +1431,16 @@ const MiniStat = ({ icon: Icon, val, label, color }: any) => (
 const HubItem = ({ icon, label, sub, onClick, color }: { icon: any, label: string, sub: string, onClick: () => void, color: string }) => (
     <div
         onClick={onClick}
-        className="p-3 bg-card/50 rounded-[1.5rem] border border-border/10 active:bg-secondary/20 transition-all flex items-center gap-2 group min-w-0"
+        className="p-4 active:bg-slate-50 dark:active:bg-slate-800/50 transition-colors flex items-center gap-3 group min-w-0"
     >
-        <div className={cn("w-9 h-9 rounded-full flex items-center justify-center shrink-0 transition-transform group-active:scale-90", color)}>
+        <div className={cn("w-9 h-9 rounded-xl flex items-center justify-center shrink-0 transition-transform group-active:scale-90", color)}>
             {React.cloneElement(icon as React.ReactElement, { size: 16 })}
         </div>
         <div className="min-w-0 flex-1">
-            <p className="text-[10px] font-black uppercase tracking-tight truncate text-foreground leading-tight">{label}</p>
-            <p className="text-[7px] font-black text-muted-foreground uppercase tracking-widest mt-0.5 truncate opacity-60 leading-tight">{sub}</p>
+            <p className="text-xs font-black text-slate-900 dark:text-white truncate leading-tight">{label}</p>
+            <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest mt-0.5 truncate leading-tight">{sub}</p>
         </div>
-        <ChevronRight size={10} className="ml-auto text-muted-foreground/20 group-hover:text-foreground transition-all shrink-0" />
+        <ChevronRight size={12} className="ml-auto text-slate-300 dark:text-slate-600 group-hover:text-slate-600 transition-all shrink-0" />
     </div>
 );
 

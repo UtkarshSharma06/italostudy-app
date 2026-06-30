@@ -5,7 +5,7 @@ import {
     User, Lock, Bell, CreditCard, HelpCircle,
     LogOut, ChevronRight, Moon, Globe, Zap,
     Share2, ShieldCheck, Key, MessageSquare,
-    Camera, Check, X, ArrowLeft, Smartphone, Info, Clock, Loader2, Save
+    Camera, Check, X, ArrowLeft, Smartphone, Info, Clock, Loader2, Save, Crown
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
@@ -327,7 +327,7 @@ export default function MobileSettings() {
         setLoading(true);
         try {
             // ⚠️ Must call edge function to cancel at Dodo first
-            const { data, error } = await supabase.functions.invoke('cancel-dodo-subscription', {});
+            const { data, error } = await supabase.functions.invoke('cancel-subscription', {});
 
             if (error) throw new Error(error.message || 'Cancellation failed');
             if (!data?.success) throw new Error(data?.error || 'Cancellation not confirmed by payment provider.');
@@ -358,11 +358,11 @@ export default function MobileSettings() {
             await Share.share({
                 title: 'Join me on ItaloStudy!',
                 text: 'Master the IMAT, SAT, and IELTS with the best adaptive prep app.',
-                url: 'https://italostudy.com/download',
+                url: 'https://italostudy.com',
                 dialogTitle: 'Share ItaloStudy',
             });
         } catch (error) {
-            navigator.clipboard.writeText('Join me on ItaloStudy! https://italostudy.com/download');
+            navigator.clipboard.writeText('Join me on ItaloStudy! https://italostudy.com');
             toast({ title: "Link Copied", description: "Invite link copied to clipboard!" });
         } finally {
             setIsSharing(false);
@@ -444,7 +444,7 @@ export default function MobileSettings() {
                     icon: HelpCircle,
                     label: t('settings.help'),
                     sub: t('settings.help_sub'),
-                    onClick: () => navigate('/contact'),
+                    onClick: () => window.open('https://italostudy.com/contact', '_blank'),
                     iconClass: "bg-teal-600"
                 },
                 {
@@ -460,70 +460,71 @@ export default function MobileSettings() {
     if (activeView === 'account') {
         return (
             <MobileLayout isLoading={!profile} hideHeader={true}>
-                <div className="flex flex-col min-h-full bg-background animate-in slide-in-from-right duration-300">
-                <header className="px-6 py-8 flex items-center gap-4 sticky top-0 bg-background/80 backdrop-blur-md z-10 border-b border-border/10">
-                    <button onClick={() => setActiveView('main')} className="p-2 -ml-2 text-primary transition-transform active:scale-90"><ArrowLeft /></button>
-                    <h1 className="text-xl font-black uppercase tracking-tight">{t('settings.account_edit')}</h1>
+                <div className="flex flex-col min-h-full bg-slate-50 dark:bg-[#020617] animate-in slide-in-from-right duration-300 pb-20">
+                <header className="px-6 py-8 flex items-center gap-4 sticky top-0 bg-slate-50/80 dark:bg-[#020617]/80 backdrop-blur-md z-10 border-b border-slate-100 dark:border-white/5">
+                    <button onClick={() => setActiveView('main')} className="p-2 -ml-2 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-transform active:scale-90"><ArrowLeft size={24} /></button>
+                    <div>
+                        <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">{t('settings.account_edit')}</h2>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Identity Settings</p>
+                    </div>
                 </header>
-                <div className="px-6 py-8 space-y-8 overflow-y-auto">
+                <div className="px-4 py-6 space-y-6 overflow-y-auto">
+                    <div className="bg-white dark:bg-slate-950 p-6 rounded-[2rem] border border-slate-100 dark:border-white/5 space-y-8 shadow-sm">
                     {/* Avatar Upload */}
                     <div className="flex flex-col items-center gap-4 mb-4">
                         <div className="relative group/avatar">
                             <Avatar className={cn(
-                                "h-32 w-32 shadow-2xl border-4",
-                                profile?.selected_plan === 'global'
-                                    ? "border-amber-400 ring-4 ring-amber-400/30 shadow-amber-500/40"
-                                    : "border-background ring-4 ring-primary/10"
+                                "h-32 w-32 shadow-xl border-4",
+                                profile?.selected_plan !== 'explorer' && profile?.selected_plan
+                                    ? "ring-[6px] ring-amber-400 ring-offset-4 bg-amber-50 shadow-[0_0_20px_rgba(251,191,36,0.2)]"
+                                    : "border-slate-50 dark:border-white/5 bg-slate-100"
                             )}>
-                                <AvatarImage src={getOptimizedImageUrl(avatarUrl || profile?.avatar_url, 128)} />
-                                <AvatarFallback className={cn(
-                                    "text-white font-black text-4xl uppercase",
-                                    profile?.selected_plan === 'global' ? "bg-amber-500" : "bg-primary"
-                                )}>
-                                    {(displayName || user?.email)?.charAt(0) || 'U'}
+                                <AvatarImage src={getOptimizedImageUrl(avatarUrl || profile?.avatar_url, 128)} className="w-full h-full object-cover" />
+                                <AvatarFallback className="bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                                    <User className="w-8 h-8 text-slate-300" />
                                 </AvatarFallback>
                             </Avatar>
                             {isUploading && (
-                                <div className="absolute inset-0 bg-background/60 backdrop-blur-sm flex items-center justify-center rounded-full z-10">
-                                    <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                                <div className="absolute inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center rounded-full z-10">
+                                    <Loader2 className="w-8 h-8 text-white animate-spin" />
                                 </div>
                             )}
                             <button
                                 onClick={() => fileInputRef.current?.click()}
-                                className="absolute bottom-1 right-1 w-10 h-10 bg-emerald-500 rounded-full border-4 border-background flex items-center justify-center text-white shadow-xl hover:scale-110 active:scale-90 transition-all z-20"
+                                className="absolute bottom-1 right-1 w-10 h-10 bg-[#00a884] rounded-full border-4 border-white dark:border-slate-950 flex items-center justify-center text-white shadow-xl hover:scale-110 active:scale-90 transition-all z-20"
                             >
                                 <Camera size={18} />
                             </button>
                             <input type="file" ref={fileInputRef} onChange={handleFileSelect} className="hidden" accept="image/*" />
                         </div>
-                        <p className="text-[10px] font-black text-muted-foreground uppercase tracking-widest opacity-40">Tap camera to update photo</p>
+                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest opacity-40">Tap camera to update photo</p>
                     </div>
 
-                    <div className="bg-card p-8 rounded-[2.5rem] border border-border/40 space-y-6 shadow-xl shadow-primary/5">
+                    <div className="space-y-6">
                         <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest">{t('settings.display_name')}</Label>
+                            <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('settings.display_name')}</Label>
                             <Input
                                 value={displayName}
                                 onChange={(e) => setDisplayName(e.target.value)}
-                                className="h-14 rounded-2xl bg-secondary/20 border-border/10 focus:border-primary focus:ring-0 text-lg font-bold"
+                                className="h-14 rounded-2xl bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 focus:border-indigo-500 text-lg font-bold"
                                 placeholder="Your full name"
                             />
                         </div>
                         <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest">{t('settings.username')}</Label>
+                            <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">{t('settings.username')}</Label>
                             <div className="relative">
-                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-muted-foreground font-black opacity-30 text-lg">@</span>
+                                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-400 font-black opacity-30 text-lg">@</span>
                                 <Input
                                     value={username}
                                     onChange={(e) => setUsername(e.target.value)}
-                                    className="h-14 rounded-2xl bg-secondary/20 border-border/10 focus:border-primary focus:ring-0 pl-10 text-lg font-bold"
+                                    className="h-14 rounded-2xl bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 focus:border-indigo-500 pl-10 text-lg font-bold"
                                     placeholder="username"
                                 />
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest">Phone Number Identity</Label>
-                            <div className="flex items-center bg-secondary/20 border border-border/10 rounded-2xl focus-within:border-primary transition-all px-2 h-14">
+                            <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Phone Number Identity</Label>
+                            <div className="flex items-center bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-2xl focus-within:border-indigo-500 transition-all px-2 h-14">
                                 <Popover open={openCountryPopup} onOpenChange={setOpenCountryPopup}>
                                     <PopoverTrigger asChild>
                                         <button className="h-10 px-2 font-bold flex items-center gap-2 hover:bg-secondary/30 rounded-lg">
@@ -564,25 +565,26 @@ export default function MobileSettings() {
                                     </PopoverContent>
                                 </Popover>
                                 <Input
+                                    type="tel"
                                     value={phoneNumber}
                                     onChange={(e) => {
                                         const val = e.target.value.replace(/\D/g, '');
                                         if (val.length <= phoneLimit) setPhoneNumber(val);
                                     }}
-                                    className="bg-transparent border-0 focus-visible:ring-0 font-bold h-full text-lg pl-2"
-                                    placeholder="e.g. 555 000 000"
+                                    className="flex-1 bg-transparent border-0 focus-visible:ring-0 h-full font-bold text-lg px-2 rounded-r-2xl"
+                                    placeholder="0000 0000"
                                 />
                             </div>
                         </div>
                         <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest">Email Identity</Label>
-                            <Input value={user?.email} disabled className="h-14 rounded-2xl bg-secondary/10 border-border/5 opacity-50 text-sm font-bold" />
+                            <Label className="text-[10px] font-black uppercase text-slate-400 tracking-widest ml-1">Email Identity</Label>
+                            <Input value={user?.email} disabled className="h-14 rounded-2xl bg-slate-100/20 border-transparent opacity-50 text-sm font-bold" />
                         </div>
 
                         <Button
                             onClick={handleUpdateProfile}
                             disabled={isSavingProfile}
-                            className="w-full h-16 rounded-[1.5rem] bg-primary hover:bg-primary/90 text-white font-black uppercase tracking-widest text-xs shadow-lg shadow-primary/20 transition-all active:scale-95 mt-4"
+                            className="w-full h-16 rounded-[1.5rem] bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase tracking-widest text-[10px] shadow-lg shadow-indigo-500/20 active:scale-[0.98] transition-all"
                         >
                             {isSavingProfile ? (
                                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -594,6 +596,7 @@ export default function MobileSettings() {
                             )}
                         </Button>
                     </div>
+                </div>
                 </div>
 
                 {isCropperOpen && selectedImage && (
@@ -615,14 +618,17 @@ export default function MobileSettings() {
     if (activeView === 'security') {
         return (
             <MobileLayout isLoading={!profile} hideHeader={true}>
-                <div className="flex flex-col min-h-full bg-background animate-in slide-in-from-right duration-300 pb-20 overflow-y-auto">
-                <header className="px-6 py-8 flex items-center gap-4 sticky top-0 bg-background/80 backdrop-blur-md z-10 border-b border-border/10">
-                    <button onClick={() => setActiveView('main')} className="p-2 -ml-2 text-primary transition-transform active:scale-90"><ArrowLeft /></button>
-                    <h1 className="text-xl font-black uppercase tracking-tight">Security</h1>
+                <div className="flex flex-col min-h-full bg-slate-50 dark:bg-[#020617] animate-in slide-in-from-right duration-300 pb-20">
+                <header className="px-6 py-8 flex items-center gap-4 sticky top-0 bg-slate-50/80 dark:bg-[#020617]/80 backdrop-blur-md z-10 border-b border-slate-100 dark:border-white/5">
+                    <button onClick={() => setActiveView('main')} className="p-2 -ml-2 text-slate-400 hover:text-slate-900 dark:hover:text-white transition-transform active:scale-90"><ArrowLeft size={24} /></button>
+                    <div>
+                        <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter uppercase">Security Protocol</h2>
+                        <p className="text-[9px] font-black text-slate-400 uppercase tracking-[0.2em]">Authentication & Access</p>
+                    </div>
                 </header>
-                <div className="px-6 py-8 space-y-8">
+                <div className="px-4 py-6 space-y-6 overflow-y-auto">
                     {/* MFA Section */}
-                    <div className="bg-emerald-500/5 p-8 rounded-[2.5rem] border border-emerald-500/20 space-y-6 shadow-xl shadow-emerald-500/5">
+                    <div className="bg-white dark:bg-slate-950 p-6 rounded-[2rem] border border-slate-100 dark:border-white/5 space-y-6 shadow-sm">
                         <div className="flex items-center gap-4">
                             <div className="w-14 h-14 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-600 shadow-inner">
                                 <Smartphone size={28} />
@@ -663,50 +669,50 @@ export default function MobileSettings() {
 
                     {/* Password Section */}
                     {!isGoogleUser ? (
-                        <div className="bg-indigo-500/5 p-8 rounded-[2.5rem] border border-indigo-500/20 space-y-6 shadow-xl shadow-indigo-500/5">
+                        <div className="bg-white dark:bg-slate-950 p-6 rounded-[2rem] border border-slate-100 dark:border-white/5 space-y-6 shadow-sm">
                             <div className="flex items-center gap-4 mb-2">
-                                <div className="w-12 h-12 rounded-2xl bg-indigo-500/10 flex items-center justify-center text-indigo-600">
+                                <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400 flex items-center justify-center">
                                     <Key size={24} />
                                 </div>
-                                <span className="text-base font-black uppercase tracking-tight">Credentials Update</span>
+                                <span className="text-base font-black text-slate-900 dark:text-white uppercase tracking-tight">Credentials Update</span>
                             </div>
                             <div className="space-y-4">
                                 <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest">New Protocol Password</Label>
+                                    <Label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">New Protocol Password</Label>
                                     <Input
                                         type="password"
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        className="h-14 rounded-2xl bg-secondary/20 border-border/10 focus:border-indigo-500 text-lg font-bold"
+                                        className="h-14 rounded-2xl bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 focus:border-indigo-500 text-lg font-bold"
                                         placeholder="••••••••"
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label className="text-[10px] font-black uppercase text-muted-foreground ml-1 tracking-widest">Confirm Identity</Label>
+                                    <Label className="text-[10px] font-black uppercase text-slate-400 ml-1 tracking-widest">Confirm Identity</Label>
                                     <Input
                                         type="password"
                                         value={confirmPassword}
                                         onChange={(e) => setConfirmPassword(e.target.value)}
-                                        className="h-14 rounded-2xl bg-secondary/20 border-border/10 focus:border-indigo-500 text-lg font-bold"
+                                        className="h-14 rounded-2xl bg-slate-50 dark:bg-slate-900 border-slate-200 dark:border-slate-700 focus:border-indigo-500 text-lg font-bold"
                                         placeholder="••••••••"
                                     />
                                 </div>
                                 <Button
                                     onClick={handleUpdatePassword}
                                     disabled={loading}
-                                    className="w-full h-16 rounded-[1.5rem] bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase tracking-widest text-[10px] shadow-lg shadow-indigo-500/20 transition-all active:scale-95"
+                                    className="w-full h-16 rounded-[1.5rem] bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase tracking-widest text-[10px] shadow-lg shadow-indigo-500/20 active:scale-[0.98] transition-all"
                                 >
                                     {loading ? <Loader2 className="w-5 h-5 animate-spin" /> : "Sync New Credentials"}
                                 </Button>
                             </div>
                         </div>
                     ) : (
-                        <div className="bg-slate-500/5 p-10 rounded-[3rem] border border-slate-500/10 text-center space-y-4">
-                            <div className="w-16 h-16 bg-background rounded-3xl flex items-center justify-center mx-auto shadow-md border border-border/5">
+                        <div className="bg-slate-50 dark:bg-slate-900/50 p-8 rounded-[2rem] border border-slate-100 dark:border-white/5 text-center space-y-4 shadow-sm">
+                            <div className="w-16 h-16 bg-white dark:bg-slate-900 rounded-3xl flex items-center justify-center mx-auto shadow-md border border-slate-100 dark:border-slate-800">
                                 <Globe className="text-blue-500" size={32} />
                             </div>
-                            <h3 className="text-lg font-black uppercase tracking-tight">SSO Managed Protocol</h3>
-                            <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em] leading-relaxed px-4 opacity-60">
+                            <h3 className="text-lg font-black text-slate-900 dark:text-white uppercase tracking-tight">SSO Managed Protocol</h3>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em] leading-relaxed px-4">
                                 Managed by Google. All credentials and security layers are synchronized via your primary provider.
                             </p>
                         </div>
@@ -773,122 +779,127 @@ export default function MobileSettings() {
 
     return (
         <MobileLayout isLoading={!profile}>
-            <div className="flex flex-col min-h-full bg-background pb-4 animate-in fade-in duration-500 overflow-y-auto">
+            <div className="flex flex-col min-h-full bg-slate-50 dark:bg-[#020617] pb-4 animate-in fade-in duration-500 overflow-y-auto">
             {/* Header / Profile Row */}
-            <div className="px-4 py-10 mt-2">
+            <div className="px-4 py-8">
                 <button
                     onClick={() => setActiveView('account')}
-                    className="w-full flex items-center gap-6 p-6 rounded-[2.5rem] bg-card hover:bg-secondary/10 active:bg-secondary/20 transition-all text-left shadow-2xl shadow-primary/5 border border-border/5 group"
+                    className="w-full flex items-center gap-5 p-5 rounded-[2rem] bg-white dark:bg-slate-950 hover:bg-slate-50 dark:hover:bg-slate-900/50 active:scale-[0.98] transition-all text-left shadow-sm border border-slate-100 dark:border-white/5 relative overflow-hidden group"
                 >
-                    <div className="relative">
-                        <Avatar className={cn(
-                            "h-24 w-24 shadow-2xl border-4 transition-transform group-hover:scale-105 group-active:scale-95",
-                            profile?.selected_plan === 'global'
-                                ? "border-amber-400 ring-4 ring-amber-400/30 shadow-amber-500/40"
-                                : "border-background ring-4 ring-primary/5"
-                        )}>
-                            <AvatarImage src={avatarUrl || profile?.avatar_url} />
-                            <AvatarFallback className={cn(
-                                "text-white font-black text-3xl uppercase",
-                                profile?.selected_plan === 'global' ? "bg-amber-500" : "bg-primary"
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full -translate-y-16 translate-x-16 blur-2xl" />
+                    <div className="relative z-10 flex items-center gap-5 w-full">
+                        <div className="relative group/avatar">
+                            <Avatar className={cn(
+                                "w-20 h-20 shadow-xl border-4 transition-transform group-hover:scale-105 group-active:scale-95",
+                                profile?.selected_plan !== 'explorer' && profile?.selected_plan
+                                    ? "ring-[6px] ring-amber-400 ring-offset-4 bg-amber-50 shadow-[0_0_20px_rgba(251,191,36,0.2)]"
+                                    : "border-slate-50 dark:border-white/5 bg-slate-100"
                             )}>
-                                {(displayName || user?.email)?.charAt(0) || 'U'}
-                            </AvatarFallback>
-                        </Avatar>
-                        <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-emerald-500 text-white rounded-full flex items-center justify-center border-4 border-background shadow-lg group-hover:bg-emerald-600 transition-colors">
-                            <Camera size={14} />
+                                <AvatarImage src={getOptimizedImageUrl(avatarUrl || profile?.avatar_url, 128)} className="w-full h-full object-cover" />
+                                <AvatarFallback className="bg-slate-100 dark:bg-slate-800 flex items-center justify-center">
+                                    <User className="w-8 h-8 text-slate-300" />
+                                </AvatarFallback>
+                            </Avatar>
+                            <div className="absolute -bottom-1 -right-1 w-7 h-7 bg-[#00a884] rounded-full border-[3px] border-white dark:border-slate-950 flex items-center justify-center text-white shadow-lg group-hover:scale-110 transition-transform">
+                                <Camera size={12} />
+                            </div>
                         </div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                        <h2 className="text-2xl font-black tracking-tighter text-foreground truncate uppercase leading-none mb-1">
-                            {displayName || profile?.display_name || "Protocol Agent"}
-                        </h2>
-                        <p className="text-xs font-black text-muted-foreground truncate opacity-40 uppercase tracking-[0.2em]">
-                            {username ? `@${username}` : t('settings.status')}
-                        </p>
-                        <div className="mt-2 inline-flex flex-col">
-                            <span className="text-[7px] font-black text-muted-foreground uppercase tracking-[0.1em] leading-none mb-1">Next Billing</span>
-                            <span className={cn("text-[9px] font-black uppercase tracking-tighter leading-none opacity-60", profile?.selected_plan === 'explorer' && "text-emerald-500 opacity-100")}>
-                                {profile?.selected_plan === 'explorer'
-                                    ? 'FREE PLAN'
-                                    : profile?.subscription_expiry_date
-                                        ? new Date(profile.subscription_expiry_date).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })
-                                        : 'LIFETIME'}
-                            </span>
+                        <div className="flex-1 min-w-0">
+                            <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tighter uppercase leading-tight truncate mb-0.5">
+                                {displayName || profile?.display_name || "Protocol Agent"}
+                            </h2>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.15em] mb-1.5 truncate">
+                                {username ? `@${username}` : 'Citizen'}
+                            </p>
+                            <div className="flex flex-col gap-1">
+                                <p className="text-[8px] font-black text-slate-400 uppercase tracking-widest leading-none">Active Plan</p>
+                                <div className="flex items-center gap-2">
+                                    {profile?.selected_plan !== 'explorer' && profile?.selected_plan ? (
+                                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-gradient-to-r from-amber-200 to-yellow-400 border border-amber-300 shadow-sm">
+                                            <Crown size={10} className="text-amber-700" />
+                                            <span className="text-[8px] font-black text-amber-900 uppercase tracking-widest">{profile?.selected_plan}</span>
+                                        </div>
+                                    ) : (
+                                        <div className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+                                            <span className="text-[8px] font-black text-slate-500 dark:text-slate-400 uppercase tracking-widest">Explorer</span>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
                         </div>
-
-                    </div>
-                    <div className="w-12 h-12 rounded-2xl bg-secondary/30 flex items-center justify-center text-primary/30 group-hover:text-primary transition-colors">
-                        <ChevronRight size={24} />
+                        <div className="w-10 h-10 rounded-2xl flex items-center justify-center text-slate-300 dark:text-slate-600 transition-colors">
+                            <ChevronRight size={20} />
+                        </div>
                     </div>
                 </button>
             </div>
 
             {/* Content List */}
-            <div className="space-y-8">
+            <div className="space-y-6">
                 {settingsGroups.map((group, i) => (
                     <div key={i} className="px-4">
-                        <div className="bg-card rounded-[2.5rem] border border-border/20 overflow-hidden shadow-2xl shadow-primary/5">
-                            {group.items.map((item, j) => (
-                                item.toggle ? (
-                                    <div
-                                        key={j}
-                                        className="w-full h-24 flex items-center justify-between p-6 hover:bg-secondary/10 transition-colors text-left border-b border-border/5 last:border-0 group"
-                                    >
-                                        <div className="flex items-center gap-5">
-                                            <div className={cn(
-                                                "w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-xl transition-all group-hover:rotate-3",
-                                                item.iconClass
-                                            )}>
-                                                <item.icon size={24} className="stroke-[2.5px]" />
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <p className="text-[15px] font-black tracking-tight text-foreground uppercase">{item.label}</p>
-                                                {item.sub && <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest opacity-40 leading-tight mt-1">{item.sub}</p>}
-                                            </div>
+                        <div className="bg-white dark:bg-slate-950 rounded-[2rem] border border-slate-100 dark:border-white/5 overflow-hidden shadow-sm">
+                            {group.items.map((item, j) => {
+                                // Convert old iconClass (e.g., "bg-emerald-500") to desktop's pastel style if possible, 
+                                // or just use a generic nice color if it's the danger button.
+                                const isDanger = item.label === t('settings.logout');
+                                const IconTag = item.icon;
+                                
+                                const innerContent = (
+                                    <>
+                                        <div className={cn(
+                                            "w-10 h-10 rounded-xl flex items-center justify-center shrink-0",
+                                            isDanger ? 'bg-rose-50 text-rose-600 dark:bg-rose-500/10 dark:text-rose-400' : 'bg-indigo-50 text-indigo-600 dark:bg-indigo-500/10 dark:text-indigo-400'
+                                        )}>
+                                            <IconTag className="w-5 h-5" />
                                         </div>
-                                        <div className="flex items-center gap-2">
-                                            <Switch className="scale-110" checked={item.checked} onCheckedChange={item.onClick} />
+                                        <div className="flex-1 text-left overflow-hidden min-w-0">
+                                            <h3 className={cn(
+                                                "font-bold text-sm truncate",
+                                                isDanger ? 'text-rose-600 dark:text-rose-400' : 'text-slate-900 dark:text-white'
+                                            )}>{item.label}</h3>
+                                            {item.sub && <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest truncate mt-0.5">{item.sub}</p>}
                                         </div>
-                                    </div>
-                                ) : (
+                                    </>
+                                );
+
+                                if (item.toggle) {
+                                    return (
+                                        <div
+                                            key={j}
+                                            className="w-full h-20 flex items-center gap-4 px-6 hover:bg-slate-50 dark:hover:bg-slate-900/50 transition-colors border-b border-slate-100 dark:border-white/5 last:border-0"
+                                        >
+                                            {innerContent}
+                                            <Switch checked={item.checked} onCheckedChange={item.onClick} />
+                                        </div>
+                                    );
+                                }
+
+                                return (
                                     <button
                                         key={j}
                                         onClick={item.onClick}
-                                        className="w-full h-24 flex items-center justify-between p-6 hover:bg-secondary/10 active:bg-secondary/20 transition-colors text-left border-b border-border/5 last:border-0 group"
+                                        className="w-full h-20 flex items-center gap-4 px-6 hover:bg-slate-50 dark:hover:bg-slate-900/50 active:bg-slate-100 dark:active:bg-slate-800 transition-colors border-b border-slate-100 dark:border-white/5 last:border-0"
                                     >
-                                        <div className="flex items-center gap-5">
-                                            <div className={cn(
-                                                "w-12 h-12 rounded-2xl flex items-center justify-center text-white shadow-xl transition-all group-active:scale-90 group-hover:rotate-3",
-                                                item.iconClass
-                                            )}>
-                                                <item.icon size={24} className="stroke-[2.5px]" />
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <p className="text-[15px] font-black tracking-tight text-foreground uppercase">{item.label}</p>
-                                                {item.sub && <p className="text-[10px] text-muted-foreground font-black uppercase tracking-widest opacity-40 leading-tight mt-1">{item.sub}</p>}
-                                            </div>
-                                        </div>
-                                        <div className="flex items-center gap-2">
-                                            <ChevronRight size={20} className="text-muted-foreground/20 group-hover:text-primary transition-colors" />
-                                        </div>
+                                        {innerContent}
+                                        <ChevronRight className="w-5 h-5 text-slate-300 shrink-0" />
                                     </button>
-                                )
-                            ))}
+                                );
+                            })}
                         </div>
                     </div>
                 ))}
+            </div>
 
-                {/* Log Out Button */}
-                <div className="px-4 pt-6">
-                    <button
-                        onClick={() => signOut()}
-                        className="w-full p-7 rounded-[2rem] bg-rose-500 hover:bg-rose-600 text-white font-black text-xs uppercase tracking-[0.3em] flex items-center justify-center gap-4 active:scale-[0.98] transition-all shadow-xl shadow-rose-500/20 border border-rose-400/20"
-                    >
-                        <LogOut size={20} className="stroke-[4px]" />
-                        {t('settings.logout')}
-                    </button>
-                </div>
+            {/* Log Out Button */}
+            <div className="px-4 pt-6">
+                <button
+                    onClick={() => signOut()}
+                    className="w-full p-5 rounded-[2rem] bg-rose-500 hover:bg-rose-600 text-white font-black text-xs uppercase tracking-[0.3em] flex items-center justify-center gap-4 active:scale-[0.98] transition-all shadow-lg shadow-rose-500/20"
+                >
+                    <LogOut size={20} className="stroke-[4px]" />
+                    {t('settings.logout')}
+                </button>
             </div>
 
             {/* Branding Footer */}
@@ -979,9 +990,8 @@ export default function MobileSettings() {
                             <CreditCard size={40} />
                         </div>
                         <div className="text-center space-y-2">
-                            <p className="text-sm font-black uppercase tracking-tight">Beta Access Protocol</p>
                             <p className="text-[10px] text-muted-foreground font-bold uppercase tracking-widest leading-relaxed px-4">
-                                You are currently on an authorized Beta Plan. No payment method is required at this stage.
+                                You are currently on an authorized Free Plan. No payment method is required at this stage.
                             </p>
                         </div>
                     </div>

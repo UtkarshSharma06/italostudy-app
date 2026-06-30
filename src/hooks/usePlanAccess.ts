@@ -3,6 +3,12 @@ import { supabase } from "@/integrations/supabase/client";
 import { useState, useEffect, useCallback } from "react";
 import { usePricing } from "@/context/PricingContext";
 
+// Module-level cache to de-duplicate simultaneous hook calls and cache across page loads
+let globalUsageCache: { totalPracticeCount: number; subjectCounts: Record<string, number>; mockAttempts: number } | null = null;
+let globalUsagePromise: Promise<any> | null = null;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+let lastFetchTime = 0;
+
 export function usePlanAccess() {
     const { profile, user } = useAuth();
     const { openPricingModal } = usePricing();
@@ -12,6 +18,9 @@ export function usePlanAccess() {
     const [totalPracticeCount, setTotalPracticeCount] = useState<number>(0);
     const [mockAttempts, setMockAttempts] = useState<number>(0);
     const [isLoading, setIsLoading] = useState(true);
+
+    // Server-verified expiry is now handled by the robust profile fetch and real-time updates in AuthProvider
+    // Using the secure auth profile directly eliminates redundant database calls.
 
     // Plan & Role Definitions
     const plan = profile?.selected_plan || 'explorer';
@@ -24,6 +33,7 @@ export function usePlanAccess() {
     const isAdmin = profile?.role === 'admin';
 
     // Subscription Expiry Check
+    // Rely on the secure auth profile which is synced via realtime updates
     const expiryDate = profile?.subscription_expiry_date;
     const isSubscriptionExpired = expiryDate
         ? new Date(expiryDate) < new Date()
@@ -49,46 +59,79 @@ export function usePlanAccess() {
             return;
         }
 
-        try {
-            // Use secure RPCs for limits (server-side validation)
-            const [practiceRes, mockRes] = await Promise.all([
-                supabase.rpc('check_practice_limit', { user_uuid: user.id }),
-                supabase.rpc('check_mock_limit', { user_uuid: user.id })
-            ]);
+        const now = Date.now();
+        // 1. Return from memory cache if fresh
+        if (globalUsageCache && (now - lastFetchTime < CACHE_TTL)) {
+            setTotalPracticeCount(globalUsageCache.totalPracticeCount);
+            setSubjectCounts(globalUsageCache.subjectCounts);
+            setMockAttempts(globalUsageCache.mockAttempts);
+            setIsLoading(false);
+            return;
+        }
 
-            // Process practice limit response
-            if (practiceRes.data) {
-                const practiceData = practiceRes.data as any;
-                setTotalPracticeCount(practiceData.used || 0);
-                // Subject counts can still be calculated client-side for UI display
-                const { data: subjectData } = await supabase
-                    .from('user_practice_responses')
-                    .select('subject')
-                    .eq('user_id', user.id)
-                    .gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString());
+        // 2. If another component is already fetching, wait for its promise
+        if (globalUsagePromise) {
+            try {
+                const cached = await globalUsagePromise;
+                setTotalPracticeCount(cached.totalPracticeCount);
+                setSubjectCounts(cached.subjectCounts);
+                setMockAttempts(cached.mockAttempts);
+            } catch (e) {
+                // Ignore, will be handled by the primary fetcher
+            } finally {
+                setIsLoading(false);
+            }
+            return;
+        }
 
-                const counts: Record<string, number> = {};
-                if (subjectData) {
-                    subjectData.forEach((r: any) => {
-                        const subj = r.subject || 'General';
-                        counts[subj] = (counts[subj] || 0) + 1;
-                    });
+        // 3. Initiate the fetch and store the promise globally
+        globalUsagePromise = (async () => {
+            let result = { totalPracticeCount: 0, subjectCounts: {} as Record<string, number>, mockAttempts: 0 };
+            try {
+                const [practiceRes, mockRes] = await Promise.all([
+                    supabase.rpc('check_practice_limit', { user_uuid: user.id }),
+                    supabase.rpc('check_mock_limit', { user_uuid: user.id })
+                ]);
+
+                if (practiceRes.data) {
+                    const practiceData = practiceRes.data as any;
+                    result.totalPracticeCount = practiceData.used || 0;
+                    
+                    const { data: subjectData } = await supabase
+                        .from('user_practice_responses')
+                        .select('subject')
+                        .eq('user_id', user.id)
+                        .gte('created_at', new Date(new Date().setHours(0, 0, 0, 0)).toISOString());
+
+                    if (subjectData) {
+                        subjectData.forEach((r: any) => {
+                            const subj = r.subject || 'General';
+                            result.subjectCounts[subj] = (result.subjectCounts[subj] || 0) + 1;
+                        });
+                    }
                 }
-                setSubjectCounts(counts);
-            }
 
-            // Process mock limit response
-            if (mockRes.data) {
-                const mockData = mockRes.data as any;
-                setMockAttempts(mockData.used || 0);
+                if (mockRes.data) {
+                    const mockData = mockRes.data as any;
+                    result.mockAttempts = mockData.used || 0;
+                }
+                return result;
+            } catch (error) {
+                console.error('Error calculating plan usage:', error);
+                return { totalPracticeCount: 999, subjectCounts: {}, mockAttempts: 999 };
             }
+        })();
 
-        } catch (error) {
-            console.error('Error calculating plan usage:', error);
-            // Fallback to restrictive limits on error
-            setTotalPracticeCount(999);
-            setMockAttempts(999);
+        // 4. Await our newly created promise and save to cache
+        try {
+            const finalResult = await globalUsagePromise;
+            globalUsageCache = finalResult;
+            lastFetchTime = Date.now();
+            setTotalPracticeCount(finalResult.totalPracticeCount);
+            setSubjectCounts(finalResult.subjectCounts);
+            setMockAttempts(finalResult.mockAttempts);
         } finally {
+            globalUsagePromise = null;
             setIsLoading(false);
         }
     }, [user?.id]);

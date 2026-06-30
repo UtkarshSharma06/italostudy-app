@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import Layout from '@/components/Layout';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
-import { Bookmark, Target, ChevronRight, LayoutGrid, Search, Trash2, Lock, AlertTriangle, Sparkles, BookOpen, X } from 'lucide-react';
+import { Bookmark, Target, ChevronRight, LayoutGrid, Search, Trash2, Lock, AlertTriangle, Sparkles, BookOpen, X, ChevronDown, Filter, Folder, Star, Clock } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -15,6 +15,13 @@ import {
     DialogDescription,
     DialogClose
 } from "@/components/ui/dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Input } from "@/components/ui/input";
 import { MathText } from '@/components/MathText';
 import QuestionMedia from '@/components/QuestionMedia';
 import DiagramRenderer from '@/components/DiagramRenderer';
@@ -51,8 +58,13 @@ export default function Bookmarks() {
     const [page, setPage] = useState(0);
     const PAGE_SIZE = 5;
 
-    // Reset to first page whenever the tab changes
-    useEffect(() => { setPage(0); }, [activeTab]);
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filterSubject, setFilterSubject] = useState('All Subjects');
+    const [filterStatus, setFilterStatus] = useState('All Status');
+    const [sortOrder, setSortOrder] = useState('Newest First');
+
+    // Reset to first page whenever any filter changes
+    useEffect(() => { setPage(0); }, [activeTab, searchQuery, filterSubject, filterStatus, sortOrder]);
 
     useEffect(() => {
         if (user) {
@@ -204,151 +216,309 @@ export default function Bookmarks() {
         return '🧠';
     };
 
+    // Derived Data
+    const totalBookmarksCount = bookmarks.length;
+    const uniqueSubjectsList = Array.from(new Set(bookmarks.map(b => b.display.subject))).filter(Boolean);
+    const totalSubjectsCount = uniqueSubjectsList.length;
+
+    const subjectCounts = bookmarks.reduce((acc, b) => {
+        acc[b.display.subject] = (acc[b.display.subject] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
+    const mostSavedSubjectStr = totalBookmarksCount > 0 
+        ? Object.keys(subjectCounts).reduce((a, b) => subjectCounts[a] > subjectCounts[b] ? a : b, 'None')
+        : 'None';
+    const mostSavedPercent = totalBookmarksCount > 0 ? Math.round((subjectCounts[mostSavedSubjectStr] / totalBookmarksCount) * 100) : 0;
+
+    const lastAddedBookmark = bookmarks.length > 0 ? [...bookmarks].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] : null;
+    let lastAddedStr = 'None';
+    let lastAddedSubj = '';
+    if (lastAddedBookmark) {
+        lastAddedSubj = lastAddedBookmark.display.subject;
+        const d = new Date(lastAddedBookmark.created_at);
+        const today = new Date();
+        const isToday = d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+        lastAddedStr = `${isToday ? 'Today' : d.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}, ${d.toLocaleTimeString('en-US', {hour: '2-digit', minute:'2-digit'})}`;
+    }
+
+    const filteredBookmarks = bookmarks.filter(b => {
+        if (activeTab === 'reported' && !b.is_reported_by_user) return false;
+        
+        const textMatch = b.display.text?.toLowerCase().includes(searchQuery.toLowerCase()) || b.display.subject?.toLowerCase().includes(searchQuery.toLowerCase());
+        const subjectMatch = filterSubject === 'All Subjects' || b.display.subject === filterSubject;
+        
+        let statusMatch = true;
+        if (filterStatus === 'Under Review') {
+            statusMatch = !!b.is_reported_by_user && !b.display.is_corrected;
+        } else if (filterStatus === 'Fixed') {
+            statusMatch = !!b.display.is_corrected;
+        } else if (filterStatus === 'Standard') {
+            statusMatch = !b.is_reported_by_user && !b.display.is_corrected;
+        }
+        
+        return textMatch && subjectMatch && statusMatch;
+    }).sort((a, b) => {
+        if (sortOrder === 'Newest First') {
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        } else {
+            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        }
+    });
+
+    const totalPages = Math.ceil(filteredBookmarks.length / PAGE_SIZE);
+    const paged = filteredBookmarks.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+
     return (
         <Layout isLoading={loading}>
-            <div className="container mx-auto px-6 py-16 max-w-5xl">
-                {/* Header (Sleek Modern) */}
-                <div className="text-center mb-16 space-y-4">
-                    <div className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-50 rounded-full border border-indigo-100 mb-4 scale-90">
-                        <Bookmark className="w-3.5 h-3.5 text-indigo-600" />
-                        <span className="text-[10px] font-black text-indigo-900 uppercase tracking-widest">Knowledge Base</span>
+            <div className="container mx-auto px-4 sm:px-6 py-2 sm:py-4 max-w-[1200px]">
+                {/* Header Section */}
+                <div className="flex flex-col md:flex-row items-center justify-between mb-8 sm:mb-10 gap-6 animate-in fade-in duration-700">
+                    <div className="space-y-3 text-center md:text-left">
+                        <div className="inline-flex items-center px-5 py-2 rounded-full bg-white dark:bg-slate-800 border border-slate-100 dark:border-slate-700 shadow-sm mb-1 gap-3">
+                            <div className="w-8 h-8 rounded-full bg-indigo-50 flex items-center justify-center">
+                                <Bookmark className="w-4 h-4 text-indigo-600" />
+                            </div>
+                            <h1 className="text-3xl sm:text-4xl font-black text-slate-900 dark:text-white tracking-tighter uppercase uppercase bg-clip-text text-transparent bg-gradient-to-r from-indigo-700 to-indigo-500 pr-2">
+                                BOOKMARKS
+                            </h1>
+                        </div>
+                        <p className="text-base sm:text-lg text-slate-500 font-medium tracking-tight">
+                            Your curated collection of important questions and resources.
+                        </p>
+                        <div className="flex items-center justify-center md:justify-start gap-4 pt-1">
+                            <button
+                                onClick={() => setActiveTab('all')}
+                                className={`px-6 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all flex items-center gap-2 ${activeTab === 'all'
+                                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 border border-indigo-600'
+                                    : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
+                                    }`}
+                            >
+                                <Bookmark className="w-4 h-4" /> All Bookmarks
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('reported')}
+                                className={`px-6 py-2.5 rounded-xl font-bold text-xs uppercase tracking-widest transition-all flex items-center gap-2 ${activeTab === 'reported'
+                                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 border border-indigo-600'
+                                    : 'bg-white text-slate-500 border border-slate-200 hover:bg-slate-50'
+                                    }`}
+                            >
+                                <Target className="w-4 h-4" /> Reported & Fixed
+                                {bookmarks.filter(b => b.is_reported_by_user).length > 0 && (
+                                    <span className={`px-2 py-0.5 rounded-full text-[10px] ${activeTab === 'reported' ? 'bg-white text-indigo-600' : 'bg-slate-100 text-slate-600'}`}>
+                                        {bookmarks.filter(b => b.is_reported_by_user).length}
+                                    </span>
+                                )}
+                            </button>
+                        </div>
                     </div>
-                    <h1 className="text-5xl font-black text-slate-900 dark:text-slate-100 tracking-tighter leading-tight">Saved <span className="text-indigo-600">Assets</span></h1>
-                    <p className="text-lg text-slate-400 font-bold tracking-tight">Access your curated collection of complex items.</p>
+                    <div className="hidden md:block shrink-0 relative pr-6">
+                        <div className="absolute inset-0 bg-indigo-200/50 blur-3xl rounded-full" />
+                        <img src="/bookmark.webp" alt="Saved Assets Folder" className="w-[180px] h-[180px] object-contain relative z-10 drop-shadow-2xl hover:scale-105 transition-transform duration-500" />
+                    </div>
                 </div>
 
-                {/* Tabs */}
-                <div className="flex items-center justify-center gap-4 mb-12">
-                    <button
-                        onClick={() => setActiveTab('all')}
-                        className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all ${activeTab === 'all'
-                            ? 'bg-slate-900 text-white shadow-xl shadow-slate-200'
-                            : 'bg-slate-50 text-slate-400 hover:bg-slate-100'
-                            }`}
-                    >
-                        All Bookmarks
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('reported')}
-                        className={`px-8 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 ${activeTab === 'reported'
-                            ? 'bg-indigo-600 text-white shadow-xl shadow-indigo-100'
-                            : 'bg-indigo-50 text-indigo-400 hover:bg-indigo-100'
-                            }`}
-                    >
-                        Reported & Fixed
-                        {bookmarks.filter(b => b.is_reported_by_user).length > 0 && (
-                            <span className={`px-2 py-0.5 rounded-full text-[8px] ${activeTab === 'reported' ? 'bg-white text-indigo-600' : 'bg-indigo-600 text-white'}`}>
-                                {bookmarks.filter(b => b.is_reported_by_user).length}
-                            </span>
-                        )}
-                    </button>
+                {/* Statistics Row */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-[1.5rem] border border-slate-100 dark:border-slate-800 flex items-center gap-5 shadow-sm">
+                        <div className="w-14 h-14 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                            <Bookmark className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Total Bookmarks</p>
+                            <p className="text-2xl font-black text-slate-900 dark:text-white leading-none">{totalBookmarksCount}</p>
+                            <p className="text-[11px] font-semibold text-slate-500 mt-1">Questions saved</p>
+                        </div>
+                    </div>
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-[1.5rem] border border-slate-100 dark:border-slate-800 flex items-center gap-5 shadow-sm">
+                        <div className="w-14 h-14 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                            <Folder className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Subjects</p>
+                            <p className="text-2xl font-black text-slate-900 dark:text-white leading-none">{totalSubjectsCount}</p>
+                            <p className="text-[11px] font-semibold text-slate-500 mt-1">Across all bookmarks</p>
+                        </div>
+                    </div>
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-[1.5rem] border border-slate-100 dark:border-slate-800 flex items-center gap-5 shadow-sm">
+                        <div className="w-14 h-14 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
+                            <Clock className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Last Added</p>
+                            <p className="text-sm font-black text-slate-900 dark:text-white leading-tight truncate w-[120px]">{lastAddedStr}</p>
+                            <p className="text-[11px] font-semibold text-slate-500 mt-0.5 truncate">{lastAddedSubj || 'None'}</p>
+                        </div>
+                    </div>
+                    <div className="bg-white dark:bg-slate-900 p-6 rounded-[1.5rem] border border-slate-100 dark:border-slate-800 flex items-center gap-5 shadow-sm">
+                        <div className="w-14 h-14 rounded-2xl bg-purple-50 text-purple-600 flex items-center justify-center shrink-0">
+                            <Star className="w-6 h-6" />
+                        </div>
+                        <div>
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-1">Most Saved</p>
+                            <p className="text-sm font-black text-slate-900 dark:text-white leading-tight truncate w-[120px]">{mostSavedSubjectStr}</p>
+                            <p className="text-[11px] font-semibold text-slate-500 mt-0.5">{mostSavedPercent}% of total</p>
+                        </div>
+                    </div>
                 </div>
 
-                {bookmarks.length === 0 ? (
-                    <div className="text-center py-32 bg-white dark:bg-card rounded-[3rem] border border-slate-100 dark:border-border shadow-sm transition-all hover:shadow-xl hover:shadow-indigo-50/50">
+                {/* Filter Bar */}
+                <div className="bg-white dark:bg-slate-900 p-3 rounded-[1rem] sm:rounded-full border border-slate-100 dark:border-slate-800 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4 shadow-sm mb-8">
+                    <div className="relative flex-1">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <Input 
+                            placeholder="Search your bookmarks..." 
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-10 pr-10 h-12 bg-transparent border-none shadow-none focus-visible:ring-0 text-slate-800 font-medium placeholder:text-slate-400"
+                        />
+                        <div className="absolute right-4 top-1/2 -translate-y-1/2 px-2 py-0.5 rounded-md bg-slate-100 text-slate-400 text-[10px] font-bold">/</div>
+                    </div>
+                    
+                    <div className="hidden sm:block w-px h-8 bg-slate-200 dark:bg-slate-800" />
+
+                    <div className="flex items-center gap-2 px-2 sm:px-0">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-10 px-4 rounded-xl font-bold text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-slate-100 sm:border-none">
+                                    {filterSubject} <ChevronDown className="w-4 h-4 ml-2 opacity-50" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48 rounded-xl">
+                                <DropdownMenuItem onClick={() => setFilterSubject('All Subjects')} className="font-bold cursor-pointer rounded-lg">All Subjects</DropdownMenuItem>
+                                {uniqueSubjectsList.map(s => (
+                                    <DropdownMenuItem key={s} onClick={() => setFilterSubject(s)} className="font-bold cursor-pointer rounded-lg">{s}</DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-10 px-4 rounded-xl font-bold text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-slate-100 sm:border-none">
+                                    {filterStatus} <ChevronDown className="w-4 h-4 ml-2 opacity-50" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48 rounded-xl">
+                                {['All Status', 'Standard', 'Under Review', 'Fixed'].map(s => (
+                                    <DropdownMenuItem key={s} onClick={() => setFilterStatus(s)} className="font-bold cursor-pointer rounded-lg">{s}</DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-10 px-4 rounded-xl font-bold text-slate-600 hover:bg-slate-50 hover:text-slate-900 border border-slate-100 sm:border-none">
+                                    {sortOrder} <ChevronDown className="w-4 h-4 ml-2 opacity-50" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" className="w-48 rounded-xl">
+                                <DropdownMenuItem onClick={() => setSortOrder('Newest First')} className="font-bold cursor-pointer rounded-lg">Newest First</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setSortOrder('Oldest First')} className="font-bold cursor-pointer rounded-lg">Oldest First</DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <Button variant="outline" size="icon" className="h-10 w-10 shrink-0 rounded-xl border-slate-200 hidden md:flex mr-2">
+                            <Filter className="w-4 h-4 text-slate-500" />
+                        </Button>
+                    </div>
+                </div>
+
+                {filteredBookmarks.length === 0 ? (
+                    <div className="text-center py-32 bg-white dark:bg-card rounded-[2rem] border border-slate-100 dark:border-border shadow-sm transition-all hover:shadow-md">
                         <div className="w-20 h-20 bg-slate-50 dark:bg-muted rounded-[2rem] flex items-center justify-center mx-auto mb-8 border border-slate-100 dark:border-border group transition-all">
                             <Bookmark className="w-8 h-8 text-slate-200 group-hover:text-indigo-600 transition-colors" />
                         </div>
-                        <h3 className="text-3xl font-black text-slate-900 dark:text-slate-100 mb-3 tracking-tight">Archive Empty</h3>
+                        <h3 className="text-3xl font-black text-slate-900 dark:text-slate-100 mb-3 tracking-tight">No matching items</h3>
                         <p className="text-slate-400 font-bold mb-10 max-w-xs mx-auto text-lg leading-relaxed">
-                            No items have been secured yet. Start a mission to find items worth saving.
+                            Try adjusting your search query or modifying the selected filters.
                         </p>
-                        <Button
-                            onClick={() => navigate('/practice')}
-                            className="h-16 px-12 font-black bg-slate-900 hover:bg-slate-800 text-white rounded-2xl active:scale-95 transition-all shadow-xl"
-                        >
-                            START NEW MISSION
-                        </Button>
                     </div>
                 ) : (
-                    (() => {
-                        const filtered = bookmarks.filter(b => activeTab === 'all' ? true : b.is_reported_by_user);
-                        const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
-                        const paged = filtered.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
-                        return (
                     <div>
                         <div className="grid gap-6">
                         {paged
-                            .map((bookmark) => (
+                            .map((bookmark, index) => (
                                 <div
                                     key={bookmark.id}
-                                    className="bg-white/80 dark:bg-slate-900/40 backdrop-blur-xl p-8 rounded-[2.5rem] border border-slate-100 dark:border-white/5 shadow-xl shadow-slate-200/50 dark:shadow-none hover:border-indigo-600 dark:hover:border-indigo-500 transition-all duration-500 group flex flex-col md:flex-row gap-8 items-start relative overflow-hidden hover:-translate-y-1"
+                                    className="bg-white dark:bg-slate-900 p-6 sm:p-8 rounded-[2rem] border border-slate-100 dark:border-slate-800 shadow-sm hover:shadow-xl transition-all duration-500 group flex flex-col md:flex-row gap-6 items-start md:items-center relative overflow-hidden"
                                 >
-                                    <div className="absolute top-0 right-0 w-32 h-32 bg-slate-50 dark:bg-muted rounded-full -translate-y-1/2 translate-x-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-700" />
-
-                                    <div className="w-16 h-16 bg-slate-50 dark:bg-white/5 rounded-3xl border border-slate-100 dark:border-white/10 flex items-center justify-center text-3xl group-hover:bg-indigo-600 group-hover:text-white group-hover:rotate-6 transition-all shrink-0">
-                                        {getSubjectEmoji(bookmark.display.subject)}
+                                    <div className="hidden sm:flex w-16 h-16 bg-indigo-50 dark:bg-indigo-500/10 rounded-2xl items-center justify-center text-indigo-600 font-black text-2xl shrink-0">
+                                        {String(page * PAGE_SIZE + index + 1).padStart(2, '0')}
                                     </div>
 
-                                    <div className="flex-1 space-y-4 relative z-10">
-                                        <div className="flex flex-wrap items-center gap-3">
-                                            <span className="px-3 py-1 bg-slate-900 text-white text-[9px] font-black uppercase tracking-widest rounded-full">
-                                                {bookmark.display.subject}
-                                            </span>
-                                            <span className={`px-3 py-1 text-[9px] font-black uppercase tracking-widest rounded-full border ${bookmark.display.difficulty.toLowerCase() === 'easy' ? 'bg-emerald-50 text-emerald-600 border-emerald-100' :
-                                                bookmark.display.difficulty.toLowerCase() === 'medium' ? 'bg-orange-50 text-orange-600 border-orange-100' :
-                                                    'bg-indigo-50 text-indigo-600 border-indigo-100'
-                                                }`}>
-                                                {bookmark.display.difficulty}
-                                            </span>
-                                            {bookmark.display.is_corrected && (
-                                                <span className="px-3 py-1 bg-emerald-50 text-emerald-600 text-[9px] font-black uppercase tracking-widest rounded-full border border-emerald-100 flex items-center gap-1.5">
-                                                    <Target className="w-2.5 h-2.5" />
-                                                    Fixed by Admin
+                                    <div className="flex-1 w-full space-y-4">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                                            <div className="flex flex-wrap items-center gap-2">
+                                                <div className="sm:hidden w-8 h-8 bg-indigo-50 dark:bg-indigo-500/10 rounded-lg flex items-center justify-center text-indigo-600 font-black text-sm shrink-0 mr-1">
+                                                    {String(page * PAGE_SIZE + index + 1).padStart(2, '0')}
+                                                </div>
+                                                <span className="px-3 py-1 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 text-[10px] font-black uppercase tracking-widest rounded-full">
+                                                    {bookmark.display.subject}
                                                 </span>
-                                            )}
-                                            {bookmark.is_reported_by_user && !bookmark.display.is_corrected && (
-                                                <span className="px-3 py-1 bg-amber-50 text-amber-600 text-[9px] font-black uppercase tracking-widest rounded-full border border-amber-100 flex items-center gap-1.5">
-                                                    <AlertTriangle className="w-2.5 h-2.5" />
-                                                    Under Review
+                                                <span className="px-3 py-1 bg-slate-50 dark:bg-slate-800 text-slate-500 text-[10px] font-black uppercase tracking-widest rounded-full">
+                                                    {bookmark.display.difficulty}
                                                 </span>
-                                            )}
+                                                {bookmark.display.is_corrected && (
+                                                    <span className="px-3 py-1 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[10px] font-black uppercase tracking-widest rounded-full flex items-center gap-1.5">
+                                                        <Target className="w-3 h-3" />
+                                                        Fixed by Admin
+                                                    </span>
+                                                )}
+                                                {bookmark.is_reported_by_user && !bookmark.display.is_corrected && (
+                                                    <span className="px-3 py-1 bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400 text-[10px] font-black uppercase tracking-widest rounded-full flex items-center gap-1.5">
+                                                        <AlertTriangle className="w-3 h-3" />
+                                                        Reported
+                                                    </span>
+                                                )}
+                                            </div>
+                                            <div className="text-[11px] font-bold text-slate-400 shrink-0">
+                                                Saved on {new Date(bookmark.created_at).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})}
+                                            </div>
                                         </div>
 
                                         <MathText 
                                             content={bookmark.display.text.substring(0, 200) + (bookmark.display.text.length > 200 ? '...' : '')}
-                                            className="text-slate-800 font-bold leading-relaxed tracking-tight text-lg line-clamp-2"
+                                            className="text-slate-900 dark:text-slate-100 font-bold leading-relaxed tracking-tight text-base sm:text-lg line-clamp-2"
                                             variant="default"
                                         />
 
                                         {bookmark.admin_message && (
-                                            <div className="mt-4 p-4 bg-indigo-50 rounded-2xl border border-indigo-100 flex items-start gap-3">
+                                            <div className="mt-4 p-4 bg-indigo-50/50 dark:bg-indigo-500/5 rounded-2xl border border-indigo-100 dark:border-indigo-500/20 flex items-start gap-3">
                                                 <Sparkles className="w-4 h-4 text-indigo-600 shrink-0 mt-0.5" />
                                                 <div>
-                                                    <p className="text-[10px] font-black text-indigo-900 uppercase tracking-widest mb-1">Admin Response</p>
-                                                    <p className="text-sm font-bold text-indigo-700 italic">"{bookmark.admin_message}"</p>
+                                                    <p className="text-[10px] font-black text-indigo-900 dark:text-indigo-400 uppercase tracking-widest mb-1">Admin Response</p>
+                                                    <p className="text-xs sm:text-sm font-bold text-indigo-700 dark:text-indigo-300 italic">"{bookmark.admin_message}"</p>
                                                 </div>
                                             </div>
                                         )}
                                     </div>
 
-                                    <div className="flex md:flex-col gap-3 shrink-0 relative z-10 w-full md:w-auto mt-4 md:mt-0">
+                                    <div className="flex flex-row md:flex-col gap-3 shrink-0 relative z-10 w-full md:w-auto justify-end border-t border-slate-100 dark:border-slate-800 md:border-t-0 pt-4 md:pt-0">
                                         <Button
                                             variant="ghost"
                                             size="icon"
                                             onClick={() => removeBookmark(bookmark)}
                                             disabled={bookmark.is_reported_by_user && !bookmark.display.is_corrected}
                                             className={cn(
-                                                "h-12 w-12 rounded-xl transition-all",
+                                                "h-10 w-10 sm:h-12 sm:w-12 rounded-full sm:rounded-xl transition-all shrink-0",
                                                 bookmark.is_reported_by_user && !bookmark.display.is_corrected
-                                                    ? "text-slate-200 cursor-not-allowed bg-slate-50 border-slate-100"
-                                                    : "text-rose-300 hover:text-rose-600 hover:bg-rose-50 border border-slate-50 hover:border-rose-100"
+                                                    ? "text-slate-300 cursor-not-allowed bg-slate-50 border-slate-100"
+                                                    : "text-rose-400 hover:text-white hover:bg-rose-500 bg-rose-50 border border-rose-100 hover:border-rose-500"
                                             )}
                                             title={bookmark.is_reported_by_user && !bookmark.display.is_corrected ? "Mandatory until resolved" : "Remove Bookmark"}
                                         >
                                             {bookmark.is_reported_by_user && !bookmark.display.is_corrected ? (
                                                 <Lock className="w-4 h-4" />
                                             ) : (
-                                                <Trash2 className="w-5 h-5" />
+                                                <Trash2 className="w-4 h-4 sm:w-5 sm:h-5" />
                                             )}
                                         </Button>
                                         <Button
                                             variant="ghost"
                                             size="icon"
                                             onClick={() => setSelectedBookmark(bookmark)}
-                                            className="h-12 w-12 rounded-xl text-slate-300 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-50 hover:border-indigo-100 transition-all"
+                                            className="h-10 w-10 sm:h-12 sm:w-12 rounded-full sm:rounded-xl text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 border border-slate-100 hover:border-indigo-200 transition-all shrink-0"
                                         >
-                                            <ChevronRight className="w-5 h-5" />
+                                            <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
                                         </Button>
                                     </div>
                                 </div>
@@ -378,8 +548,6 @@ export default function Bookmarks() {
                             </div>
                         )}
                     </div>
-                        );
-                    })()
                 )}
 
                 <Dialog open={!!selectedBookmark} onOpenChange={(open) => !open && setSelectedBookmark(null)}>

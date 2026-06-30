@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useSystemSettings } from '@/context/SystemSettingsContext';
 
 export interface Plan {
     id: string;
@@ -12,6 +12,7 @@ export interface Plan {
     isPopular: boolean;
     badge: string;
     isVisible: boolean;
+    features?: string[];
     paddleId?: string; // Plan-level Paddle ID
     regionalPrices?: Record<string, number>; // New: Fixed regional prices (e.g. { "INR": 499, "TRY": 199 })
     cycles?: {
@@ -60,79 +61,48 @@ const DEFAULT_CONFIG: PricingConfig = {
     mode: 'beta'
 };
 
+/**
+ * PricingProvider
+ * ────────────────
+ * Reads pricing_plans and pricing_coupon_message from SystemSettingsContext
+ * instead of running its own Supabase queries or maintaining its own realtime
+ * channel. All return values are identical to the previous implementation.
+ */
 export const PricingProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
     const [isPricingModalOpen, setIsPricingModalOpen] = useState(false);
     const [isCheckoutOpen, setIsCheckoutOpen] = useState(false);
     const [config, setConfig] = useState<PricingConfig>(DEFAULT_CONFIG);
     const [couponMessage, setCouponMessage] = useState<string | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
 
-    const fetchPricing = async () => {
-        setIsLoading(true);
-        try {
-            // Fetch pricing plans
-            const { data: plansData } = await supabase
-                .from('system_settings')
-                .select('value')
-                .eq('key', 'pricing_plans')
-                .maybeSingle();
+    const { getSetting, loading: settingsLoading, refresh } = useSystemSettings();
 
-            if (plansData && plansData.value) {
-                setConfig(plansData.value as unknown as PricingConfig);
-            } else {
-                setConfig(DEFAULT_CONFIG);
-            }
-
-            // Fetch coupon message
-            const { data: messageData } = await supabase
-                .from('system_settings')
-                .select('value')
-                .eq('key', 'pricing_coupon_message')
-                .maybeSingle();
-
-            if (messageData && messageData.value !== undefined) {
-                const val = messageData.value;
-                if (typeof val === 'string') {
-                    setCouponMessage(val);
-                } else if (val && typeof val === 'object' && (val as any).message) {
-                    setCouponMessage(String((val as any).message));
-                } else if (val && typeof val === 'object' && (val as any).text) {
-                    setCouponMessage(String((val as any).text));
-                } else if (val !== null) {
-                    setCouponMessage(String(val));
-                } else {
-                    setCouponMessage(null);
-                }
-            } else {
-                setCouponMessage(null);
-            }
-        } catch (err) {
-            // console.error('Error fetching pricing context:', err); // Removed console.error
-            setConfig(DEFAULT_CONFIG);
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
+    // Derive pricing config from shared settings
     useEffect(() => {
-        fetchPricing();
+        const plansData = getSetting('pricing_plans');
+        if (plansData) {
+            setConfig(plansData as PricingConfig);
+        } else {
+            setConfig(DEFAULT_CONFIG);
+        }
+    }, [getSetting]);
 
-        // Listen for changes
-        const channel = supabase
-            .channel('pricing_updates')
-            .on('postgres_changes',
-                { event: '*', schema: 'public', table: 'system_settings' },
-                (payload) => {
-                    const { key } = payload.new as any;
-                    if (key === 'pricing_plans' || key === 'pricing_coupon_message') {
-                        fetchPricing();
-                    }
-                }
-            )
-            .subscribe();
-
-        return () => { supabase.removeChannel(channel); };
-    }, []);
+    // Derive coupon message from shared settings
+    useEffect(() => {
+        const val = getSetting('pricing_coupon_message');
+        if (val === undefined || val === null) {
+            setCouponMessage(null);
+        } else if (typeof val === 'string') {
+            setCouponMessage(val);
+        } else if (val && typeof val === 'object' && (val as any).message) {
+            setCouponMessage(String((val as any).message));
+        } else if (val && typeof val === 'object' && (val as any).text) {
+            setCouponMessage(String((val as any).text));
+        } else if (val !== null) {
+            setCouponMessage(String(val));
+        } else {
+            setCouponMessage(null);
+        }
+    }, [getSetting]);
 
     const openPricingModal = () => setIsPricingModalOpen(true);
     const closePricingModal = () => setIsPricingModalOpen(false);
@@ -151,8 +121,8 @@ export const PricingProvider: React.FC<{ children: ReactNode }> = ({ children })
             closeCheckout,
             config,
             couponMessage,
-            isLoading,
-            refreshPricing: fetchPricing
+            isLoading: settingsLoading,
+            refreshPricing: refresh,
         }}>
             {children}
         </PricingContext.Provider>

@@ -15,7 +15,8 @@ export default function LatestNotificationPopup() {
             checkLatestNotification();
 
             // Real-time subscription for newly added notifications
-            const channelName = `site_notifications_popup_${Date.now()}_${Math.random().toString(36).substring(7)}`;
+            // Unique channel name to avoid React remount collisions
+            const channelName = `site_notifications_popup_${Math.random().toString(36).substring(7)}`;
             const subscription = supabase
                 .channel(channelName)
                 .on('postgres_changes',

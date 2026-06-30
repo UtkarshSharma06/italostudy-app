@@ -19,6 +19,7 @@ interface Course {
     price_eur: number; discount_price_eur?: number | null;
     thumbnail_url?: string;
     regional_prices?: Record<string, number>;
+    pre_register_discount_percent?: number;
 }
 
 export default function CourseCheckout() {
@@ -42,6 +43,9 @@ export default function CourseCheckout() {
     const [couponInput, setCouponInput] = useState('');
     const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
     const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
+    
+    // Pre-Registration state
+    const [isPreRegistered, setIsPreRegistered] = useState(false);
 
     const isINR = typeof navigator !== 'undefined' && (
         Intl.DateTimeFormat().resolvedOptions().timeZone?.includes('Calcutta') ||
@@ -56,9 +60,20 @@ export default function CourseCheckout() {
     const fetchData = async () => {
         setIsLoading(true);
         // 1. Fetch course
-        const { data: courseData, error } = await (supabase as any).from('courses').select('id, title, price_eur, discount_price_eur, thumbnail_url, regional_prices').eq('id', courseId).single();
+        const { data: courseData, error } = await (supabase as any).from('courses').select('id, title, price_eur, discount_price_eur, thumbnail_url, regional_prices, pre_register_discount_percent').eq('id', courseId).single();
         if (error || !courseData) { navigate('/courses'); return; }
         setCourse(courseData);
+
+        // Check if pre-registered
+        if (user && courseData.pre_register_discount_percent > 0) {
+            const { data: preReg } = await supabase
+                .from('course_pre_registrations')
+                .select('id')
+                .eq('user_id', user.id)
+                .eq('course_id', courseId)
+                .maybeSingle();
+            if (preReg) setIsPreRegistered(true);
+        }
 
         // 2. Fetch gateways
         const { data: gatewayData } = await (supabase as any).rpc('get_payment_config');
@@ -278,8 +293,17 @@ export default function CourseCheckout() {
         ? getRegionalPrice(course.discount_price_eur || course.price_eur, course.regional_prices?.INR_discount ? { INR: course.regional_prices.INR_discount } : undefined)
         : originalLocal;
         
-    // Calculate locally applied coupon
     let finalLocal = { ...baseLocal };
+    
+    // Apply Pre-Registration Discount
+    let preRegDiscountApplied = false;
+    if (isPreRegistered && course.pre_register_discount_percent && course.pre_register_discount_percent > 0) {
+        preRegDiscountApplied = true;
+        const discountRatio = course.pre_register_discount_percent / 100;
+        finalLocal.amount = Math.max(0, finalLocal.amount * (1 - discountRatio));
+    }
+
+    // Apply Coupon Discount
     if (appliedCoupon) {
         if (appliedCoupon.discount_type === 'percent') {
             finalLocal.amount = Math.max(0, finalLocal.amount * (1 - appliedCoupon.discount_value / 100));
@@ -314,6 +338,20 @@ export default function CourseCheckout() {
                 </div>
 
                 <div className="max-w-[1200px] mx-auto px-4 py-8 relative">
+                    {/* Pre-Registration Success Alert */}
+                    {preRegDiscountApplied && (
+                        <div className="mb-6 bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex gap-3">
+                            <div className="w-10 h-10 bg-emerald-100 rounded-full flex items-center justify-center shrink-0">
+                                <Tag className="w-5 h-5 text-emerald-600" />
+                            </div>
+                            <div>
+                                <h3 className="font-bold text-emerald-800">Early Bird Discount Applied!</h3>
+                                <p className="text-sm text-emerald-700 mt-0.5">
+                                    Because you pre-registered, you are getting an automatic {course.pre_register_discount_percent}% discount.
+                                </p>
+                            </div>
+                        </div>
+                    )}
                     {/* Background blob for aesthetics */}
                     <div className="absolute top-0 left-1/2 -translate-x-1/2 w-full max-w-3xl h-64 bg-indigo-500/5 blur-[120px] rounded-full pointer-events-none" />
 

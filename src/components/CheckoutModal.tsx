@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Check, Loader2, CreditCard, Lock, ShieldCheck, Ticket, Zap } from 'lucide-react';
+import { X, Check, Loader2, CreditCard, Lock, ShieldCheck, Ticket, Zap, FileText, PlaySquare, BarChart2, Target, MessageSquare, Globe, Circle, ChevronDown } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { initializePaddle, Paddle } from '@paddle/paddle-js';
 import { Button } from '@/components/ui/button';
@@ -119,7 +119,9 @@ export default function CheckoutModal({
     const [couponCode, setCouponCode] = useState('');
     const [isValidating, setIsValidating] = useState(false);
     const [discount, setDiscount] = useState<{ type: 'percent' | 'fixed', value: number, id: string } | null>(null);
+    const [isMobileCouponOpen, setIsMobileCouponOpen] = useState(false);
     const [gateways, setGateways] = useState<any>({});
+    const [isLoadingGateways, setIsLoadingGateways] = useState(true);
     const [isProcessing, setIsProcessing] = useState(false);
     const [selectedGateway, setSelectedGateway] = useState<string | null>(null);
     const { getPaymentDetails, formatPrice, getRegionalPrice, currency: currentCurrency } = useCurrency();
@@ -149,23 +151,36 @@ export default function CheckoutModal({
         }
     }, [isOpen]);
 
-    const fetchGateways = async () => {
-        const { data, error } = await (supabase as any).rpc('get_payment_config');
+    const fetchGateways = async (retries = 3) => {
+        setIsLoadingGateways(true);
+        for (let i = 0; i < retries; i++) {
+            const { data, error } = await (supabase as any).rpc('get_payment_config');
+            
+            if (data) {
+                setGateways(data);
+                setIsLoadingGateways(false);
+                loadPaymentScripts(data); // Pass data directly to ensure immediate loading
 
-        if (data) {
-            setGateways(data);
-            loadPaymentScripts(data); // Pass data directly to ensure immediate loading
-
-            // Initialize Paddle
-            if (data.paddle?.enabled && data.paddle?.client_token && !paddle) {
-                initializePaddle({
-                    environment: data.paddle.environment || 'sandbox',
-                    token: data.paddle.client_token
-                }).then(paddleInstance => setPaddle(paddleInstance));
+                // Initialize Paddle
+                if (data.paddle?.enabled && data.paddle?.client_token && !paddle) {
+                    initializePaddle({
+                        environment: data.paddle.environment || 'sandbox',
+                        token: data.paddle.client_token
+                    }).then(paddleInstance => setPaddle(paddleInstance));
+                }
+                return; // Success, exit retry loop
+            } else if (error) {
+                console.warn(`Failed to load payment config (attempt ${i + 1}/${retries})`, error);
+                if (i < retries - 1) {
+                    await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i))); // 1s, 2s, 4s
+                }
             }
-        } else if (error) {
-            console.error('Failed to load payment config', error);
         }
+        
+        // All retries failed
+        console.error('All attempts to load payment config failed');
+        toast.error('Failed to load payment options. Please try again later or contact support.');
+        setIsLoadingGateways(false);
     };
 
     const loadPaymentScripts = (config?: any) => {
@@ -363,6 +378,22 @@ export default function CheckoutModal({
         return 'months';
     }
 
+    // ── Edge Function Retry Helper ───────────────────────────────────────────
+    // Invokes an edge function with up to 3 retries and exponential backoff on failure.
+    const invokeWithRetry = async (fn: string, body: object, retries = 3): Promise<any> => {
+        for (let i = 0; i < retries; i++) {
+            const res = await supabase.functions.invoke(fn, { body });
+            if (!res.error) return res;
+            
+            console.warn(`Edge function '${fn}' failed (attempt ${i + 1}/${retries})...`, res.error);
+            if (i < retries - 1) {
+                await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i))); // 1s, 2s, 4s
+            } else {
+                return res; // Return the final error if all retries fail
+            }
+        }
+    };
+
     const handleRazorpay = async () => {
         setIsProcessing(true);
         try {
@@ -403,16 +434,18 @@ export default function CheckoutModal({
             const data = rawData as RazorpayOrderResponse;
             if (data.error) throw new Error(data.error);
 
-            // 3. Create Subscription on Razorpay Server
-            const { data: subData, error: subError } = await supabase.functions.invoke('create-razorpay-order', {
-                body: {
-                    transactionId: data.transaction_id,
-                    gatewayPlanId: gatewayPlanId
-                }
+            // 3. Create Subscription on Razorpay Server (with retry)
+            // Pass discountedAmount so the edge function can create a temp plan at the discounted price
+            const { data: subData, error: subError } = await invokeWithRetry('create-razorpay-order', {
+                transactionId: data.transaction_id,
+                gatewayPlanId: gatewayPlanId,
+                discountedAmount: discount ? totalAmount : undefined,
+                currency: targetCurrency,
+                couponCode: discount ? couponCode : undefined,
             });
 
-            if (subError) throw subError;
-            if (subData.error) throw new Error(subData.error);
+            if (subError) throw new Error('Payment server unavailable. Please try again or contact support@italostudy.com');
+            if (subData?.error) throw new Error(subData.error);
 
             // 4. Open Razorpay Checkout for Auto-Pay
             const options = {
@@ -437,7 +470,7 @@ export default function CheckoutModal({
             setIsProcessing(false);
         } catch (err: any) {
             console.error('Razorpay error:', err);
-            toast.error(err?.message || 'Failed to initialize Razorpay Subscription');
+            toast.error(err?.message || 'Failed to initialize Razorpay. Please try again or contact support@italostudy.com');
             setIsProcessing(false);
         }
     };
@@ -536,9 +569,60 @@ export default function CheckoutModal({
             window.paypal.Buttons({
                 vault: true,  // Required for createSubscription
                 createSubscription: (_data: any, actions: any) => {
-                    return actions.subscription.create({
+                    const req: any = {
                         'plan_id': gatewayPlanId
-                    });
+                    };
+                    
+                    if (discount) {
+                        // PayPal requires singular interval_unit: MONTH, DAY, YEAR (NOT MONTHS/DAYS/YEARS)
+                        const unitMap: Record<string, string> = {
+                            days: 'DAY',
+                            months: 'MONTH',
+                            years: 'YEAR',
+                        };
+                        const pUnit = unitMap[actualDurationUnit.toLowerCase()] || 'MONTH';
+                        const originalPaymentAmount = paymentCurrency === targetCurrency ? amountInTargetCurrency : amount;
+
+                        // PayPal discount strategy: override billing cycles.
+                        // Sequence 1 = TRIAL (1 billing cycle at discounted price)
+                        // Sequence 2 = REGULAR (ongoing at full price)
+                        req['plan'] = {
+                            billing_cycles: [
+                                {
+                                    sequence: 1,
+                                    tenure_type: 'TRIAL',
+                                    total_cycles: 1, // Only ONE discounted cycle
+                                    frequency: {
+                                        interval_unit: pUnit,
+                                        interval_count: actualDurationValue,
+                                    },
+                                    pricing_scheme: {
+                                        fixed_price: {
+                                            value: paymentAmount.toFixed(2),
+                                            currency_code: paymentCurrency
+                                        }
+                                    }
+                                },
+                                {
+                                    sequence: 2,
+                                    tenure_type: 'REGULAR',
+                                    total_cycles: 0, // 0 = infinite
+                                    frequency: {
+                                        interval_unit: pUnit,
+                                        interval_count: actualDurationValue,
+                                    },
+                                    pricing_scheme: {
+                                        fixed_price: {
+                                            value: originalPaymentAmount.toFixed(2),
+                                            currency_code: paymentCurrency
+                                        }
+                                    }
+                                }
+                            ]
+                        };
+                    }
+
+                    return actions.subscription.create(req);
                 },
                 onApprove: async (data_pp: any, _actions: any) => {
                     toast.loading('Verifying subscription...');
@@ -582,7 +666,12 @@ export default function CheckoutModal({
             console.log('✅ Payment Verification Response:', data);
 
             if (!data.success) {
-                toast.error(data.error || 'Payment verification failed');
+                // Handle retryable errors (e.g. gateway verification temporarily unavailable)
+                if ((data as any).retry) {
+                    toast.error(data.error || (data as any).message || 'Payment verification temporarily unavailable. Your order is saved — please contact support@italostudy.com');
+                } else {
+                    toast.error(data.error || 'Payment verification failed. Contact support@italostudy.com');
+                }
                 console.error('❌ Verification failed:', data.error);
                 throw new Error(data.error || 'Payment verification failed');
             }
@@ -599,7 +688,7 @@ export default function CheckoutModal({
 
             // Force profile refresh to get updated plan
             setTimeout(() => {
-                window.location.href = '/dashboard';
+                window.location.href = '/dashboard?upgraded=1';
             }, 2500); // Increased delay to let animation play
         } catch (err: any) {
             console.error('Payment verification error:', err);
@@ -674,17 +763,16 @@ export default function CheckoutModal({
 
             const transactionId = rpcData.transaction_id;
 
-            // 3. Invoke Edge Function → get Dodo checkout_url
-            const { data: edgeData, error: edgeError } = await supabase.functions.invoke('create-dodo-order', {
-                body: {
-                    transactionId,
-                    gatewayPlanId,
-                    amount: totalAmount,
-                    currency: targetCurrency
-                }
+            // 3. Invoke Edge Function → get Dodo checkout_url (with retry)
+            const { data: edgeData, error: edgeError } = await invokeWithRetry('create-dodo-order', {
+                transactionId,
+                gatewayPlanId,
+                amount: totalAmount,
+                currency: targetCurrency,
+                couponCode: discount ? couponCode : undefined
             });
 
-            if (edgeError) throw edgeError;
+            if (edgeError) throw new Error('Payment server unavailable. Please try again or contact support@italostudy.com');
             if (edgeData?.error) throw new Error(edgeData.error);
             if (!edgeData?.checkout_url) throw new Error('Invalid session response from Payment Server');
 
@@ -817,7 +905,7 @@ export default function CheckoutModal({
 
         } catch (err: any) {
             console.error('Cashfree error:', err);
-            toast.error(err?.message || 'Failed to initialize Cashfree');
+            toast.error(err?.message || 'Failed to initialize Cashfree. Please try again or contact support@italostudy.com');
             setIsProcessing(false);
         }
     };
@@ -846,7 +934,7 @@ export default function CheckoutModal({
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
                         onClick={onClose}
-                        className="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-[100]"
+                        className="fixed inset-0 bg-slate-900/40 optimize-blur z-[200]"
                     />
 
                     {/* Modal */}
@@ -854,157 +942,311 @@ export default function CheckoutModal({
                         initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                        className="fixed inset-0 flex items-center justify-center z-[110] p-4 pointer-events-none"
+                        className="fixed inset-0 flex items-center justify-center z-[210] p-4 md:p-6 pointer-events-none"
                     >
-                        <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl overflow-hidden pointer-events-auto border border-slate-100 dark:border-slate-800">
-                            {/* Header */}
-                            <div className="p-6 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
-                                <div>
-                                    <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Checkout</h2>
-                                    <p className="text-sm text-slate-400 font-medium">Secure Payment</p>
+                        <div className="w-full h-[100dvh] md:h-auto max-w-[1000px] md:max-h-[95vh] bg-[#f8f9fc] md:bg-white dark:bg-slate-950 md:dark:bg-slate-900 rounded-none md:rounded-[2rem] shadow-2xl overflow-hidden pointer-events-auto border-0 md:border border-slate-100 dark:border-slate-800 flex flex-col relative font-sans">
+                            {/* Header row (Title + Close) */}
+                            <div className="px-5 md:px-8 pt-12 md:pt-8 pb-4 flex items-start justify-between shrink-0 bg-[#f8f9fc] md:bg-transparent dark:bg-slate-950 md:dark:bg-transparent">
+                                <div className="flex flex-col">
+                                    <h2 className="text-[26px] md:text-[28px] font-black text-[#131131] dark:text-white tracking-tight leading-tight">Checkout</h2>
+                                    <p className="text-[12px] md:text-sm text-slate-500 font-medium flex items-center gap-1.5 mt-1">
+                                        <Lock className="w-3.5 h-3.5 md:w-4 md:h-4" /> Secure & Encrypted Payment
+                                    </p>
                                 </div>
-                                <button onClick={onClose} className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
-                                    <X className="w-5 h-5 text-slate-400" />
+                                <button onClick={onClose} className="w-8 h-8 flex items-center justify-center bg-white md:bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 rounded-full transition-colors shadow-sm md:shadow-none mt-1 md:mt-0">
+                                    <X className="w-4 h-4 text-[#131131] md:text-slate-500 dark:text-white" />
                                 </button>
                             </div>
 
-                            <div className="flex-1 overflow-y-auto max-h-[70vh] custom-scrollbar">
-                                <div className="p-6 space-y-6">
-                                    {/* Plan Summary */}
-                                    <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-2xl flex items-center justify-between">
-                                        <div>
-                                            <p className="text-xs font-bold text-slate-400 uppercase tracking-widest">{getDurationLabel()} Plan</p>
-                                            <h3 className="text-lg font-bold text-slate-900 dark:text-white">{planName}</h3>
+                            {/* Scrollable Content: 2-column Grid */}
+                            <div className="flex-1 overflow-y-auto custom-scrollbar px-5 md:px-8 pb-6 md:pb-8 flex flex-col md:flex-row gap-5 md:gap-8 bg-[#f8f9fc] md:bg-transparent dark:bg-slate-950 md:dark:bg-transparent">
+                                
+                                {/* LEFT COLUMN: Plan Details & Features */}
+                                <div className="flex-1 flex flex-col gap-6">
+                                    {/* YOU'RE BUYING Card */}
+                                    <div className="border border-slate-200/60 md:border-slate-200 dark:border-slate-800 md:dark:border-slate-700 rounded-2xl p-4 md:p-5 relative bg-white dark:bg-slate-900 md:dark:bg-slate-800 shadow-sm">
+                                        <div className="absolute top-0 right-0 bg-[#D81865] text-white text-[9px] md:text-[10px] font-black px-3 md:px-4 py-1 rounded-bl-xl md:rounded-bl-2xl rounded-tr-2xl tracking-wider uppercase shadow-sm">
+                                            Best Value
                                         </div>
-                                        <div className="text-right">
-                                            {discount && (
-                                                <p className="text-xs font-bold text-rose-500 line-through">
-                                                    {formatPrice(amountInTargetCurrency, targetCurrency)}
-                                                </p>
-                                            )}
-                                            <p className={cn("text-xl font-black tracking-tight", discount ? "text-emerald-500" : "text-slate-900 dark:text-white")}>
-                                                {formatPrice(calculateTotal(), targetCurrency)}
-                                            </p>
-                                        </div>
-                                    </div>
-
-                                    {/* Coupon */}
-                                    <div className="space-y-2">
-                                        <label className="text-xs font-bold text-slate-500 uppercase flex items-center gap-2">
-                                            <Ticket className="w-3 h-3" /> Coupon Code
-                                        </label>
-                                        <div className="flex gap-2">
-                                            <Input
-                                                value={couponCode}
-                                                onChange={e => setCouponCode(e.target.value)}
-                                                placeholder="ENTER CODE"
-                                                className="uppercase font-mono tracking-widest"
-                                                disabled={!!discount}
-                                            />
-                                            {discount ? (
-                                                <Button variant="ghost" onClick={() => { setDiscount(null); setCouponCode(''); }} className="text-rose-500 hover:text-rose-600 hover:bg-rose-50">
-                                                    <X className="w-4 h-4" />
-                                                </Button>
-                                            ) : (
-                                                <Button onClick={handleValidateCoupon} disabled={isValidating || !couponCode} className="min-w-[80px]">
-                                                    {isValidating ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Apply'}
-                                                </Button>
-                                            )}
+                                        <h4 className="hidden md:block text-[10px] font-bold text-indigo-600 tracking-widest uppercase mb-4">You're Buying</h4>
+                                        <div className="flex gap-3 md:gap-4 items-center">
+                                            <div className="w-14 h-14 bg-[#5022f5] md:bg-indigo-600 rounded-[14px] flex items-center justify-center shrink-0 shadow-sm md:shadow-md">
+                                                <Globe className="w-7 h-7 text-white" />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <h3 className="text-[17px] md:text-lg font-black text-[#131131] dark:text-white leading-tight truncate">{planName}</h3>
+                                                <p className="text-[11px] md:text-[12px] text-slate-500 font-medium mt-0.5 md:mt-0.5 truncate">All premium features. Everywhere.</p>
+                                                <div className="mt-1 md:mt-1.5 inline-block bg-[#f3f0ff] md:bg-slate-100 dark:bg-indigo-500/10 md:dark:bg-slate-700 px-2 py-0.5 rounded text-[10px] md:text-[11px] font-bold text-[#5022f5] md:text-slate-600 dark:text-indigo-300 md:dark:text-slate-300">
+                                                    Billed {getDurationLabel()}
+                                                </div>
+                                            </div>
+                                            <div className="text-right pl-2 shrink-0">
+                                                {discount && (
+                                                    <p className="text-[10px] md:text-xs font-bold text-rose-500 line-through mb-0.5">
+                                                        {formatPrice(amountInTargetCurrency, targetCurrency)}
+                                                    </p>
+                                                )}
+                                                <div className={cn("text-[22px] md:text-2xl font-black tracking-tight", discount ? "text-emerald-500" : "text-[#5022f5] md:text-indigo-600 dark:text-indigo-400")}>
+                                                    {formatPrice(calculateTotal(), targetCurrency)}
+                                                </div>
+                                                <div className="text-[9px] md:text-[10px] font-bold text-slate-400 uppercase tracking-wider mt-0.5">
+                                                    per {actualDurationUnit === 'days' ? (actualDurationValue === 7 ? 'week' : 'day') : (actualDurationUnit === 'months' ? 'month' : 'year')}
+                                                </div>
+                                            </div>
                                         </div>
                                     </div>
 
-                                    {/* Payment Method Tiles — same style as store */}
-                                    <div className="space-y-4 pt-2">
-                                        <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                                            <CreditCard className="w-3 h-3" /> Select Payment Method
-                                        </p>
-
-                                        {/* India section */}
-                                        {targetCurrency === 'INR' && gateways.razorpay?.enabled && (
-                                            <div className="space-y-2">
-                                                <p className="text-[8px] font-black uppercase tracking-widest text-slate-300 px-1">India</p>
-                                                <button
-                                                    onClick={() => setSelectedGateway('razorpay')}
-                                                    className={cn(
-                                                        "w-full p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2.5",
-                                                        selectedGateway === 'razorpay' ? "border-indigo-600 bg-indigo-50/50" : "border-slate-100 hover:border-slate-200"
-                                                    )}
-                                                >
-                                                    <img src="/payments/razorpay.webp" alt="Razorpay" className="h-6 w-auto object-contain" />
-                                                    <div className="flex items-center gap-2 opacity-60">
-                                                        <img src="/payments/upi.webp" alt="UPI" className="h-3 w-auto" />
-                                                        <img src="/payments/visa.webp" alt="Visa" className="h-3 w-auto" />
-                                                        <img src="/payments/mastercard.webp" alt="MC" className="h-3 w-auto" />
+                                    {/* YOU'LL GET Section */}
+                                    <div className="hidden md:flex flex-col gap-4">
+                                        <h4 className="text-[10px] font-bold text-indigo-600 tracking-widest uppercase ml-1">You'll Get</h4>
+                                        <div className="flex flex-col gap-1">
+                                            {[
+                                                { title: "Unlimited Access", sub: "All premium content & resources", icon: FileText, color: "text-indigo-600 bg-indigo-100 dark:bg-indigo-500/20" },
+                                                { title: "Mock Tests & Analysis", sub: "Full-length mocks with detailed analytics", icon: Target, color: "text-blue-600 bg-blue-100 dark:bg-blue-500/20" },
+                                                { title: "Priority Support", sub: "Faster response & dedicated support", icon: MessageSquare, color: "text-emerald-600 bg-emerald-100 dark:bg-emerald-500/20" },
+                                                { title: "24/7 Cent-s Slot Tracker", sub: "Never miss a test slot", icon: Zap, color: "text-purple-600 bg-purple-100 dark:bg-purple-500/20" },
+                                                { title: "Cancel Anytime", sub: "No questions asked", icon: Lock, color: "text-slate-600 bg-slate-100 dark:bg-slate-700" }
+                                            ].map((f, i) => (
+                                                <div key={i} className="flex items-center gap-4 py-3 border-b border-slate-100 dark:border-slate-800 last:border-0">
+                                                    <div className={cn("w-8 h-8 rounded-full flex items-center justify-center shrink-0", f.color)}>
+                                                        <f.icon className="w-4 h-4" />
                                                     </div>
-                                                </button>
-                                            </div>
-                                        )}
-
-                                        {/* International: Dodo */}
-                                        {targetCurrency !== 'INR' && gateways.dodo?.enabled && (
-                                            <div className="space-y-2">
-                                                <p className="text-[8px] font-black uppercase tracking-widest text-slate-300 px-1">Cards & Digital Wallets</p>
-                                                <button
-                                                    onClick={() => setSelectedGateway('dodo')}
-                                                    className={cn(
-                                                        "w-full p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2.5",
-                                                        selectedGateway === 'dodo' ? "border-indigo-600 bg-indigo-50/50" : "border-slate-100 hover:border-slate-200"
-                                                    )}
-                                                >
-                                                    <img src="/payments/dodopayments.webp" alt="Dodo Payments" className="h-6 w-auto object-contain" />
-                                                    <div className="flex flex-wrap items-center justify-center gap-1.5 opacity-60">
-                                                        <img src="/payments/googlepay.webp" alt="Google Pay" className="h-3 w-auto" />
-                                                        <img src="/payments/applepay.webp" alt="Apple Pay" className="h-3 w-auto" />
-                                                        <img src="/payments/visa.webp" alt="Visa" className="h-3 w-auto" />
-                                                        <img src="/payments/mastercard.webp" alt="Mastercard" className="h-3 w-auto" />
+                                                    <div className="flex flex-col flex-1">
+                                                        <span className="text-[13px] font-bold text-slate-900 dark:text-white leading-tight mb-0.5">{f.title}</span>
+                                                        <span className="text-[11px] text-slate-500">{f.sub}</span>
                                                     </div>
-                                                </button>
-                                            </div>
-                                        )}
+                                                    <div className="w-5 h-5 rounded-full border-2 border-emerald-500 flex items-center justify-center">
+                                                        <Check className="w-3 h-3 text-emerald-500" strokeWidth={3} />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
 
-                                        {/* PayPal — all regions */}
-                                        {gateways.paypal?.enabled && (
-                                            <div className="space-y-2">
-                                                {targetCurrency !== 'INR' && <p className="text-[8px] font-black uppercase tracking-widest text-slate-300 px-1">PayPal</p>}
-                                                {targetCurrency === 'INR' && <p className="text-[8px] font-black uppercase tracking-widest text-slate-300 px-1">PayPal (charges in EUR)</p>}
-                                                <button
-                                                    onClick={() => setSelectedGateway('paypal')}
-                                                    className={cn(
-                                                        "w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-center",
-                                                        selectedGateway === 'paypal' ? "border-indigo-600 bg-indigo-50/50" : "border-slate-100 hover:border-slate-200"
-                                                    )}
-                                                >
-                                                    <img src="/payments/paypal.webp" alt="PayPal" className="h-6 w-auto object-contain" />
-                                                </button>
-                                                {/* PayPal buttons render here after selection */}
-                                                <div id="paypal-button-container" className="mt-2 empty:hidden"></div>
-                                            </div>
-                                        )}
-
-                                        {/* Pay Now button */}
-                                        {selectedGateway && (
-                                            <button
-                                                onClick={() => {
-                                                    if (selectedGateway === 'razorpay') handleRazorpay();
-                                                    else if (selectedGateway === 'dodo') handleDodoPayment();
-                                                    else if (selectedGateway === 'paypal') handlePayPal();
-                                                }}
-                                                disabled={isProcessing}
-                                                className="w-full h-12 rounded-2xl bg-indigo-600 hover:bg-indigo-700 text-white font-black uppercase tracking-widest text-[10px] flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60"
-                                            >
-                                                {isProcessing ? <Loader2 className="w-4 h-4 animate-spin" /> : <><Lock className="w-3.5 h-3.5" /> Pay Now &middot; {formatPrice(calculateTotal(), targetCurrency)}</>}
-                                            </button>
-                                        )}
 
                                     </div>
                                 </div>
 
+                                {/* RIGHT COLUMN: Coupons & Payments */}
+                                <div className="flex-1 flex flex-col gap-6 w-full max-w-[420px] mx-auto md:mx-0">
+                                    
+                                    {/* Coupon Code Box */}
+                                    <div className="border border-slate-200/60 md:border-slate-200 dark:border-slate-800 md:dark:border-slate-700 rounded-xl md:rounded-2xl bg-white dark:bg-slate-900 md:dark:bg-slate-800 shadow-sm overflow-hidden flex flex-col">
+                                        {/* Mobile Accordion Header */}
+                                        <div 
+                                            className="p-3.5 md:p-4 flex items-center justify-between cursor-pointer md:cursor-default"
+                                            onClick={() => {
+                                                if (window.innerWidth < 768) {
+                                                    setIsMobileCouponOpen(!isMobileCouponOpen);
+                                                }
+                                            }}
+                                        >
+                                            <div className="flex items-center gap-3">
+                                                <div className="w-7 h-7 md:w-8 md:h-8 bg-slate-50 md:bg-indigo-50 dark:bg-slate-800 md:dark:bg-indigo-500/10 rounded-lg flex items-center justify-center shrink-0">
+                                                    <Ticket className="w-3.5 h-3.5 md:w-4 md:h-4 text-slate-600 md:text-indigo-600 dark:text-slate-400 md:dark:text-indigo-400" />
+                                                </div>
+                                                <div>
+                                                    <h5 className="text-[13px] font-bold text-[#131131] dark:text-white leading-tight">
+                                                        <span className="md:hidden">Coupon code</span>
+                                                        <span className="hidden md:inline">Have a coupon code?</span>
+                                                    </h5>
+                                                    <p className="hidden md:block text-[11px] text-slate-500 mt-0.5">Enter it to get exciting discounts</p>
+                                                </div>
+                                            </div>
+                                            <div className="md:hidden flex items-center gap-1 text-[#5022f5] font-bold text-[12px]">
+                                                {discount ? 'Applied' : 'Add code'}
+                                                <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", isMobileCouponOpen ? "rotate-180" : "")} />
+                                            </div>
+                                        </div>
+                                        <div className={cn(
+                                            "p-4 bg-slate-50/50 dark:bg-slate-900/20 border-t border-slate-100 dark:border-slate-800 md:border-slate-100 md:dark:border-slate-700/50",
+                                            isMobileCouponOpen ? "block" : "hidden md:block"
+                                        )}>
+                                            <div className="flex gap-2">
+                                                <Input
+                                                    value={couponCode}
+                                                    onChange={e => setCouponCode(e.target.value)}
+                                                    placeholder="Enter coupon code"
+                                                    className="uppercase tracking-widest text-xs h-10 bg-white dark:bg-slate-800 border-slate-200"
+                                                    disabled={!!discount}
+                                                />
+                                                {discount ? (
+                                                    <Button variant="outline" onClick={() => { setDiscount(null); setCouponCode(''); }} className="h-10 text-rose-500 hover:text-rose-600 border-rose-200 hover:bg-rose-50">
+                                                        Remove
+                                                    </Button>
+                                                ) : (
+                                                    <Button variant="secondary" onClick={handleValidateCoupon} disabled={isValidating || !couponCode} className="h-10 bg-indigo-50 md:bg-indigo-50 text-[#5022f5] md:text-indigo-600 hover:bg-indigo-100 border border-indigo-100 px-6 font-bold text-xs">
+                                                        {isValidating ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Apply'}
+                                                    </Button>
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Payment Methods */}
+                                    <div className="flex flex-col gap-2.5 md:gap-3">
+                                        <h4 className="text-[10px] font-bold text-slate-400 tracking-widest uppercase ml-1">Choose Payment Method</h4>
+                                        
+                                        {isLoadingGateways ? (
+                                            <div className="space-y-3">
+                                                <div className="w-full h-14 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
+                                                <div className="w-full h-14 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col gap-2 md:gap-2">
+                                                {/* INDIA SPECIFIC: Razorpay */}
+                                                {targetCurrency === 'INR' && gateways.razorpay?.enabled && (
+                                                    <>
+                                                        <button
+                                                            onClick={() => setSelectedGateway('razorpay')}
+                                                            className={cn(
+                                                                "w-full h-[52px] md:h-16 px-4 rounded-xl border flex items-center justify-between transition-all group bg-white dark:bg-slate-900 md:bg-transparent",
+                                                                selectedGateway === 'razorpay' ? "border-[#5022f5] md:border-indigo-600 bg-[#fbfaff] md:bg-indigo-50/30 dark:bg-indigo-500/10 shadow-sm" : "border-slate-200/80 md:border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
+                                                            )}
+                                                        >
+                                                            <div className="flex items-center gap-3">
+                                                                <div className={cn("w-4 h-4 rounded-full border-[1.5px] md:border-2 flex items-center justify-center shrink-0", selectedGateway === 'razorpay' ? "border-[#5022f5] md:border-indigo-600" : "border-slate-300 dark:border-slate-600")}>
+                                                                    {selectedGateway === 'razorpay' && <div className="w-2 h-2 rounded-full bg-[#5022f5] md:bg-indigo-600" />}
+                                                                </div>
+                                                                <img src="/payments/razorpay.webp" alt="Razorpay" className="h-3.5 md:h-4 w-auto object-contain" />
+                                                                <div className="md:hidden flex items-center gap-1.5 opacity-80 ml-1">
+                                                                    <img src="/payments/upi.webp" alt="UPI" className="h-2.5 w-auto" />
+                                                                    <img src="/payments/visa.webp" alt="Visa" className="h-2.5 w-auto" />
+                                                                    <img src="/payments/mastercard.webp" alt="MC" className="h-2.5 w-auto" />
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center gap-3 shrink-0">
+                                                                <div className="hidden md:flex items-center gap-1.5 opacity-70">
+                                                                    <img src="/payments/upi.webp" alt="UPI" className="h-3.5 w-auto" />
+                                                                    <img src="/payments/visa.webp" alt="Visa" className="h-3.5 w-auto" />
+                                                                    <img src="/payments/mastercard.webp" alt="MC" className="h-3.5 w-auto" />
+                                                                </div>
+                                                                <div className="bg-emerald-50 md:bg-emerald-100 text-emerald-600 md:text-emerald-700 text-[8px] md:text-[9px] font-bold px-1.5 md:px-2 py-0.5 rounded uppercase tracking-wider">Recommended</div>
+                                                            </div>
+                                                        </button>
+
+                                                    </>
+                                                )}
+
+                                                {/* GLOBAL SPECIFIC: Dodo */}
+                                                {targetCurrency !== 'INR' && gateways.dodo?.enabled && (
+                                                    <button
+                                                        onClick={() => setSelectedGateway('dodo')}
+                                                        className={cn(
+                                                            "w-full h-[52px] md:h-16 px-4 rounded-xl border flex items-center justify-between transition-all group bg-white dark:bg-slate-900 md:bg-transparent",
+                                                            selectedGateway === 'dodo' ? "border-[#5022f5] md:border-indigo-600 bg-indigo-50/10 md:bg-indigo-50/30 dark:bg-indigo-500/10 shadow-sm" : "border-slate-200/80 md:border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
+                                                        )}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={cn("w-4 h-4 rounded-full border-[1.5px] md:border-2 flex items-center justify-center", selectedGateway === 'dodo' ? "border-[#5022f5] md:border-indigo-600" : "border-slate-300 dark:border-slate-600")}>
+                                                                {selectedGateway === 'dodo' && <div className="w-2 h-2 rounded-full bg-[#5022f5] md:bg-indigo-600" />}
+                                                            </div>
+                                                            <img src="/payments/dodopayments.webp" alt="Dodo Payments" className="h-3.5 md:h-4 w-auto object-contain" />
+                                                        </div>
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="hidden md:flex items-center gap-1.5 opacity-70">
+                                                                <img src="/payments/visa.webp" alt="Visa" className="h-3.5 w-auto" />
+                                                                <img src="/payments/mastercard.webp" alt="MC" className="h-3.5 w-auto" />
+                                                                <img src="/payments/applepay.webp" alt="Apple Pay" className="h-3.5 w-auto dark:invert" />
+                                                            </div>
+                                                            <div className="bg-emerald-50 md:bg-emerald-100 text-emerald-600 md:text-emerald-700 text-[8px] md:text-[9px] font-bold px-1.5 md:px-2 py-0.5 rounded uppercase tracking-wider">Recommended</div>
+                                                        </div>
+                                                    </button>
+                                                )}
+
+                                                {/* PayPal (All Regions) */}
+                                                {gateways.paypal?.enabled && targetCurrency !== 'INR' && (
+                                                    <button
+                                                        onClick={() => setSelectedGateway('paypal')}
+                                                        className={cn(
+                                                            "w-full h-[52px] md:h-16 px-4 rounded-xl border flex items-center justify-between transition-all group bg-white dark:bg-slate-900 md:bg-transparent",
+                                                            selectedGateway === 'paypal' ? "border-[#5022f5] md:border-indigo-600 bg-indigo-50/10 md:bg-indigo-50/30 dark:bg-indigo-500/10 shadow-sm" : "border-slate-200/80 md:border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
+                                                        )}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={cn("w-4 h-4 rounded-full border-[1.5px] md:border-2 flex items-center justify-center", selectedGateway === 'paypal' ? "border-[#5022f5] md:border-indigo-600" : "border-slate-300 dark:border-slate-600")}>
+                                                                {selectedGateway === 'paypal' && <div className="w-2 h-2 rounded-full bg-[#5022f5] md:bg-indigo-600" />}
+                                                            </div>
+                                                            <div className="flex flex-col items-start">
+                                                                <img src="/payments/paypal.webp" alt="PayPal" className="h-3.5 md:h-4 w-auto object-contain mb-0.5" />
+                                                                {targetCurrency === 'INR' && <span className="text-[9px] text-slate-400">Charges in EUR</span>}
+                                                            </div>
+                                                        </div>
+                                                    </button>
+                                                )}
+                                            </div>
+                                        )}
+                                        {/* PayPal Subscriptions JS Button Container */}
+                                        <div id="paypal-button-container" className={cn("empty:hidden", selectedGateway === 'paypal' ? "mt-2" : "hidden")}></div>
+                                    </div>
+                                    
+                                    {/* Mobile Secure Banner */}
+                                    <div className="md:hidden mt-2 mb-2 w-full bg-[#f6f4ff] dark:bg-indigo-500/10 rounded-xl p-4 flex items-center gap-4 border border-[#e4dfff] dark:border-indigo-500/20">
+                                        <div className="w-8 h-8 rounded-full bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-700">
+                                            <ShieldCheck className="w-4 h-4 text-[#5022f5] dark:text-indigo-400" />
+                                        </div>
+                                        <div>
+                                            <h5 className="text-[12px] font-bold text-[#131131] dark:text-white leading-tight mb-0.5">100% Secure Payment</h5>
+                                            <p className="text-[11px] text-slate-500">Your payment details are safe with us.</p>
+                                        </div>
+                                    </div>
+
+                                </div>
                             </div>
-                            <div className="bg-slate-50 dark:bg-slate-900/50 p-4 text-center shrink-0 border-t border-slate-100 dark:border-slate-800">
-                                <p className="text-[10px] text-slate-400 flex items-center justify-center gap-2">
-                                    <Lock className="w-3 h-3" /> SSL Encrypted & Secure
-                                </p>
+
+                            {/* Footer / CTA Row */}
+                            <div className="bg-white md:bg-slate-50 dark:bg-slate-900 md:dark:bg-slate-800/50 p-4 md:p-6 border-t border-slate-200/80 md:border-slate-200 dark:border-slate-800 md:dark:border-slate-700/50 flex flex-col md:flex-row items-center justify-between gap-4 shrink-0 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] md:shadow-none z-10">
+                                
+                                {/* Trust Badges */}
+                                <div className="hidden md:flex items-center gap-6 shrink-0 order-1">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center"><ShieldCheck className="w-3.5 h-3.5"/></div>
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] font-bold text-slate-900 dark:text-white leading-tight">100% Secure</span>
+                                            <span className="text-[9px] text-slate-500">SSL Encrypted</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center"><Zap className="w-3.5 h-3.5"/></div>
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] font-bold text-slate-900 dark:text-white leading-tight">Instant Access</span>
+                                            <span className="text-[9px] text-slate-500">Start learning immediately</span>
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center"><Circle className="w-3 h-3"/></div>
+                                        <div className="flex flex-col">
+                                            <span className="text-[10px] font-bold text-slate-900 dark:text-white leading-tight">Cancel Anytime</span>
+                                            <span className="text-[9px] text-slate-500">No questions asked</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Pay Button & Total */}
+                                <div className="flex items-center justify-between w-full md:w-auto gap-4 md:gap-6 order-2">
+                                    <div className="flex flex-col items-start md:items-end">
+                                        <span className="text-[10px] md:text-[10px] font-bold text-slate-500 md:text-slate-400 md:uppercase tracking-widest">Total Amount</span>
+                                        <span className="text-[22px] md:text-xl font-black text-[#5022f5] md:text-slate-900 dark:text-white leading-none mt-0.5 md:mt-1">{formatPrice(calculateTotal(), targetCurrency)}</span>
+                                    </div>
+                                    <button
+                                        onClick={() => {
+                                            if (selectedGateway === 'razorpay') handleRazorpay();
+                                            else if (selectedGateway === 'dodo') handleDodoPayment();
+                                            else if (selectedGateway === 'paypal') handlePayPal();
+                                        }}
+                                        disabled={isProcessing || !selectedGateway}
+                                        className="h-[52px] md:h-12 px-5 md:px-6 flex-1 md:flex-none bg-gradient-to-r from-[#8134e7] to-[#d81865] hover:from-[#6c2bbd] hover:to-[#be1558] md:bg-none md:bg-[#6332F6] md:hover:bg-[#5326D4] text-white rounded-[14px] md:rounded-xl font-bold flex items-center justify-center md:justify-start gap-2.5 md:gap-3 transition-all disabled:opacity-50 active:scale-95 shadow-lg shadow-purple-500/25 md:shadow-indigo-500/20"
+                                    >
+                                        {isProcessing ? <Loader2 className="w-5 h-5 animate-spin" /> : (
+                                            <>
+                                                <Lock className="w-4 h-4 md:w-4 md:h-4 opacity-90" />
+                                                <span className="text-[15px] md:text-base">Pay {formatPrice(calculateTotal(), targetCurrency)} <span className="hidden sm:inline">Securely</span></span>
+                                                <svg className="w-4 h-4 opacity-90" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M14 5l7 7m0 0l-7 7m7-7H3" /></svg>
+                                            </>
+                                        )}
+                                    </button>
+                                </div>
                             </div>
+
                         </div>
                     </motion.div>
                 </>

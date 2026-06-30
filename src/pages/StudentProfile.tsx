@@ -66,6 +66,15 @@ export default function StudentProfile({ hideLayout = false }: { hideLayout?: bo
 
     const fetchProfileData = async () => {
         if (!id && !username) return;
+        
+        // Prevent PostgreSQL error 22P02 if id is not a valid UUID
+        const isUuid = (str: string) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(str);
+        if (id && !isUuid(id)) {
+            setHasError(true);
+            setLoading(false);
+            return;
+        }
+
         setLoading(true);
         try {
             let query = supabase
@@ -74,13 +83,13 @@ export default function StudentProfile({ hideLayout = false }: { hideLayout?: bo
 
             if (id) {
                 query = query.eq('id', id);
+            } else if (username) {
+                query = (query as any).eq('username', username);
             }
-            // Removed username query fallback
 
             const { data, error } = await query.single();
 
             if (error || !data) {
-                console.error("Profile not found:", error);
                 setHasError(true);
                 return;
             }

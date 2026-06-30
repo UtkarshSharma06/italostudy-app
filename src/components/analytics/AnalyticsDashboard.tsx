@@ -101,14 +101,17 @@ export default function AnalyticsDashboard({ userId: propUserId, isMobile: propI
     const { hasPremiumAccess: authHasPremium, isAdmin: authIsAdmin, plan: authPlan } = usePlanAccess();
     const isConsultant = authProfile?.is_consultant || authProfile?.role === 'consultant';
 
-    // Premium access for the VIEWER: 
-    // They see full data if they are Admin, Consultant, or have an active Premium plan.
-    const isPremiumViewer = authIsAdmin || authHasPremium || isConsultant;
-
     const isSelfView = !propUserId || (String(propUserId) === String(authUser?.id));
 
-    // For upsell logic: we blur if the viewer is NOT premium AND it's not their own profile.
-    const shouldShowBlur = !isPremiumViewer && !isSelfView;
+    // Premium access for the VIEWER: 
+    // If the user's plan is 'explorer', strictly enforce the paywall (blocks them completely, allowing admins to test).
+    // Otherwise, premium users, admins, and consultants get access.
+    const isPremiumViewer = authPlan === 'explorer' 
+        ? false 
+        : (authIsAdmin || authHasPremium || isConsultant);
+
+    // For upsell logic: we blur if the viewer is NOT premium
+    const shouldShowBlur = !isPremiumViewer;
     const effectiveExamId = targetProfile?.selected_exam || (targetProfile as any)?.selected_exam_id || activeExam?.id;
     
     // Determine the relevant exam configuration for the target student
@@ -127,6 +130,12 @@ export default function AnalyticsDashboard({ userId: propUserId, isMobile: propI
     const dummySubjectData = [
         { subject: 'Subject A', accuracy: 0, total: 0, correct: 0, icon: Brain, color: '#6366f1' },
         { subject: 'Subject B', accuracy: 0, total: 0, correct: 0, icon: FlaskConical, color: '#10b981' }
+    ];
+    const dummyTopics = [
+        { topic: 'Predictive Analysis', accuracy_percentage: 85, status: 'STRONG' },
+        { topic: 'Behavioral Diagnostics', accuracy_percentage: 42, status: 'WEAK' },
+        { topic: 'Weakness Identification', accuracy_percentage: 60, status: 'IMPROVING' },
+        { topic: 'Topic Mastery Tracking', accuracy_percentage: 95, status: 'MASTERED' }
     ];
 
     const displayStats = shouldShowBlur ? dummyStats : stats;
@@ -155,6 +164,9 @@ export default function AnalyticsDashboard({ userId: propUserId, isMobile: propI
                 return;
             }
             try {
+                const isUuid = (str: string) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(str);
+                if (!isUuid(String(targetUserId))) return;
+
                 const { data } = await supabase
                     .from('profiles')
                     .select('*')
@@ -181,6 +193,12 @@ export default function AnalyticsDashboard({ userId: propUserId, isMobile: propI
                 return;
             }
 
+            const isUuid = (str: string) => /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/.test(str);
+            if (!isUuid(String(targetUserId))) {
+                if (isMounted) setIsLoading(false);
+                return;
+            }
+
             const fetchKey = `${targetUserId}-${effectiveExamId}-${timeframe}`;
             if (lastFetchRef.current === fetchKey) return; // Already have/loading this data
             
@@ -192,6 +210,7 @@ export default function AnalyticsDashboard({ userId: propUserId, isMobile: propI
                 const examIds = [effectiveExamId];
                 if (effectiveExamId === 'cent-s-prep') examIds.push('cent-s');
                 if (effectiveExamId === 'imat-prep') examIds.push('imat');
+                if (effectiveExamId === 'til-i-prep') examIds.push('til-i');
 
                 // ============================================================
                 // Fetch all data in parallel using proven working queries
@@ -399,7 +418,8 @@ export default function AnalyticsDashboard({ userId: propUserId, isMobile: propI
                 const allTests = (testsRes.data as any[]) || [];
                 const mockHistory = allTests.filter((t: any) => t.test_type === 'mock' || t.is_mock === true);
 
-                if (isPremiumViewer) {
+                // Always fetch mock data (display is gated by isPremiumViewer in the UI)
+                {
                     const latestMock = mockHistory.length > 0 ? mockHistory[0] : null;
                     const fetchedMockHistory = mockHistory.map((t: any) => ({
                         ...t,
@@ -409,19 +429,20 @@ export default function AnalyticsDashboard({ userId: propUserId, isMobile: propI
                     }));
 
                     const mockIds = mockHistory.map((m: any) => m.id);
+                    // Always use the secure RPC (works for both self and other users)
                     const { data: qData, error: qError } = await (mockIds.length > 0
-                        ? (isSelfView
-                            ? supabase.from('questions').select('*').in('test_id', mockIds)
-                            : (supabase as any).rpc('get_questions_secure', { target_test_ids: mockIds }))
+                        ? (supabase as any).rpc('get_questions_secure', { target_test_ids: mockIds })
                         : Promise.resolve({ data: [] }));
 
                     if (qError) console.error("Questions fetch error:", qError);
-                    setAdvancedData(prev => ({
-                        ...prev,
-                        latestTest: latestMock,
-                        latestQuestions: qData || [],
-                        mockHistory: fetchedMockHistory
-                    }));
+                    if (isMounted) {
+                        setAdvancedData(prev => ({
+                            ...prev,
+                            latestTest: latestMock,
+                            latestQuestions: qData || [],
+                            mockHistory: fetchedMockHistory
+                        }));
+                    }
                 }
 
                 // ============================================================
@@ -454,7 +475,7 @@ export default function AnalyticsDashboard({ userId: propUserId, isMobile: propI
             isMounted = false;
             if (timeoutId) clearTimeout(timeoutId);
         };
-    }, [targetUserId, effectiveExamId, timeframe, isPremiumViewer, isSelfView]);
+    }, [targetUserId, effectiveExamId, timeframe, isPremiumViewer]);
 
     const mockTrendData = useMemo(() => {
         if (!advancedData.mockHistory || advancedData.mockHistory.length === 0) return [];
@@ -531,12 +552,13 @@ export default function AnalyticsDashboard({ userId: propUserId, isMobile: propI
             const examId = (m.exam_type || '').toLowerCase();
             const isImat = examId.includes('imat');
             const isCents = examId.includes('cent-s');
+            const isTilI = examId.includes('til-i');
 
             // IMAT: +1.5 / -0.4
-            // CEnT-S: +1.0 / -0.25
+            // CEnT-S/TIL-I: +1.0 / -0.25
             // Default: +1.0 / 0 (if unrecognized)
-            const corrPts = isImat ? 1.5 : (isCents ? 1.0 : (examObj?.scoring?.correct || 1));
-            const incorrPts = isImat ? 0.4 : (isCents ? 0.25 : Math.abs(examObj?.scoring?.incorrect || 0));
+            const corrPts = isImat ? 1.5 : ((isCents || isTilI) ? 1.0 : (examObj?.scoring?.correct || 1));
+            const incorrPts = isImat ? 0.4 : ((isCents || isTilI) ? 0.25 : Math.abs(examObj?.scoring?.incorrect || 0));
 
             const currentGross = (m.correct_answers || 0) * corrPts;
             const currentPenalty = (m.wrong_answers || 0) * incorrPts;
@@ -904,7 +926,7 @@ export default function AnalyticsDashboard({ userId: propUserId, isMobile: propI
                                                 <span>Mastery</span>
                                             </div>
                                             <div className="space-y-3 pt-2 max-h-[450px] overflow-y-auto custom-scrollbar pr-2">
-                                                {filteredTopics.map((topic, i) => {
+                                                {(shouldShowBlur ? dummyTopics : filteredTopics).map((topic, i) => {
                                                     const acc = Number(topic.accuracy_percentage);
                                                     const barColor = acc >= 80 ? '#10b981' : acc >= 50 ? '#f59e0b' : acc > 0 ? '#f43f5e' : '#94a3b8';
                                                     const statusLabel = acc >= 80 ? 'STRONG' : acc >= 50 ? 'IMPROVING' : acc > 0 ? 'WEAK' : 'NEW';

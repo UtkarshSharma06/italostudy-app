@@ -172,7 +172,7 @@ export default function TestPage() {
     // Standard mock (live session) or Practice Full Exam for CEnT-S/IMAT
     // 'is_mock' is set to true for "Official Simulation" practice in StartTest.tsx
     if (test.test_type === 'mock') return true;
-    if (test.is_mock && (test.exam_type?.includes('cent-s') || test.exam_type?.includes('imat'))) return true;
+    if (test.is_mock && (test.exam_type?.includes('cent-s') || test.exam_type?.includes('imat') || test.exam_type?.includes('til-i'))) return true;
     return false;
   }, [test]);
 
@@ -523,7 +523,7 @@ export default function TestPage() {
         setCurrentIndex(restoredIndex);
       }
 
-      if (testData.test_type === 'mock' || (testData.is_mock && (testData.exam_type?.includes('cent-s') || testData.exam_type?.includes('imat')))) {
+      if (testData.test_type === 'mock' || (testData.is_mock && (testData.exam_type?.includes('cent-s') || testData.exam_type?.includes('imat') || testData.exam_type?.includes('til-i')))) {
         const stage = restoredSection !== null ? restoredSection + 1 : (typeof (testData as any).current_stage === 'number' ? (testData as any).current_stage : 1);
 
         const resolvedConfig = (testData.exam_type && allExams[testData.exam_type]) ? allExams[testData.exam_type] : (activeExam || Object.values(allExams)[0]);

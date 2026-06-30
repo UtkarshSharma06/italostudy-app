@@ -19,6 +19,8 @@ import Layout from '@/components/Layout';
 import { motion } from 'framer-motion';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useActiveTest } from '@/hooks/useActiveTest';
+import { usePlanAccess } from '@/hooks/usePlanAccess';
+import { usePricing } from '@/context/PricingContext';
 
 export default function MockGuidelines() {
     const [searchParams] = useSearchParams();
@@ -28,6 +30,8 @@ export default function MockGuidelines() {
     const { toast } = useToast();
     const isMobile = useIsMobile();
     const { activeTest } = useActiveTest();
+    const { hasReachedMockLimit } = usePlanAccess();
+    const { openPricingModal } = usePricing();
     
     const sessionId = searchParams.get('session_id');
     const examTypeParam = searchParams.get('exam_type');
@@ -73,6 +77,11 @@ export default function MockGuidelines() {
     }, [isMobile, proctorMode, session]);
 
     const handleStart = () => {
+        if (hasReachedMockLimit()) {
+            openPricingModal();
+            return;
+        }
+
         if (!isAccepted) {
             toast({
                 title: "Missing Action: Checkbox",

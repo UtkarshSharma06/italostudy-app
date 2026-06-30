@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
-import { Home, ClipboardList, BarChart3, Settings, Menu, Bell, Search, Play, Users, MessageCircle, Sun, Moon, Crown, ArrowRight, Bug, Target } from 'lucide-react';
+import { Home, ClipboardList, BarChart3, Settings, Menu, Bell, Search, Play, Users, MessageCircle, Sun, Moon, Crown, ArrowRight, Bug, Target, Radar, X, Store } from 'lucide-react';
 import MobileSidebar from './MobileSidebar';
 import { Button } from '@/components/ui/button';
 import LatestNotificationPopup from '@/components/LatestNotificationPopup';
@@ -24,78 +24,15 @@ import { getSkeletonForPath } from '@/lib/skeletons';
 const AnnouncementBar = lazy(() => import('@/components/AnnouncementBar'));
 const PremiumSuccessAnimation = lazy(() => import('@/components/PremiumSuccessAnimation').then(module => ({ default: module.PremiumSuccessAnimation })));
 const FeedbackDialog = lazy(() => import('@/components/FeedbackDialog').then(m => ({ default: m.FeedbackDialog })));
-
-interface NavButtonProps {
-  to: string;
-  icon: React.ReactNode;
-  badge?: boolean;
-  isSoon?: boolean;
-  onClick?: () => void;
-}
-
-const NavButton: React.FC<NavButtonProps & { isGlobal?: boolean }> = ({ to, icon, badge, isGlobal, isSoon, onClick }) => {
-  const location = useLocation();
-  const { theme } = useTheme();
-
-  // Use a more predictable matching logic
-  const currentPath = location.pathname;
-  const isActive = currentPath === to ||
-    (to !== '/mobile/dashboard' && to !== '/' && currentPath.startsWith(to + '/')) ||
-    (to === '/mobile/practice' && currentPath.startsWith('/mobile/practice')) ||
-    (to === '/mobile/mock-exams' && currentPath.startsWith('/mobile/mock-exams'));
-
-  if (isSoon) {
-    return (
-      <button
-        onClick={onClick}
-        className="flex-1 flex flex-col items-center justify-center h-full relative"
-      >
-        <div className="flex items-center justify-center w-full h-full relative">
-          <motion.div
-            className={cn(
-              "relative p-3.5 rounded-2xl transition-all duration-300 z-10 text-muted-foreground"
-            )}
-          >
-            {React.cloneElement(icon as React.ReactElement, { size: 24 })}
-            <div className="absolute -top-1 -right-1 bg-indigo-600 text-[6px] font-black px-1 py-0.5 rounded-full text-white tracking-widest uppercase shadow-sm">SOON</div>
-          </motion.div>
-        </div>
-      </button>
-    );
-  }
-
-  return (
-    <NavLink
-      to={to}
-      className="flex-1 flex flex-col items-center justify-center h-full relative"
-    >
-      <div className="flex items-center justify-center w-full h-full relative">
-        <motion.div
-          animate={{
-            y: isActive ? -4 : 0,
-            scale: isActive ? 1.2 : 1,
-            color: isActive ? "#ffffff" : (theme === 'dark' ? "#94a3b8" : "#64748b")
-          }}
-          transition={{ type: "spring", stiffness: 400, damping: 25 }}
-          className={cn(
-            "relative p-3.5 rounded-2xl transition-all duration-300 z-10",
-            isActive
-              ? (isGlobal
-                ? "bg-gradient-to-br from-amber-400 to-amber-600 text-white shadow-lg shadow-amber-500/40 ring-1 ring-amber-300/50"
-                : "bg-primary text-white shadow-lg shadow-primary/30")
-              : "text-slate-400 dark:text-slate-500"
-          )}
-          style={{ willChange: "transform" }}
-        >
-          {React.cloneElement(icon as React.ReactElement, { size: 24 })}
-          {badge && (
-            <div className="absolute top-2 right-2 w-3 h-3 bg-rose-500 rounded-full border-2 border-white shadow-[0_0_10px_rgba(244,63,94,0.5)] animate-pulse z-20" />
-          )}
-        </motion.div>
-      </div>
-    </NavLink>
-  );
-};
+const SeatTrackerModal = lazy(() => import('@/components/SeatTrackerModal').then(m => ({ default: m.SeatTrackerModal })));
+const SupportWidget = lazy(() => import('@/components/SupportWidget'));
+const tabs = [
+  { id: 'courses', path: '/courses', icon: Play, label: 'Courses' },
+  { id: 'chat', path: '/mobile/community', icon: MessageCircle, label: 'Chat' },
+  { id: 'home', path: '/mobile/dashboard', icon: Home, label: 'Home' },
+  { id: 'store', path: 'https://store.italostudy.com', icon: Store, label: 'Store', isExternal: true },
+  { id: 'analytics', path: '/mobile/analytics', icon: BarChart3, label: 'Analytics' }
+];
 
 interface MobileLayoutProps {
   children?: React.ReactNode;
@@ -106,8 +43,11 @@ interface MobileLayoutProps {
 const MobileLayout: React.FC<MobileLayoutProps> = ({ children, isLoading, hideHeader = false }) => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isNative, setIsNative] = useState<boolean | null>(null);
+  const [isScrolledDown, setIsScrolledDown] = useState(false);
+  const lastScrollY = React.useRef(0);
   const [hasUnreadCommunity, setHasUnreadCommunity] = useState(false);
   const [hasUnreadAnnouncement, setHasUnreadAnnouncement] = useState(false);
+  const [isTrackerModalOpen, setIsTrackerModalOpen] = useState(false);
   const { user, profile } = useAuth() as any;
   const { activeExam } = useExam();
   const { theme, setTheme } = useTheme();
@@ -121,6 +61,11 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children, isLoading, hideHe
   const { openPricingModal } = usePricing();
 
   const isGlobal = profile?.selected_plan === 'global';
+
+  const currentPath = location.pathname;
+  const activeIndex = tabs.findIndex(t => currentPath.startsWith(t.path));
+  const safeActiveIndex = activeIndex >= 0 ? activeIndex : 2;
+
   useEffect(() => {
     if (!user || !activeExam) return;
 
@@ -330,17 +275,29 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children, isLoading, hideHe
               onClick={() => setIsSidebarOpen(true)}
               className="rounded-full hover:bg-secondary active:scale-90 transition-transform h-10 w-10"
             >
-              <Menu className="w-6 h-6" />
+              <Menu className="w-6 h-6" strokeWidth={3} />
             </Button>
-            <div className="flex flex-col">
-              <h1 className="text-sm font-black tracking-tight uppercase leading-none truncate max-w-[120px] sm:max-w-[200px]">
-                {getPageTitle(location.pathname)}
-              </h1>
-              <span className="text-[8px] font-black text-primary uppercase tracking-[0.2em] mt-1 opacity-60">Student Portal</span>
-            </div>
+              <div className="flex items-center ml-1">
+                <img 
+                  src={theme === 'dark' ? "/logo-dark-compact.webp" : "/sidebar-logo.webp"} 
+                  alt="logo" 
+                  loading="eager"
+                  className="w-[52px] h-[52px] object-contain drop-shadow-sm" 
+                />
+              </div>
           </div>
 
           <div className="flex items-center gap-1 sm:gap-2">
+            {/* CEnT-S Slot Tracker button — only for cent-s-prep exam */}
+            {activeExam?.id === 'cent-s-prep' && (
+              <button
+                onClick={() => setIsTrackerModalOpen(true)}
+                className="flex items-center gap-1.5 h-9 px-3 rounded-xl bg-orange-50 dark:bg-orange-950/30 border border-orange-100 dark:border-orange-900/50 text-orange-600 dark:text-orange-400 hover:bg-orange-100 dark:hover:bg-orange-900/40 active:scale-95 transition-all shadow-sm"
+              >
+                <Radar className="h-4 w-4 animate-pulse" />
+                <span className="text-[9px] font-black uppercase tracking-widest hidden sm:block">Slots</span>
+              </button>
+            )}
             <Button
               variant="ghost"
               size="icon"
@@ -387,7 +344,18 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children, isLoading, hideHe
       )}
 
       {/* Main Content Area */}
-      <main className={cn("flex-1 overflow-y-auto pb-32 safe-area-bottom relative", !isStorePage && !hideHeader && "h-[calc(100vh-140px)]")}>
+      <main 
+        className={cn("flex-1 overflow-y-auto pb-32 safe-area-bottom relative", !isStorePage && !hideHeader && "h-[calc(100vh-140px)]")}
+        onScroll={(e) => {
+          const currentScrollY = e.currentTarget.scrollTop;
+          if (currentScrollY > lastScrollY.current + 15) {
+            setIsScrolledDown(true);
+          } else if (currentScrollY < lastScrollY.current - 15 || currentScrollY < 10) {
+            setIsScrolledDown(false);
+          }
+          lastScrollY.current = currentScrollY;
+        }}
+      >
         {isExplorer && !isStorePage && (
           <motion.div
             initial={{ opacity: 0, y: -20 }}
@@ -416,39 +384,107 @@ const MobileLayout: React.FC<MobileLayoutProps> = ({ children, isLoading, hideHe
 
       <MobileSidebar isOpen={isSidebarOpen} onOpenChange={setIsSidebarOpen} />
 
-      {/* Premium Floating Bottom Dock */}
-      <div className="fixed bottom-0 left-0 right-0 px-6 pb-[calc(0.75rem+env(safe-area-inset-bottom,16px))] z-50 pointer-events-none">
-        <nav className="max-w-md mx-auto h-[68px] bg-white/80 dark:bg-slate-950/80 backdrop-blur-2xl border border-white/20 dark:border-slate-800/50 rounded-[2rem] flex items-center justify-around px-2 shadow-[0_20px_50px_rgba(0,0,0,0.3)] pointer-events-auto relative overflow-visible">
-          <NavButton to="/mobile/practice" icon={<ClipboardList />} isGlobal={isGlobal} />
-          <NavButton to="/mobile/mock-exams" icon={<Target />} isGlobal={isGlobal} />
-          
-          {/* Center Home Button - Elevated */}
-          {/* pointer-events-auto: the -top-3 offset lifts this button above the nav's */}
-          {/* natural boundary into the outer pointer-events-none zone. Without this fix, */}
-          {/* the top half of the button swallows taps silently, requiring 2 presses.   */}
-          <div className="relative -top-3 pointer-events-auto">
-             <NavLink
-               to="/mobile/dashboard"
-               className={cn(
-                 "flex items-center justify-center w-14 h-14 rounded-2xl transition-all duration-500 shadow-xl",
-                 location.pathname === '/mobile/dashboard'
-                  ? "bg-primary text-white scale-110 shadow-primary/40 -translate-y-1" 
-                  : "bg-white dark:bg-slate-900 text-slate-400 border border-slate-100 dark:border-slate-800"
-               )}
-             >
-               <Home size={26} strokeWidth={2.5} />
-             </NavLink>
-          </div>
+      {/* CEnT-S Slot Tracker Modal */}
+      <Suspense fallback={null}>
+        <SeatTrackerModal
+          isOpen={isTrackerModalOpen}
+          onClose={() => setIsTrackerModalOpen(false)}
+          isGlobal={profile?.selected_plan === 'global'}
+        />
+      </Suspense>
 
-          <NavButton to="/mobile/learning" icon={<Play />} isGlobal={isGlobal} />
-          <NavButton
-            to="/mobile/community"
-            icon={<MessageCircle />}
-            badge={hasUnreadCommunity}
-            isGlobal={isGlobal}
-          />
-        </nav>
+      {/* Exact Sliding Pop-Out Dock */}
+      <div className="fixed bottom-0 left-0 right-0 px-4 pb-[calc(1rem+env(safe-area-inset-bottom,12px))] z-[45] pointer-events-none">
+        <motion.nav 
+          animate={{ height: isScrolledDown ? 56 : 72 }}
+          transition={{ type: "spring", stiffness: 400, damping: 30 }}
+          className="max-w-[380px] mx-auto w-[92%] relative flex items-end pointer-events-auto"
+        >
+          {/* Glassmorphic Dock Background */}
+          <div className="absolute inset-0 w-full h-full rounded-[34px] bg-[#ebe0ff]/90 dark:bg-[#31225c]/70 backdrop-blur-2xl shadow-[0_20px_50px_rgba(110,50,220,0.25)] dark:shadow-[0_20px_40px_rgba(0,0,0,0.6)] border-[1.5px] border-[#d4bfff] dark:border-[1px] dark:border-[#5f4994]/40 overflow-hidden" />
+
+          {/* Sliding Orb and Dots */}
+          <motion.div
+            className="absolute w-[20%] h-[90px] pointer-events-none z-20 flex flex-col items-center"
+            initial={false}
+            animate={{ 
+              left: `${safeActiveIndex * 20}%`,
+              top: isScrolledDown ? -10 : -18 
+            }}
+            transition={{ type: "spring", stiffness: 400, damping: 30 }}
+          >
+            <motion.div 
+              animate={{ scale: isScrolledDown ? 0.9 : 1 }}
+              className="relative flex items-center justify-center w-[52px] h-[52px] rounded-full bg-white/5 backdrop-blur-md border-[1.5px] border-white/20 shadow-[0_0_30px_rgba(255,77,141,0.7)] group-active:scale-95 transition-transform duration-300"
+            >
+              <div className="absolute inset-0 rounded-full bg-gradient-to-b from-white/30 to-transparent opacity-50" />
+              <div className="absolute inset-[4px] rounded-full bg-gradient-to-b from-[#ff6b9d] to-[#8a3ffc] shadow-[inset_0_0_10px_rgba(255,255,255,0.4)]" />
+              
+              {(() => {
+                const ActiveIcon = tabs[safeActiveIndex].icon;
+                return <ActiveIcon size={24} className="text-white relative z-10 drop-shadow-md" fill={safeActiveIndex === 2 ? "currentColor" : "none"} strokeWidth={safeActiveIndex === 2 ? 1 : 2} />;
+              })()}
+            </motion.div>
+            
+            {/* 4 dots at the bottom */}
+            <motion.div 
+              animate={{ opacity: isScrolledDown ? 0 : 1, y: isScrolledDown ? 10 : 0 }}
+              className="absolute bottom-[8px] flex gap-1"
+            >
+              <div className="w-[3px] h-[3px] rounded-full bg-[#ff4d8d] shadow-[0_0_4px_#ff4d8d]"></div>
+              <div className="w-[3px] h-[3px] rounded-full bg-white/30"></div>
+              <div className="w-[3px] h-[3px] rounded-full bg-white/30"></div>
+              <div className="w-[3px] h-[3px] rounded-full bg-white/30"></div>
+            </motion.div>
+          </motion.div>
+
+          {/* Nav Items */}
+          <div className="flex w-full h-full justify-between items-end relative z-10">
+            {tabs.map((tab, idx) => {
+              const isActive = safeActiveIndex === idx;
+              
+              const innerContent = (
+                  <>
+                  <motion.div 
+                    animate={{ top: isScrolledDown ? 18 : 16 }}
+                    className={cn(
+                      "absolute transition-all duration-300 flex flex-col items-center",
+                      isActive ? "opacity-0 translate-y-4" : "opacity-100 text-[#73639e] hover:text-[#2d1b54] dark:text-[#a08dc7] dark:hover:text-white/90"
+                    )}
+                  >
+                    <tab.icon size={22} strokeWidth={1.5} />
+                  </motion.div>
+                  <span className={cn(
+                    "absolute bottom-[16px] text-[9px] font-bold tracking-widest transition-all duration-300 whitespace-nowrap",
+                    isActive ? "text-[#2d1b54] dark:text-white opacity-100" : "text-[#73639e] dark:text-[#a08dc7] opacity-100",
+                    isScrolledDown ? "opacity-0 translate-y-4 pointer-events-none" : "opacity-100"
+                  )}>
+                    {tab.label}
+                  </span>
+                  </>
+              );
+
+              if (tab.isExternal) {
+                return (
+                  <a key={tab.id} href={tab.path} className="flex-1 flex flex-col items-center h-full relative">
+                    {innerContent}
+                  </a>
+                );
+              }
+
+              return (
+                <NavLink key={tab.id} to={tab.path} className="flex-1 flex flex-col items-center h-full relative">
+                  {innerContent}
+                </NavLink>
+              );
+            })}
+          </div>
+        </motion.nav>
       </div>
+
+      <Suspense fallback={null}>
+        <SupportWidget />
+      </Suspense>
 
       <PremiumSuccessAnimation show={showPremiumAnimation} onComplete={() => setShowPremiumAnimation(false)} />
     </div>

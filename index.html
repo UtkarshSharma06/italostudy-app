@@ -172,7 +172,7 @@
       });
 
       // Immediately hide the dashboard skeleton for public/auth pages to prevent layout flash
-      if (window.location.pathname.includes('/auth') || window.location.pathname.includes('/waiting-room') || window.location.pathname.includes('/solutions')) {
+      if (window.location.pathname.includes('/auth') || window.location.pathname.includes('/waiting-room') || window.location.pathname.includes('/solutions') || window.location.pathname.includes('/onboarding')) {
         const sk = document.getElementById('app-sk');
         if (sk) sk.style.display = 'none';
       }

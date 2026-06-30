@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from 'react';
 import { useLocation } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
+import { useSystemSettings } from '@/context/SystemSettingsContext';
 import { 
     Shield, 
     BookOpen, 
@@ -32,81 +32,56 @@ export default function SecurityEnforcer() {
         };
     }, []);
 
+    const { getSetting } = useSystemSettings();
+
+    // React to maintenance_mode changes pushed by SystemSettingsContext realtime
     useEffect(() => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const checkMaintenance = async (payload?: any) => {
-            let maintenanceActive = false;
+        const maintenanceActive = getSetting('maintenance_mode') === true;
+        const isAdmin = profile?.role === 'admin' || profile?.role === 'sub_admin';
 
-            if (payload) {
-                maintenanceActive = payload.new.value === true;
-            } else {
-                const { data } = await supabase
-                    .from('system_settings')
-                    .select('value')
-                    .eq('key', 'maintenance_mode')
-                    .maybeSingle();
-                maintenanceActive = data?.value === true;
-            }
+        // Handle transition false -> true (only after first initialization)
+        if (isInitialized && lastStatus.current === false && maintenanceActive && !isAdmin) {
+            // Start a 30 second warning
+            setCountdown(30);
+            setShowWarning(true);
 
-            const isAdmin = profile?.role === 'admin' || profile?.role === 'sub_admin';
-
-            // Handle transition false -> true
-            if (lastStatus.current === false && maintenanceActive && !isAdmin) {
-                // Start a 30 second warning
-                setCountdown(30);
-                setShowWarning(true);
-
-                if (timerRef.current) clearInterval(timerRef.current);
-                timerRef.current = setInterval(() => {
-                    if (!isMounted.current) {
+            if (timerRef.current) clearInterval(timerRef.current);
+            timerRef.current = setInterval(() => {
+                if (!isMounted.current) {
+                    if (timerRef.current) clearInterval(timerRef.current);
+                    return null;
+                }
+                setCountdown(prev => {
+                    if (prev !== null && prev <= 1) {
                         if (timerRef.current) clearInterval(timerRef.current);
+                        setIsMaintenance(true);
+                        setShowWarning(false);
                         return null;
                     }
-                    setCountdown(prev => {
-                        if (prev !== null && prev <= 1) {
-                            if (timerRef.current) clearInterval(timerRef.current);
-                            setIsMaintenance(true);
-                            setShowWarning(false);
-                            return null;
-                        }
-                        return prev !== null ? prev - 1 : null;
-                    });
-                }, 1000);
-            }
-            // Handle initial load or already active
-            else if (lastStatus.current === null && maintenanceActive && !isAdmin) {
-                setIsMaintenance(true);
-            }
-            // Handle turning OFF OR user is Admin
-            else if (!maintenanceActive || isAdmin) {
-                if (timerRef.current) clearInterval(timerRef.current);
-                setCountdown(null);
-                setShowWarning(false);
-                setIsMaintenance(false);
-            }
+                    return prev !== null ? prev - 1 : null;
+                });
+            }, 1000);
+        }
+        // Handle initial load or already active
+        else if (!isInitialized && maintenanceActive && !isAdmin) {
+            setIsMaintenance(true);
+        }
+        // Handle turning OFF OR user is Admin
+        else if (!maintenanceActive || isAdmin) {
+            if (timerRef.current) clearInterval(timerRef.current);
+            setCountdown(null);
+            setShowWarning(false);
+            setIsMaintenance(false);
+        }
 
-            lastStatus.current = maintenanceActive;
-            setIsInitialized(true);
-        };
-
-        checkMaintenance();
-
-        // Subscription for real-time maintenance toggle
-        const channel = supabase
-            .channel('maintenance_check')
-            .on('postgres_changes', {
-                event: 'UPDATE',
-                schema: 'public',
-                table: 'system_settings',
-                filter: 'key=eq.maintenance_mode'
-            }, (payload) => checkMaintenance(payload))
-            .subscribe();
+        lastStatus.current = maintenanceActive;
+        setIsInitialized(true);
 
         return () => {
             if (timerRef.current) clearInterval(timerRef.current);
-            supabase.removeChannel(channel);
         };
-    }, [profile?.role]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [getSetting('maintenance_mode'), profile?.role]);
 
     useEffect(() => {
         // WHITELIST CHECK (Routes that NEVER get blocked or security enforced)

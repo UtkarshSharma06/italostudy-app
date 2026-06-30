@@ -15,7 +15,7 @@ import { cn } from '@/lib/utils';
 
 interface AdmissionPredictorProps {
     userScore: number;
-    examType: 'imat' | 'cent-s';
+    examType: 'imat' | 'cent-s' | 'til-i';
     isEuOrigin?: boolean;
     isMobile?: boolean;
 }

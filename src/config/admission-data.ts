@@ -1,6 +1,6 @@
 export interface UniversityThreshold {
     university: string;
-    exam: 'imat' | 'cent-s';
+    exam: 'imat' | 'cent-s' | 'til-i';
     euThreshold: number;
     nonEuThreshold: number;
     year: number;

@@ -15,6 +15,8 @@ import {
     LearningSkeleton,
     ProfileSkeleton,
     BookmarkSkeleton,
+    MobilePageSkeleton,
+    MobilePracticeGridSkeleton
 } from '@/components/SkeletonLoader';
 import { DesktopDashboardSkeleton } from '@/components/DesktopDashboardSkeleton';
 import { DashboardSkeleton as MobileDashboardSkeleton } from '@/mobile/components/DashboardSkeleton';
@@ -64,7 +66,10 @@ export const getSkeletonForPath = (path: string) => {
     }
 
     // Practice / Test Lists
-    if (normalizedPath === '/practice' || normalizedPath === '/mobile/practice') {
+    if (normalizedPath === '/mobile/practice') {
+        return <MobilePracticeGridSkeleton />;
+    }
+    if (normalizedPath === '/practice') {
         return <TestListSkeleton />;
     }
 
@@ -74,7 +79,10 @@ export const getSkeletonForPath = (path: string) => {
     }
 
     // History
-    if (normalizedPath === '/history' || normalizedPath === '/mobile/history') {
+    if (normalizedPath === '/mobile/history') {
+        return <MobilePageSkeleton />;
+    }
+    if (normalizedPath === '/history') {
         return <HistorySkeleton />;
     }
 
@@ -112,7 +120,10 @@ export const getSkeletonForPath = (path: string) => {
     }
 
     // Bookmarks
-    if (normalizedPath === '/bookmarks' || normalizedPath === '/mobile/bookmarks') {
+    if (normalizedPath === '/mobile/bookmarks') {
+        return <MobilePageSkeleton />;
+    }
+    if (normalizedPath === '/bookmarks') {
         return <BookmarkSkeleton />;
     }
 

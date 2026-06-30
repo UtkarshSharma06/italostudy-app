@@ -18,7 +18,8 @@ import {
   Check,
   Shield,
   Server,
-  Lock
+  Lock,
+  Crown
 } from 'lucide-react';
 import { useExam } from '@/context/ExamContext';
 import { usePlanAccess } from '@/hooks/usePlanAccess';
@@ -28,7 +29,7 @@ import { useActiveTest } from '@/hooks/useActiveTest';
 import { ToastAction } from '@/components/ui/toast';
 import { motion, AnimatePresence } from 'framer-motion';
 import { readDashboardCache, invalidateDashboardCache } from '@/hooks/useDashboardPrefetch';
-// EXAMS import removed
+import { SubjectIcon, getSubjectColorClass } from '@/components/ui/SubjectIcon';
 
 const DIFFICULTIES = [
   { value: 'easy', label: 'Easy', description: 'Basic concepts', color: 'text-emerald-500' },
@@ -156,9 +157,14 @@ export default function StartTest() {
     }
 
     // Only check limits for authenticated users
-    if (user && hasReachedSubjectLimit(isFullMock ? 'Mock Simulation' : subject)) {
-      setIsUpgradeModalOpen(true);
-      return;
+    if (user) {
+      if (isFullMock && hasReachedMockLimit()) {
+        setIsUpgradeModalOpen(true);
+        return;
+      } else if (!isFullMock && hasReachedSubjectLimit(subject)) {
+        setIsUpgradeModalOpen(true);
+        return;
+      }
     }
 
     setIsGenerating(true);
@@ -693,20 +699,23 @@ export default function StartTest() {
 
   return (
     <Layout>
-      <div className="container mx-auto px-6 py-12 max-w-3xl animate-in fade-in slide-in-from-bottom-4 duration-700">
-        <div className="flex items-center gap-4 mb-10">
+      <div className="container mx-auto px-4 sm:px-6 py-12 max-w-4xl animate-in fade-in slide-in-from-bottom-4 duration-700">
+        <div className="flex items-center gap-4 mb-10 sm:mb-12 relative z-10">
           <Button
             variant="ghost"
             size="icon"
             onClick={() => navigate(-1)}
-            className="rounded-xl border border-slate-100 dark:border-border hover:bg-white dark:bg-card hover:border-slate-900 transition-all"
+            className="rounded-xl bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800 hover:border-slate-200 transition-all shadow-sm w-12 h-12"
           >
-            <ArrowLeft className="w-4 h-4" />
+            <ArrowLeft className="w-5 h-5 text-slate-600 dark:text-slate-400" />
           </Button>
-          <h1 className="text-3xl font-black text-slate-900 dark:text-slate-100 tracking-tight">Custom Practice</h1>
+          <div className="flex flex-col">
+            <h1 className="text-3xl sm:text-4xl font-black text-[#0f172a] dark:text-white tracking-tight">Custom Practice</h1>
+            <p className="text-slate-500 font-medium text-[14px] sm:text-[15px] mt-1">Configure your perfect mission parameters</p>
+          </div>
         </div>
 
-        <div className="bg-white dark:bg-card p-10 rounded-[2.5rem] border border-slate-100 dark:border-border shadow-xl shadow-slate-200/50 space-y-12">
+        <div className="space-y-12 sm:space-y-16 relative z-10">
           {/* Step 1: Subject Selection */}
           <section className="space-y-6">
             <div className="flex items-center justify-between">
@@ -716,20 +725,34 @@ export default function StartTest() {
               </div>
               <span className="text-[9px] font-black text-indigo-600 uppercase tracking-[0.2em]">{subject} Selected</span>
             </div>
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              {activeExam && activeExam.sections.map((s) => (
-                <button
-                  key={s.name}
-                  onClick={() => setSubject(s.name)}
-                  className={`p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 ${subject === s.name
-                    ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20 text-indigo-900 dark:text-indigo-100 shadow-sm'
-                    : 'border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-slate-400 hover:border-slate-200 dark:hover:border-slate-600'
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+              {activeExam && activeExam.sections.map((s) => {
+                const colorCls = getSubjectColorClass(s.name);
+
+                return (
+                  <button
+                    key={s.name}
+                    onClick={() => setSubject(s.name)}
+                    className={`relative w-full p-5 sm:p-6 rounded-[1.5rem] bg-white dark:bg-slate-900 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] dark:shadow-none transition-all duration-300 text-left flex items-center gap-5 group overflow-hidden border ${
+                        subject === s.name
+                        ? 'border-indigo-500 ring-2 ring-indigo-500/20'
+                        : 'border-slate-100 dark:border-slate-800 hover:border-indigo-500 hover:shadow-[0_8px_30px_-4px_rgba(99,102,241,0.15)] active:scale-95'
                     }`}
-                >
-                  <span className="text-xl">{s.icon}</span>
-                  <span className="font-bold text-[10px] uppercase tracking-tight text-center leading-tight">{s.name}</span>
-                </button>
-              ))}
+                  >
+                    <div className={`w-14 h-14 rounded-2xl flex items-center justify-center shrink-0 ${colorCls} group-hover:scale-110 transition-transform duration-300 shadow-sm border border-white dark:border-transparent`}>
+                        <SubjectIcon subjectName={s.name} fallbackIcon={s.icon} />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <h3 className="font-bold text-[#0f172a] dark:text-white text-[15px] sm:text-[16px] mb-1 truncate">{s.name}</h3>
+                    </div>
+                    {subject === s.name && (
+                        <div className="absolute top-4 right-4 w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center shadow-sm z-20">
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                        </div>
+                    )}
+                  </button>
+                );
+              })}
             </div>
           </section>
 
@@ -743,12 +766,12 @@ export default function StartTest() {
               {isLoadingTopics && <div className="w-4 h-4 border-2 border-indigo-600/30 border-t-indigo-600 rounded-full animate-spin" />}
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="flex flex-wrap gap-3">
               <button
                 onClick={() => setTopic('all')}
-                className={`px-6 py-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest transition-all ${topic === 'all' || !topic
-                  ? 'border-slate-900 dark:border-indigo-600 bg-slate-900 dark:bg-indigo-600 text-white shadow-lg'
-                  : 'border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-300 hover:border-slate-200 dark:hover:border-slate-600'
+                className={`px-5 py-2.5 rounded-full border text-[13px] font-semibold transition-all shadow-sm ${topic === 'all' || !topic
+                  ? 'border-indigo-600 bg-indigo-600 text-white'
+                  : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-200 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'
                   }`}
               >
                 All Topics
@@ -757,19 +780,19 @@ export default function StartTest() {
                 <button
                   key={t.name}
                   onClick={() => setTopic(t.name)}
-                  className={`px-6 py-3 rounded-xl border-2 font-black text-[10px] uppercase tracking-widest transition-all flex items-center gap-2 ${topic === t.name
-                    ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20 text-indigo-900 dark:text-indigo-100 shadow-sm'
-                    : 'border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 text-slate-400 dark:text-slate-300 hover:border-slate-200 dark:hover:border-slate-600'
+                  className={`px-5 py-2.5 rounded-full border text-[13px] font-semibold transition-all shadow-sm flex items-center gap-2 ${topic === t.name
+                    ? 'border-indigo-600 bg-indigo-600 text-white'
+                    : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-200 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'
                     }`}
                 >
                   {t.name}
-                  <span className={`px-2 py-0.5 rounded-full text-[8px] ${topic === t.name ? 'bg-indigo-600 text-white' : 'bg-slate-200 text-slate-500'}`}>
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] ${topic === t.name ? 'bg-indigo-500 text-white' : 'bg-slate-100 text-slate-500 dark:bg-slate-700 dark:text-slate-400'}`}>
                     {t.count}
                   </span>
                 </button>
               ))}
               {!isLoadingTopics && availableTopics.length === 0 && (
-                <p className="text-[10px] font-bold text-slate-300 uppercase tracking-widest py-2">No specific topics discovered in this sector.</p>
+                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest py-2 px-2">No specific topics discovered in this sector.</p>
               )}
             </div>
           </section>
@@ -781,59 +804,124 @@ export default function StartTest() {
                 <Zap className="w-4 h-4 text-indigo-600" />
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Step 3: Mission Scale</h3>
               </div>
-              <div className="flex gap-2 flex-wrap">
+              
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-10">
                 {[1, 5, 10, 15, 20, 25].map((count) => {
                   const remaining = getRemainingQuestions(subject);
                   const isDisabled = isExplorer && count > remaining;
+
+                  let iconContent;
+                  let colorCls;
+                  if (count === 1) {
+                      colorCls = "bg-blue-50 dark:bg-blue-500/10";
+                      iconContent = <span className="text-[40px] drop-shadow-sm leading-none">🧩</span>;
+                  } else if (count === 5) {
+                      colorCls = "bg-purple-50 dark:bg-purple-500/10";
+                      iconContent = <span className="text-[40px] drop-shadow-sm leading-none">📝</span>;
+                  } else if (count === 10) {
+                      colorCls = "bg-green-50 dark:bg-green-500/10";
+                      iconContent = <span className="text-[40px] drop-shadow-sm leading-none">📖</span>;
+                  } else if (count === 15) {
+                      colorCls = "bg-orange-50 dark:bg-orange-500/10";
+                      iconContent = <span className="text-[40px] drop-shadow-sm leading-none">🎯</span>;
+                  } else if (count === 20) {
+                      colorCls = "bg-purple-50 dark:bg-purple-500/10";
+                      iconContent = <span className="text-[40px] drop-shadow-sm leading-none">🏆</span>;
+                  } else {
+                      colorCls = "bg-yellow-50 dark:bg-yellow-500/10";
+                      iconContent = <span className="text-[40px] drop-shadow-sm leading-none">👑</span>;
+                  }
+
                   return (
                     <button
-                      key={count}
-                      type="button"
-                      disabled={isDisabled}
-                      onClick={() => setQuestionCount(count)}
-                      className={`w-12 h-12 rounded-xl border-2 font-black text-xs transition-all ${isDisabled
-                        ? 'opacity-40 cursor-not-allowed bg-slate-100 dark:bg-slate-800/30 border-slate-200 dark:border-slate-700'
-                        : questionCount === count
-                          ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20 text-indigo-900 dark:text-indigo-100 shadow-sm'
-                          : 'border-slate-100 dark:border-slate-700 bg-slate-50/30 dark:bg-slate-800/50 text-slate-400 dark:text-slate-300 hover:border-slate-200 dark:hover:border-slate-600'
+                        key={count}
+                        type="button"
+                        disabled={isDisabled}
+                        onClick={() => setQuestionCount(count)}
+                        className={`relative w-full p-6 sm:p-8 rounded-[1.5rem] sm:rounded-[2rem] border bg-white dark:bg-slate-900 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] dark:shadow-none transition-all duration-300 text-left flex items-center justify-between group overflow-hidden ${
+                            isDisabled
+                                ? 'border-slate-100 dark:border-slate-800 opacity-50 cursor-not-allowed'
+                                : questionCount === count
+                                ? 'border-indigo-500 ring-2 ring-indigo-500/20'
+                                : 'border-slate-100 dark:border-slate-800 hover:border-indigo-500 hover:shadow-[0_8px_30px_-4px_rgba(99,102,241,0.15)] active:scale-95'
                         }`}
                     >
-                      {count}
+                        {/* Left Content */}
+                        <div className="flex flex-col relative z-10">
+                            <div className="flex items-baseline gap-2 mb-1">
+                                <span className="text-4xl sm:text-5xl font-black text-[#0f172a] dark:text-white tracking-tighter">{count}</span>
+                            </div>
+                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-[0.2em] mb-4">QUESTIONS</span>
+                            
+                            <div className="flex items-center gap-1.5 text-[12px] font-medium text-slate-500">
+                                <Clock className="w-3.5 h-3.5 text-green-500" />
+                                Est. {count} mins
+                            </div>
+                        </div>
+
+                        {/* Right Icon Radial Background */}
+                        <div className={`absolute right-[-20px] w-36 h-36 rounded-full flex items-center justify-center shrink-0 ${colorCls} transition-transform duration-500 group-hover:scale-110`}>
+                            <div className="mr-4">
+                                {iconContent}
+                            </div>
+                        </div>
+
+                        {/* Selected / Hover Checkmark Badge */}
+                        {!isDisabled && (
+                            <div className={`absolute top-4 right-4 w-6 h-6 rounded-full bg-indigo-500 text-white flex items-center justify-center transition-all duration-300 shadow-sm z-20 ${questionCount === count ? 'opacity-100 scale-100' : 'opacity-0 scale-50 group-hover:opacity-100 group-hover:scale-100'}`}>
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            </div>
+                        )}
+
+                        {/* Premium Overlay */}
+                        {isDisabled && (
+                            <div className="absolute inset-0 bg-white/60 dark:bg-slate-900/60 backdrop-blur-[2px] rounded-[1.5rem] sm:rounded-[2rem] flex flex-col items-center justify-center z-20">
+                                <Crown className="w-6 h-6 text-yellow-500 mb-2" />
+                                <span className="text-[10px] font-black text-slate-900 dark:text-white uppercase tracking-widest text-center">Premium<br/>Only</span>
+                            </div>
+                        )}
                     </button>
                   );
                 })}
               </div>
+
               {isExplorer && (
-                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mt-3">
-                  Remaining Limit: <span className="text-orange-600">{getRemainingQuestions(subject)}</span> / 15 Questions
-                </p>
+                <div className="flex items-center gap-3 px-4 sm:px-6 py-2 sm:py-3 bg-white dark:bg-slate-900 rounded-full border border-slate-100 dark:border-slate-800 shadow-[0_2px_15px_-3px_rgba(0,0,0,0.03)] w-max">
+                    <div className="w-8 h-8 rounded-lg bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center">
+                        <Zap className="w-4 h-4 text-indigo-500" />
+                    </div>
+                    <span className="text-[13px] font-medium text-slate-500">
+                        Remaining Limit: <span className="text-orange-600 font-bold">{getRemainingQuestions(subject)}</span> / 15 Questions
+                    </span>
+                </div>
               )}
             </section>
 
             {/* Step 4: Time Limit */}
             <section className="space-y-6">
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4 text-indigo-600" />
-                <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Step 4: Time Limit</h3>
+              <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-indigo-600" />
+                    <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Step 4: Time Limit</h3>
+                  </div>
+                  <span className="text-[9px] font-black text-indigo-600 uppercase tracking-[0.2em]">{timeLimit} Minutes Selected</span>
               </div>
-              <div className="flex gap-2 flex-wrap">
+              <div className="flex flex-wrap gap-3">
                 {[10, 15, 20, 30, 45, 60].map((time) => (
                   <button
                     key={time}
                     type="button"
                     onClick={() => setTimeLimit(time)}
-                    className={`px-4 h-12 rounded-xl border-2 font-black text-xs transition-all ${timeLimit === time
-                      ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20 text-indigo-900 dark:text-indigo-100 shadow-sm'
-                      : 'border-slate-100 dark:border-slate-700 bg-slate-50/30 dark:bg-slate-800/50 text-slate-400 dark:text-slate-300 hover:border-slate-200 dark:hover:border-slate-600'
+                    className={`px-5 py-3 rounded-full border text-[14px] font-bold transition-all shadow-sm flex items-center gap-2 ${timeLimit === time
+                      ? 'border-indigo-600 bg-indigo-600 text-white'
+                      : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 hover:border-indigo-200 hover:bg-indigo-50 dark:hover:bg-indigo-900/20'
                       }`}
                   >
-                    {time}m
+                    <Clock className={`w-4 h-4 ${timeLimit === time ? 'text-white' : 'text-slate-400'}`} />
+                    {time} mins
                   </button>
                 ))}
               </div>
-              <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">
-                Selected: <span className="text-indigo-600">{timeLimit} minutes</span>
-              </p>
             </section>
 
             {/* Step 5: Difficulty */}
@@ -842,24 +930,48 @@ export default function StartTest() {
                 <ShieldCheck className="w-4 h-4 text-indigo-600" />
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Step 5: Difficulty</h3>
               </div>
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
                 {DIFFICULTIES.map((d) => {
                   let displayLabel = d.label;
                   const labels = activeExam?.scoring?.difficulty_labels;
                   if (d.value === 'easy') displayLabel = labels?.easy || d.label;
                   if (d.value === 'medium') displayLabel = labels?.medium || d.label;
                   if (d.value === 'hard') displayLabel = labels?.hard || d.label;
+                  
+                  let iconContent;
+                  let colorCls;
+                  if (d.value === 'easy') {
+                      colorCls = "bg-green-50 dark:bg-green-500/10";
+                      iconContent = <span className="text-3xl drop-shadow-sm leading-none">🟢</span>;
+                  } else if (d.value === 'medium') {
+                      colorCls = "bg-orange-50 dark:bg-orange-500/10";
+                      iconContent = <span className="text-3xl drop-shadow-sm leading-none">🟡</span>;
+                  } else {
+                      colorCls = "bg-red-50 dark:bg-red-500/10";
+                      iconContent = <span className="text-3xl drop-shadow-sm leading-none">🔴</span>;
+                  }
 
                   return (
                     <button
-                      key={d.value}
-                      onClick={() => setDifficulty(d.value)}
-                      className={`p-4 rounded-xl border-2 transition-all text-left ${difficulty === d.value
-                        ? 'border-indigo-600 dark:border-indigo-500 bg-indigo-50/50 dark:bg-indigo-900/20'
-                        : 'border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/50 hover:border-slate-200 dark:hover:border-slate-600'
+                        key={d.value}
+                        onClick={() => setDifficulty(d.value)}
+                        className={`relative w-full p-5 sm:p-6 rounded-[1.5rem] bg-white dark:bg-slate-900 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] dark:shadow-none transition-all duration-300 text-left flex items-center gap-4 group overflow-hidden border ${
+                            difficulty === d.value
+                            ? 'border-indigo-500 ring-2 ring-indigo-500/20'
+                            : 'border-slate-100 dark:border-slate-800 hover:border-indigo-500 hover:shadow-[0_8px_30px_-4px_rgba(99,102,241,0.15)] active:scale-95'
                         }`}
                     >
-                      <span className={`font-black text-[10px] uppercase tracking-tight ${d.color}`}>{displayLabel}</span>
+                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${colorCls} group-hover:scale-110 transition-transform duration-300 shadow-sm border border-white dark:border-transparent`}>
+                            {iconContent}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                            <h3 className={`font-black text-[14px] uppercase tracking-widest ${difficulty === d.value ? 'text-indigo-600' : 'text-slate-600 dark:text-slate-300'}`}>{displayLabel}</h3>
+                        </div>
+                        {difficulty === d.value && (
+                            <div className="absolute top-4 right-4 w-5 h-5 rounded-full bg-indigo-500 text-white flex items-center justify-center shadow-sm z-20">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            </div>
+                        )}
                     </button>
                   );
                 })}
@@ -871,11 +983,12 @@ export default function StartTest() {
             <Button
               onClick={() => handleStartTest(false)}
               disabled={isGenerating || !subject}
-              className="w-full bg-slate-900 text-white hover:bg-slate-800 font-black h-20 rounded-[2rem] text-xs uppercase tracking-[0.3em] shadow-2xl shadow-indigo-100 active:scale-[0.98] transition-all"
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700 font-black h-20 rounded-[2rem] text-[15px] uppercase tracking-[0.2em] shadow-2xl shadow-indigo-500/30 active:scale-[0.98] transition-all flex items-center justify-center gap-3 border-0"
             >
-              Initialize Practice Mission
+              Start Mission
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>
             </Button>
-            <p className="text-center text-[9px] font-bold text-slate-300 uppercase tracking-widest mt-8">
+            <p className="text-center text-[9px] font-bold text-slate-400 uppercase tracking-widest mt-8">
               Verified Curriculum Data • 100% Human-Curated Content
             </p>
           </div>

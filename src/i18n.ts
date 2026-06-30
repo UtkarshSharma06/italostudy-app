@@ -207,7 +207,7 @@ const resources = {
                     q1: "How does ItaloStudy help me prepare for the CENT-S 2026 medical exam?",
                     a1: "ItaloStudy provides the world's most advanced study simulator specifically built for the 2026 Italian medical entrance exams. Our platform offers unlimited realistic mock exams, a comprehensive database of past papers, and detailed AI-driven analytics.",
                     q2: "Is the ItaloStudy simulator really free for international students?",
-                    a2: "Yes! We are currently in our Global Beta phase, which means access to our core CENT-S and IMAT study simulators is completely free for all users.",
+                    a2: "Yes! Our Explorer plan provides limited free access, while our Global plan unlocks unlimited practice for all exams.",
                     q3: "How accurate are the ItaloStudy mock exams compared to the real 2026 test?",
                     a3: "Our mock exams are meticulously crafted by medical education experts to mirror the exact difficulty levels, topic distribution, and timing of the real 2026 exams.",
                     q4: "What are the requirements for international students to study in Italy in 2026?",
@@ -242,3 +242,4 @@ i18n
     });
 
 export default i18n;
+

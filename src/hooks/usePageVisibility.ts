@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { supabase } from '@/integrations/supabase/client';
+import { useState, useEffect, useCallback } from 'react';
+import { useSystemSettings } from '@/context/SystemSettingsContext';
 
 export interface PageConfig {
     enabled: boolean;
@@ -10,82 +10,39 @@ export interface SitePageConfigs {
     [key: string]: PageConfig;
 }
 
+/**
+ * usePageVisibility
+ * ─────────────────
+ * Reads page enable/disable configs from SystemSettingsContext (no own fetch,
+ * no own realtime channel). All logic is identical to the previous version.
+ */
 export const usePageVisibility = () => {
-    const CACHE_KEY = 'italostudy_page_configs_v1';
-    const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+    const { getSetting, loading: settingsLoading } = useSystemSettings();
 
-    // Read from localStorage synchronously — same stale-while-revalidate pattern
-    // used for auth profile. This means loading starts as false if cache exists,
-    // so ProtectedRoute never triggers an extra re-render when the DB responds.
-    const readCache = (): SitePageConfigs | null => {
-        try {
-            const raw = localStorage.getItem(CACHE_KEY);
-            if (!raw) return null;
-            const { data, ts } = JSON.parse(raw);
-            return (Date.now() - ts < CACHE_TTL) ? data : null;
-        } catch { return null; }
-    };
+    // Derive configs from shared SystemSettingsContext
+    const buildConfigs = useCallback((): SitePageConfigs => {
+        const pageConfigsJson = getSetting('page_configs') as SitePageConfigs | undefined;
+        const communityEnabled = getSetting('enable_community') as boolean | undefined;
 
-    const writeCache = (data: SitePageConfigs) => {
-        try {
-            localStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() }));
-        } catch { /* silent */ }
-    };
+        const finalConfigs: SitePageConfigs = { ...(pageConfigsJson ?? {}) };
 
-    const cachedConfigs = readCache();
-    const [configs, setConfigs] = useState<SitePageConfigs>(cachedConfigs || {});
-    // If we have a valid cache, start with loading=false (instant unlock)
-    const [loading, setLoading] = useState(!cachedConfigs);
-
-    const fetchConfigs = async () => {
-        try {
-            const { data, error } = await supabase
-                .from('system_settings')
-                .select('key, value')
-                .in('key', [
-                    'page_configs',
-                    'enable_community' // fallback for existing toggle
-                ]);
-
-            if (error) throw error;
-
-            const pageConfigsJson = data.find(item => item.key === 'page_configs')?.value as unknown as SitePageConfigs || {};
-            const communityEnabled = data.find(item => item.key === 'enable_community')?.value as boolean;
-
-            // Merge community status if not explicitly in page_configs
-            const finalConfigs = { ...pageConfigsJson };
-            if (communityEnabled !== undefined && !finalConfigs['/community']) {
-                finalConfigs['/community'] = {
-                    enabled: communityEnabled,
-                    message: "The community features are currently disabled."
-                };
-            }
-
-            setConfigs(finalConfigs);
-            writeCache(finalConfigs); // Persist for instant hydration on next mount
-        } catch (err) {
-            console.error('Error fetching page configs:', err);
-        } finally {
-            setLoading(false);
+        // Merge community status if not explicitly in page_configs
+        if (communityEnabled !== undefined && !finalConfigs['/community']) {
+            finalConfigs['/community'] = {
+                enabled: communityEnabled,
+                message: 'The community features are currently disabled.',
+            };
         }
-    };
 
+        return finalConfigs;
+    }, [getSetting]);
+
+    const [configs, setConfigs] = useState<SitePageConfigs>(buildConfigs);
+
+    // Re-derive whenever SystemSettingsContext updates
     useEffect(() => {
-        fetchConfigs();
-
-        const channel = supabase
-            .channel(`system-settings-changes-${Math.random().toString(36).slice(2)}`)
-            .on(
-                'postgres_changes',
-                { event: '*', schema: 'public', table: 'system_settings' },
-                () => fetchConfigs()
-            )
-            .subscribe();
-
-        return () => {
-            supabase.removeChannel(channel);
-        };
-    }, []);
+        setConfigs(buildConfigs());
+    }, [buildConfigs]);
 
     const normalizePath = (path: string): string => {
         if (path.startsWith('/mobile/')) {
@@ -97,7 +54,7 @@ export const usePageVisibility = () => {
 
     const isPageEnabled = (path: string): boolean => {
         const normalized = normalizePath(path);
-        
+
         // [OVERRIDE] Store is always enabled as per user request
         if (normalized.startsWith('/store')) return true;
 
@@ -109,8 +66,11 @@ export const usePageVisibility = () => {
     const getMaintenanceMessage = (path: string): string => {
         const normalized = normalizePath(path);
         const config = configs[normalized] || (normalized.startsWith('/settings') ? configs['/settings'] : null);
-        return config?.message || "This page is currently under development. Please check back later.";
+        return config?.message || 'This page is currently under development. Please check back later.';
     };
 
-    return { configs, isPageEnabled, getMaintenanceMessage, loading, refresh: fetchConfigs };
+    // Expose refresh so callers can still call refresh() — delegates to SystemSettingsContext
+    const { refresh } = useSystemSettings();
+
+    return { configs, isPageEnabled, getMaintenanceMessage, loading: settingsLoading, refresh };
 };

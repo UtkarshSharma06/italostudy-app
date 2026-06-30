@@ -15,9 +15,7 @@ import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 
-const SUBJECT_ICONS = ['📚', '🔬', '⚗️', '🧮', '🌍', '📐', '🔭', '🎨', '🧬', '📖', '🏛️', '💡'];
-function subjectIcon(idx: number) { return SUBJECT_ICONS[idx % SUBJECT_ICONS.length]; }
-
+import { SubjectIcon, getSubjectColorClass } from '@/components/ui/SubjectIcon';
 interface Course {
     id: string; title: string; description: string;
     thumbnail_url: string; banner_url: string;
@@ -27,6 +25,7 @@ interface Course {
     launch_date?: string;
     lecture_type?: string;
     features?: string[];
+    slug?: string;
 }
 interface Subject { id: string; title: string; position: number; }
 
@@ -52,6 +51,9 @@ export default function CourseDetail({ isMobileLayout }: { isMobileLayout?: bool
     const [activeTab, setActiveTab] = useState<Tab>('description');
     const [enrolling, setEnrolling] = useState(false);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [isPreRegistered, setIsPreRegistered] = useState(false);
+    const [isPreRegistering, setIsPreRegistering] = useState(false);
+    const [preRegistrationCount, setPreRegistrationCount] = useState(0);
 
     const { config, openPricingModal } = usePricing();
     const { formatPrice, getRegionalPrice } = useCurrency();
@@ -93,6 +95,22 @@ export default function CourseDetail({ isMobileLayout }: { isMobileLayout?: bool
             setChapterCounts(counts);
         }
 
+        if (user) {
+            try {
+                const { data } = await sb.from('course_pre_registrations').select('id').eq('user_id', user.id).eq('course_id', courseId).maybeSingle();
+                if (data) setIsPreRegistered(true);
+            } catch (e) {
+                // Ignore error if table doesn't exist yet
+            }
+        }
+
+        try {
+            const { count } = await sb.from('course_pre_registrations').select('*', { count: 'exact', head: true }).eq('course_id', courseId);
+            if (count) setPreRegistrationCount(count);
+        } catch (e) {
+            // Ignore
+        }
+
         setIsLoading(false);
     };
 
@@ -116,6 +134,43 @@ export default function CourseDetail({ isMobileLayout }: { isMobileLayout?: bool
         }
     };
 
+    const handlePreRegister = async () => {
+        if (!user) { toast.error('Please sign in to pre-register.'); return; }
+        setIsPreRegistering(true);
+        try {
+            const { error } = await (supabase as any).from('course_pre_registrations').insert({
+                user_id: user.id,
+                course_id: course.id
+            });
+            if (error) throw error;
+            setIsPreRegistered(true);
+            toast.success('Successfully pre-registered! We will notify you and send a discount when it launches.');
+        } catch (e: any) {
+            toast.error(e.message || 'Failed to pre-register. Please try again later.');
+        } finally {
+            setIsPreRegistering(false);
+        }
+    };
+
+    const handleShare = async () => {
+        const slugOrId = course?.slug || courseId;
+        const url = `https://italostudy.com/courses/${slugOrId}`;
+        if (navigator.share) {
+            try {
+                await navigator.share({
+                    title: course?.title || 'ItaloStudy Course',
+                    text: `Check out this course: ${course?.title}`,
+                    url: url
+                });
+            } catch (err) {
+                // Ignore abort errors
+            }
+        } else {
+            navigator.clipboard.writeText(url);
+            toast.success('Course link copied to clipboard!');
+        }
+    };
+
     const fmt = (d: string) => new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
     const examName = (course as any)?._examName;
     const TABS: { id: Tab; label: string }[] = [
@@ -131,18 +186,52 @@ export default function CourseDetail({ isMobileLayout }: { isMobileLayout?: bool
     const displayOriginalAmount = hasDiscount ? originalLocal.amount : (originalLocal.amount > 0 ? Math.round(originalLocal.amount * 1.8) : 0);
     const discountPercent = displayOriginalAmount > 0 ? Math.round(((displayOriginalAmount - finalLocal.amount) / displayOriginalAmount) * 100) : 0;
 
+    const isComingSoon = course && course.launch_date && (
+        course.launch_date.toLowerCase() === 'coming soon' || 
+        (!isNaN(Date.parse(course.launch_date)) && new Date(course.launch_date) > new Date())
+    );
+
     // ── Loading state ────────────────────────────────────────────────────────
     if (isLoading || accessLoading) {
-        const loader = (
-            <div className="flex flex-col items-center justify-center min-h-screen gap-4">
-                <div className="w-14 h-14 rounded-2xl bg-indigo-100 dark:bg-indigo-900/30 flex items-center justify-center">
-                    <Loader2 className="w-7 h-7 animate-spin text-[#5a4bda]" />
+        const loader = isMobileLayout ? (
+            <div className="min-h-screen bg-[#f3f4f6] dark:bg-slate-950 pb-[100px] animate-pulse">
+                <div className="w-full aspect-video bg-slate-200 dark:bg-slate-800" />
+                <div className="bg-white dark:bg-slate-900 px-5 py-5">
+                    <div className="h-6 w-3/4 bg-slate-200 dark:bg-slate-800 rounded mb-3" />
+                    <div className="flex gap-2 mb-4">
+                        <div className="h-5 w-20 bg-slate-200 dark:bg-slate-800 rounded" />
+                        <div className="h-5 w-32 bg-slate-200 dark:bg-slate-800 rounded" />
+                    </div>
+                    <div className="h-12 w-full bg-slate-200 dark:bg-slate-800 rounded-lg mt-4" />
                 </div>
-                <p className="text-sm font-bold text-slate-400">Loading course…</p>
+                <div className="mt-2 bg-white dark:bg-slate-900 px-5 py-6 space-y-4">
+                    <div className="h-5 w-1/3 bg-slate-200 dark:bg-slate-800 rounded" />
+                    <div className="space-y-2">
+                        <div className="h-4 w-full bg-slate-200 dark:bg-slate-800 rounded" />
+                        <div className="h-4 w-5/6 bg-slate-200 dark:bg-slate-800 rounded" />
+                        <div className="h-4 w-4/6 bg-slate-200 dark:bg-slate-800 rounded" />
+                    </div>
+                </div>
+            </div>
+        ) : (
+            <div className="bg-[#f3f4f6] dark:bg-slate-950 min-h-screen animate-pulse">
+                <div className="bg-slate-200 dark:bg-slate-800 h-[180px] w-full" />
+                <div className="max-w-[1200px] mx-auto px-4 py-8 pb-20">
+                    <div className="flex flex-col lg:flex-row gap-6">
+                        <div className="flex-1 space-y-6">
+                            <div className="bg-white dark:bg-slate-900 rounded-xl h-[400px] border border-slate-200 dark:border-slate-800" />
+                            <div className="bg-white dark:bg-slate-900 rounded-xl h-[200px] border border-slate-200 dark:border-slate-800" />
+                        </div>
+                        <div className="w-full lg:w-[380px] shrink-0">
+                            <div className="bg-white dark:bg-slate-900 rounded-2xl h-[450px] border border-slate-200 dark:border-slate-800" />
+                        </div>
+                    </div>
+                </div>
             </div>
         );
+
         if (isMobileLayout) return loader;
-        return <Layout>{loader}</Layout>;
+        return <Layout showFooter={false}>{loader}</Layout>;
     }
 
     if (!course) return null;
@@ -184,18 +273,92 @@ export default function CourseDetail({ isMobileLayout }: { isMobileLayout?: bool
                         </h1>
                         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 text-xs font-semibold text-slate-500">
                             {course.lecture_type && (
-                                <div className={cn("px-2 py-1 rounded flex items-center gap-1 uppercase", course.lecture_type === 'Live' ? "bg-red-50 text-red-600" : "bg-slate-100 text-slate-700")}>
-                                    {course.lecture_type === 'Live' && <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span>}
-                                    {course.lecture_type} BATCH
+                                <div className={cn("px-2 py-1 rounded flex items-center gap-1 uppercase", course.lecture_type.toLowerCase() === 'live' ? "bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400" : "bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300")}>
+                                    {course.lecture_type.toLowerCase() === 'live' && <span className="w-1.5 h-1.5 rounded-full bg-red-600 animate-pulse"></span>}
+                                    {course.lecture_type}
                                 </div>
                             )}
                             <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded">
                                 <GraduationCap className="w-3.5 h-3.5" /> {examName ? `For ${examName} Aspirants` : 'For All Aspirants'}
                             </div>
                             <div className="bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 px-2 py-1 rounded">
-                                English / Hindi
+                                English
                             </div>
                         </div>
+                    </div>
+
+                    {/* Inline CTA Block */}
+                    <div className="bg-white dark:bg-slate-900 px-5 pb-5 pt-2 shadow-sm border-b border-slate-100 dark:border-slate-800">
+                        {hasAccess ? (
+                            <div className="flex flex-col gap-2">
+                                <button
+                                    onClick={() => {
+                                        if (subjects.length > 0) {
+                                            navigate(`/courses/${courseId}/subject/${subjects[0].id}`);
+                                        }
+                                    }}
+                                    className="w-full flex items-center justify-center gap-2 bg-[#5a4bda] active:bg-[#4a3bc2] text-white rounded-lg py-3 font-bold text-sm transition-all uppercase"
+                                >
+                                    <Play className="w-4 h-4 fill-white" /> Continue Learning
+                                </button>
+                                {BUNDLE_PLAN && (
+                                    <button
+                                        onClick={openPricingModal}
+                                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 text-[#5a4bda] text-xs font-bold transition-all border border-slate-200 dark:border-slate-700"
+                                    >
+                                        <Sparkles className="w-3.5 h-3.5" /> Unlock {BUNDLE_PLAN.name}
+                                    </button>
+                                )}
+                            </div>
+                        ) : isComingSoon ? (
+                            <div className="flex flex-col gap-2">
+                                <div className="flex items-center justify-between gap-2 text-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 px-3 py-2 rounded-lg text-sm">
+                                    <div className="flex items-center gap-2">
+                                        <Sparkles className="w-4 h-4" />
+                                        <span className="font-bold">Pre-register for early discount</span>
+                                    </div>
+                                </div>
+                                <button
+                                    onClick={handlePreRegister}
+                                    disabled={isPreRegistering || isPreRegistered}
+                                    className="w-full flex items-center justify-center gap-2 bg-[#5a4bda] active:bg-[#4a3bc2] disabled:opacity-60 text-white rounded-lg py-3 font-bold text-sm transition-all uppercase tracking-wide"
+                                >
+                                    {isPreRegistering ? <Loader2 className="w-5 h-5 animate-spin mx-auto" /> : (
+                                        isPreRegistered ? 'PRE-REGISTERED SUCCESSFULLY' : 'PRE-REGISTER'
+                                    )}
+                                </button>
+                            </div>
+                        ) : (
+                            <div className="flex items-center justify-between gap-3">
+                                <div className="flex-1 flex flex-col justify-center">
+                                    {course.is_free ? (
+                                        <span className="text-xl font-bold text-[#5a4bda]">Free</span>
+                                    ) : (
+                                        <>
+                                            <div className="flex items-baseline gap-1.5">
+                                                <span className="text-xl font-bold text-[#5a4bda] leading-none">
+                                                    {formatPrice(finalLocal.amount, finalLocal.currency)}
+                                                </span>
+                                                <span className="text-xs font-semibold text-slate-400 line-through">
+                                                    {formatPrice(displayOriginalAmount, finalLocal.currency)}
+                                                </span>
+                                            </div>
+                                            <div className="mt-1 w-fit inline-flex items-center gap-1 bg-green-50 border border-green-200 text-green-700 px-1 py-0.5 rounded text-[9px] font-bold">
+                                                <span className="w-2.5 h-2.5 flex items-center justify-center bg-green-700 text-white rounded-full text-[6px]">%</span>
+                                                {discountPercent}% OFF
+                                            </div>
+                                        </>
+                                    )}
+                                </div>
+                                <button
+                                    onClick={handleEnroll}
+                                    disabled={enrolling || accessLoading}
+                                    className="flex-[1.5] flex items-center justify-center gap-2 bg-[#5a4bda] active:bg-[#4a3bc2] disabled:opacity-60 text-white rounded-lg py-3 font-bold text-sm transition-all shadow-sm uppercase tracking-wide"
+                                >
+                                    {enrolling ? <Loader2 className="w-4 h-4 animate-spin" /> : (course.is_free ? 'ENROLL FREE' : 'BUY NOW')}
+                                </button>
+                            </div>
+                        )}
                     </div>
 
                     {/* ── Tab bar ── */}
@@ -267,7 +430,7 @@ export default function CourseDetail({ isMobileLayout }: { isMobileLayout?: bool
                                                         className="w-full group flex items-center gap-4 p-4 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 active:scale-[0.98] transition-all shadow-sm text-left"
                                                     >
                                                         <div className="w-12 h-12 rounded-lg bg-slate-50 dark:bg-slate-800 flex items-center justify-center text-2xl flex-shrink-0">
-                                                            {subjectIcon(si)}
+                                                            <SubjectIcon subjectName={subject.title} />
                                                         </div>
                                                         <div className="flex-1 min-w-0">
                                                             <h3 className="font-bold text-slate-900 dark:text-white text-sm leading-snug line-clamp-2">
@@ -288,61 +451,6 @@ export default function CourseDetail({ isMobileLayout }: { isMobileLayout?: bool
                         </AnimatePresence>
                     </div>
                     
-                    {/* Mobile Fixed Bottom CTA */}
-                    <div className="fixed bottom-[0px] pb-safe left-0 right-0 p-3 bg-white dark:bg-slate-900 border-t border-slate-200 dark:border-slate-800 shadow-[0_-4px_16px_rgba(0,0,0,0.06)] z-40">
-                        {hasAccess ? (
-                            <div className="flex flex-col gap-2">
-                                <button
-                                    onClick={() => {
-                                        if (subjects.length > 0) {
-                                            navigate(`/courses/${courseId}/subject/${subjects[0].id}`);
-                                        }
-                                    }}
-                                    className="w-full flex items-center justify-center gap-2 bg-[#5a4bda] active:bg-[#4a3bc2] text-white rounded-lg py-3 font-bold text-sm transition-all uppercase"
-                                >
-                                    <Play className="w-4 h-4 fill-white" /> Continue Learning
-                                </button>
-                                {BUNDLE_PLAN && (
-                                    <button
-                                        onClick={openPricingModal}
-                                        className="w-full flex items-center justify-center gap-2 py-2.5 rounded-lg bg-slate-50 dark:bg-slate-800 text-[#5a4bda] text-xs font-bold transition-all border border-slate-200 dark:border-slate-700"
-                                    >
-                                        <Sparkles className="w-3.5 h-3.5" /> Unlock {BUNDLE_PLAN.name}
-                                    </button>
-                                )}
-                            </div>
-                        ) : (
-                            <div className="flex items-center justify-between gap-3">
-                                <div className="flex-1 flex flex-col justify-center">
-                                    {course.is_free ? (
-                                        <span className="text-xl font-bold text-[#5a4bda]">Free</span>
-                                    ) : (
-                                        <>
-                                            <div className="flex items-baseline gap-1.5">
-                                                <span className="text-xl font-bold text-[#5a4bda] leading-none">
-                                                    {formatPrice(finalLocal.amount, finalLocal.currency)}
-                                                </span>
-                                                <span className="text-xs font-semibold text-slate-400 line-through">
-                                                    {formatPrice(displayOriginalAmount, finalLocal.currency)}
-                                                </span>
-                                            </div>
-                                            <div className="mt-1 w-fit inline-flex items-center gap-1 bg-green-50 border border-green-200 text-green-700 px-1 py-0.5 rounded text-[9px] font-bold">
-                                                <span className="w-2.5 h-2.5 flex items-center justify-center bg-green-700 text-white rounded-full text-[6px]">%</span>
-                                                {discountPercent}% OFF
-                                            </div>
-                                        </>
-                                    )}
-                                </div>
-                                <button
-                                    onClick={handleEnroll}
-                                    disabled={enrolling || accessLoading || course.launch_date?.toLowerCase() === 'coming soon'}
-                                    className="flex-[1.5] flex items-center justify-center gap-2 bg-[#5a4bda] active:bg-[#4a3bc2] disabled:opacity-60 text-white rounded-lg py-3 font-bold text-sm transition-all shadow-sm uppercase tracking-wide"
-                                >
-                                    {enrolling ? <Loader2 className="w-4 h-4 animate-spin" /> : (course.launch_date?.toLowerCase() === 'coming soon' ? 'COMING SOON' : (course.is_free ? 'ENROLL FREE' : 'BUY NOW'))}
-                                </button>
-                            </div>
-                        )}
-                    </div>
                 </div>
         );
     }
@@ -388,10 +496,10 @@ export default function CourseDetail({ isMobileLayout }: { isMobileLayout?: bool
                             </div>
                             {/* Action Buttons */}
                             <div className="hidden md:flex gap-3">
-                                <button className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-md text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                <button onClick={handleShare} className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-md text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                                     <Share2 className="w-4 h-4" /> Share Batch
                                 </button>
-                                <button className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-md text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+                                <button onClick={() => toast.info('Announcements coming soon!')} className="flex items-center gap-1.5 px-3 py-1.5 border border-slate-200 dark:border-slate-700 rounded-md text-sm font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
                                     <Bell className="w-4 h-4" /> Announcement
                                 </button>
                             </div>
@@ -451,8 +559,8 @@ export default function CourseDetail({ isMobileLayout }: { isMobileLayout?: bool
                                                                 onClick={() => navigate(`/courses/${courseId}/subject/${subject.id}`)}
                                                                 className="group flex items-center gap-4 p-4 rounded-xl border border-slate-200 dark:border-slate-700 hover:border-[#5a4bda] dark:hover:border-[#5a4bda] bg-slate-50 dark:bg-slate-800/50 text-left transition-all cursor-pointer"
                                                             >
-                                                                <div className="w-12 h-12 rounded-lg bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center text-2xl flex-shrink-0">
-                                                                    {subjectIcon(si)}
+                                                                <div className={cn("w-12 h-12 rounded-lg shadow-sm flex items-center justify-center flex-shrink-0", getSubjectColorClass(subject.title))}>
+                                                                    <SubjectIcon subjectName={subject.title} className="w-6 h-6" />
                                                                 </div>
                                                                 <div className="min-w-0 flex-1">
                                                                     <h3 className="font-bold text-slate-900 dark:text-white text-[15px] leading-snug line-clamp-2 group-hover:text-[#5a4bda] transition-colors">
@@ -493,7 +601,7 @@ export default function CourseDetail({ isMobileLayout }: { isMobileLayout?: bool
                                                     <GraduationCap className="w-4 h-4" /> {examName ? `For ${examName} Aspirants` : 'For All Aspirants'}
                                                 </div>
                                                 <div className="bg-[#f0f0ff] dark:bg-indigo-900/30 text-[#5a4bda] px-2 py-1 rounded">
-                                                    English / Hindi
+                                                    English
                                                 </div>
                                             </div>
 
@@ -505,7 +613,7 @@ export default function CourseDetail({ isMobileLayout }: { isMobileLayout?: bool
                                                 {course.lecture_type && (
                                                     <div className="flex justify-between text-sm items-center">
                                                         <span className="text-slate-500 dark:text-slate-400">Lecture Type</span>
-                                                        <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase", course.lecture_type === 'Live' ? "bg-red-50 text-red-600" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300")}>
+                                                        <span className={cn("px-2 py-0.5 rounded text-[10px] font-bold uppercase", course.lecture_type.toLowerCase() === 'live' ? "bg-red-50 text-red-600 dark:bg-red-500/10 dark:text-red-400" : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300")}>
                                                             {course.lecture_type}
                                                         </span>
                                                     </div>
@@ -544,6 +652,23 @@ export default function CourseDetail({ isMobileLayout }: { isMobileLayout?: bool
                                                         </button>
                                                     )}
                                                 </div>
+                                            ) : isComingSoon ? (
+                                                <div className="flex flex-col gap-3 mt-2">
+                                                    <div className="flex items-center justify-between gap-2 text-indigo-600 bg-indigo-50 dark:bg-indigo-900/20 px-3 py-2 rounded-lg text-sm">
+                                                        <div className="flex items-center gap-2">
+                                                            <Sparkles className="w-5 h-5" />
+                                                            <span className="font-bold">Pre-register for early discount</span>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        onClick={handlePreRegister}
+                                                        disabled={isPreRegistered || isPreRegistering}
+                                                        className="w-full bg-[#5a4bda] hover:bg-[#4a3bc2] text-white rounded-lg h-12 font-bold uppercase tracking-wide text-sm transition-all flex items-center justify-center gap-2 disabled:opacity-70 disabled:cursor-not-allowed"
+                                                    >
+                                                        {isPreRegistering ? <Loader2 className="w-5 h-5 animate-spin" /> : 
+                                                            isPreRegistered ? 'PRE-REGISTERED SUCCESSFULLY' : 'PRE-REGISTER NOW'}
+                                                    </button>
+                                                </div>
                                             ) : (
                                                 <div className="flex items-center justify-between gap-4 mt-2">
                                                     <div className="flex flex-col">
@@ -565,10 +690,10 @@ export default function CourseDetail({ isMobileLayout }: { isMobileLayout?: bool
 
                                                     <button
                                                         onClick={handleEnroll}
-                                                        disabled={enrolling || accessLoading || course.launch_date?.toLowerCase() === 'coming soon'}
+                                                        disabled={enrolling || accessLoading}
                                                         className="bg-[#5a4bda] hover:bg-[#4a3bc2] text-white font-bold px-6 py-3 rounded-lg shadow-sm transition-colors uppercase tracking-wide text-sm disabled:opacity-70 flex items-center gap-2 min-w-[120px] justify-center"
                                                     >
-                                                        {enrolling ? <Loader2 className="w-5 h-5 animate-spin" /> : (course.launch_date?.toLowerCase() === 'coming soon' ? 'COMING SOON' : (course.is_free ? 'ENROLL FREE' : 'BUY NOW'))}
+                                                        {enrolling ? <Loader2 className="w-5 h-5 animate-spin" /> : (course.is_free ? 'ENROLL FREE' : 'BUY NOW')}
                                                     </button>
                                                 </div>
                                             )}

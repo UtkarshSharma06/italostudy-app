@@ -2,9 +2,13 @@ import { useEffect, useState, memo, useCallback, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate, Link, useLocation } from 'react-router-dom';
 import { format } from 'date-fns';
+import { toast as sonnerToast } from 'sonner';
 import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
 import Layout from '@/components/Layout';
+import { DynamicStoreAd } from '@/components/store/DynamicStoreAd';
+import { UpgradeModal } from '@/components/UpgradeModal';
+import { SubjectIcon, getSubjectColorClass } from '@/components/ui/SubjectIcon';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -61,6 +65,7 @@ const SeatTrackerModal = lazy(() => import('@/components/SeatTrackerModal').then
 
 import { useActiveTest } from '@/hooks/useActiveTest';
 import { usePlanAccess } from '@/hooks/usePlanAccess';
+import { useGamification } from '@/hooks/useGamification';
 // import { NotificationPrompt } from '@/components/NotificationPrompt';
 import { getOptimizedImageUrl } from '@/lib/image-optimizer';
 import CountUp from '@/components/CountUp';
@@ -107,39 +112,12 @@ const StatCard = memo(({ label, value, icon: Icon, color, bg, border }: any) => 
 ));
 
 const SubjectMasteryItem = memo(({ subject, index = 0 }: { subject: SubjectMastery, index?: number }) => {
-    // Determine subject icon and color scheme based on the subject name
-    const getSubjectConfig = (name: string) => {
-        const lowerName = name.toLowerCase();
-        if (lowerName.includes('math')) return {
-            colors: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600',
-            icon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M12 12c-2-2.67-4-4-6-4a4 4 0 1 0 0 8c2 0 4-1.33 6-4Zm0 0c2 2.67 4 4 6 4a4 4 0 1 0 0-8c-2 0-4 1.33-6 4Z"/></svg>
-        }; // Infinity symbol for math
-        if (lowerName.includes('bio')) return {
-            colors: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600',
-            icon: <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="m8.5 4 7 16"/><path d="m15.5 4-7 16"/><path d="M14 6h-4"/><path d="M13 18h-2"/><path d="M15 10H9"/><path d="M14.5 14h-5"/></svg>
-        }; // DNA structure for biology
-        if (lowerName.includes('chem')) return {
-            colors: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600',
-            icon: <FlaskConical className="w-5 h-5 stroke-[2.5px]" />
-        };
-        if (lowerName.includes('reasoning') || lowerName.includes('logic')) return {
-            colors: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600',
-            icon: <Brain className="w-5 h-5 stroke-[2.5px]" />
-        };
-        return {
-            colors: 'bg-rose-100 dark:bg-rose-900/30 text-rose-600',
-            icon: <BookOpen className="w-5 h-5 stroke-[2.5px]" />
-        };
-    };
-
-    const config = getSubjectConfig(subject.subject);
-
     return (
         <div className="group relative">
             <div className="flex items-center justify-between mb-4">
                 <div className="flex items-center gap-4">
-                    <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110", config.colors)}>
-                        {config.icon}
+                    <div className={cn("w-10 h-10 rounded-xl flex items-center justify-center transition-transform group-hover:scale-110", getSubjectColorClass(subject.subject))}>
+                        <SubjectIcon subjectName={subject.subject} className="w-5 h-5" />
                     </div>
                     <span className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-tight">{subject.subject}</span>
                 </div>
@@ -307,6 +285,7 @@ export default function Dashboard() {
     const { activeExam, allExams } = useExam();
     const { activeTest, refreshActiveTest } = useActiveTest();
     const [isTestNotificationDismissed, setIsTestNotificationDismissed] = useState(false);
+    const gamification = useGamification(user?.id);
 
     // ── Check for Personal Study Plan ──
     const [hasStudyPlan, setHasStudyPlan] = useState(false);
@@ -382,6 +361,56 @@ export default function Dashboard() {
             navigate('/onboarding');
         }
     }, [user, loading, profile, navigate, location.pathname]);
+
+    // ── Payment Activation Polling Logic ──
+    useEffect(() => {
+        if (!user) return;
+
+        const searchParams = new URLSearchParams(location.search);
+        if (searchParams.get('upgraded') === '1') {
+            const toastId = sonnerToast.loading('Activating your Premium plan...', { duration: Infinity });
+            let attempts = 0;
+            const maxAttempts = 15; // 30 seconds total
+
+            const pollInterval = setInterval(async () => {
+                attempts++;
+                try {
+                    // Force a direct DB read to bypass cache
+                    const { data } = await supabase
+                        .from('profiles')
+                        .select('selected_plan, subscription_tier')
+                        .eq('id', user.id)
+                        .single();
+
+                    if (data && data.selected_plan !== 'explorer') {
+                        clearInterval(pollInterval);
+                        sonnerToast.dismiss(toastId);
+                        sonnerToast.success('Premium activation successful! Welcome to PRO.');
+                        
+                        // Clean up the URL silently
+                        window.history.replaceState({}, '', location.pathname);
+                        
+                        // Small delay then hard reload to re-initialize context hooks and cache
+                        setTimeout(() => {
+                            window.location.reload();
+                        }, 1500);
+                    } else if (attempts >= maxAttempts) {
+                        clearInterval(pollInterval);
+                        sonnerToast.dismiss(toastId);
+                        sonnerToast.error('Payment received, but plan activation is delayed. Please refresh in a minute or contact contact@italostudy.com if this persists.', { duration: 10000 });
+                        window.history.replaceState({}, '', location.pathname);
+                    }
+                } catch (e) {
+                    console.error('Polling error', e);
+                }
+            }, 2000);
+
+            return () => {
+                clearInterval(pollInterval);
+                sonnerToast.dismiss(toastId);
+            };
+        }
+    }, [user, location.search]);
 
     const dataLoadedRef = useRef({ userId: '', examId: '' });
     const abortControllerRef = useRef<AbortController | null>(null);
@@ -538,23 +567,27 @@ export default function Dashboard() {
         if (!hasCachedData) setIsDashboardLoading(true);
 
         try {
-            // Stage 1: Fetch fresh in parallel (using optimized RPCs)
-            const [testsRes, mockSubmissionsRes, learningProgressRes, summaryStatsRes, subjectStatsRes, courseEnrollmentsRes] = await Promise.all([
-                (supabase as any).from('tests').select('total_questions, correct_answers, created_at, test_type, status, is_mock').eq('exam_type', activeExam.id).eq('user_id', user.id).abortSignal(signal),
-                supabase.from('mock_exam_submissions').select('id').eq('user_id', user.id).abortSignal(signal),
-                supabase.from('learning_progress').select('last_accessed_at').eq('user_id', user.id).abortSignal(signal),
-                (supabase as any).rpc('get_student_summary_stats_secure', {
-                    user_uuid: String(user.id),
-                    exam_type_id: String(activeExam.id)
-                }),
-                (supabase as any).rpc('get_analytics_subjects_secure', {
-                    user_uuid: String(user.id),
-                    exam_type_id: String(activeExam.id)
-                }),
-                (supabase as any).from('course_enrollments').select('id').eq('user_id', user.id).eq('status', 'active').abortSignal(signal)
-            ]);
+            // Stage 1: Fetch fresh using the highly optimized consolidated RPC
+            const { data: dashboardData, error } = await (supabase as any).rpc('get_full_dashboard_data', {
+                p_user_uuid: String(user.id),
+                p_exam_type_id: String(activeExam.id)
+            });
 
             if (signal?.aborted) return;
+            
+            if (error || !dashboardData) {
+                console.error("Error fetching consolidated dashboard data:", error);
+                setIsDashboardLoading(false);
+                return;
+            }
+
+            // Map the consolidated RPC output to the existing data structure format
+            const testsRes = { data: dashboardData.tests };
+            const mockSubmissionsRes = { data: dashboardData.mockSubmissions };
+            const learningProgressRes = { data: dashboardData.learningProgress };
+            const summaryStatsRes = { data: dashboardData.summaryStats };
+            const subjectStatsRes = { data: dashboardData.subjectStats };
+            const courseEnrollmentsRes = { data: dashboardData.courseEnrollments };
 
             // ── PROCESS DATES & STREAK ──
             const learningProgress = learningProgressRes.data || [];
@@ -853,14 +886,44 @@ export default function Dashboard() {
     useEffect(() => {
         if (rankingView === 'live') {
             fetchLiveRankings();
-            // Optional: Poll every 60s
-            const interval = setInterval(fetchLiveRankings, 60000);
-            return () => clearInterval(interval);
+
+            let interval: ReturnType<typeof setInterval> | null = null;
+
+            const startPolling = () => {
+                if (!interval) {
+                    interval = setInterval(fetchLiveRankings, 30000);
+                }
+            };
+
+            const stopPolling = () => {
+                if (interval) {
+                    clearInterval(interval);
+                    interval = null;
+                }
+            };
+
+            const handleVisibilityChange = () => {
+                if (document.hidden) {
+                    stopPolling();
+                } else {
+                    fetchLiveRankings();
+                    startPolling();
+                }
+            };
+
+            startPolling();
+            document.addEventListener('visibilitychange', handleVisibilityChange);
+
+            return () => {
+                stopPolling();
+                document.removeEventListener('visibilitychange', handleVisibilityChange);
+            };
         }
     }, [rankingView, activeExam?.id]);
 
 
     const [lastProgress, setLastProgress] = useState<any>(null);
+    const [isDashboardAdActive, setIsDashboardAdActive] = useState(false);
     const [latestBlogPost, setLatestBlogPost] = useState<any>(null);
 
     useEffect(() => {
@@ -1073,17 +1136,17 @@ export default function Dashboard() {
                             </div>
                             {/* Stats Pills */}
                             <div className="flex items-center gap-3 flex-wrap">
-                                <div className="flex items-center gap-2 bg-white/15 backdrop-blur-md rounded-full px-4 py-2 border border-white/20">
-                                    <Zap className="w-4 h-4 text-yellow-300" />
-                                    <span className="text-white font-black text-sm"><CountUp to={stats.solved} /> <span className="text-white/60 font-medium text-xs">XP</span></span>
+                                <div className="flex items-center gap-2 bg-white/15 backdrop-blur-md rounded-full px-4 py-2 border border-white/20 shadow-[0_0_15px_rgba(255,255,255,0.05)]">
+                                    <Flame className="w-4 h-4 text-amber-400" />
+                                    <span className="text-white font-black text-sm"><CountUp to={gamification.xp} /> <span className="text-white/60 font-medium text-xs">XP</span></span>
                                 </div>
-                                <div className="flex items-center gap-2 bg-white/15 backdrop-blur-md rounded-full px-4 py-2 border border-white/20">
-                                    <Trophy className="w-4 h-4 text-amber-300" />
-                                    <span className="text-white font-black text-sm"><CountUp to={stats.mockExams} /> <span className="text-white/60 font-medium text-xs">Stars</span></span>
+                                <div className="flex items-center gap-2 bg-white/15 backdrop-blur-md rounded-full px-4 py-2 border border-white/20 shadow-[0_0_15px_rgba(255,255,255,0.05)]">
+                                    <Trophy className="w-4 h-4 text-yellow-400" />
+                                    <span className="text-white font-black text-sm"><CountUp to={gamification.stars} /> <span className="text-white/60 font-medium text-xs">Stars</span></span>
                                 </div>
-                                <div className="flex items-center gap-2 bg-white/15 backdrop-blur-md rounded-full px-4 py-2 border border-white/20">
-                                    <Flame className="w-4 h-4 text-orange-300" />
-                                    <span className="text-white font-black text-sm"><CountUp to={stats.streak} /> <span className="text-white/60 font-medium text-xs">Days</span></span>
+                                <div className="flex items-center gap-2 bg-white/15 backdrop-blur-md rounded-full px-4 py-2 border border-white/20 shadow-[0_0_15px_rgba(255,255,255,0.05)]">
+                                    <Zap className="w-4 h-4 text-orange-400" />
+                                    <span className="text-white font-black text-sm"><CountUp to={gamification.streak} /> <span className="text-white/60 font-medium text-xs">Days</span></span>
                                 </div>
                             </div>
                         </div>
@@ -1135,6 +1198,7 @@ export default function Dashboard() {
                                 </div>
                             </div>
 
+                            <DynamicStoreAd placementId="dashboard-bottom" onStatusChange={setIsDashboardAdActive} />
 
                             {/* Quick Navigation Icons */}
                             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-5 shadow-sm">
@@ -1182,7 +1246,7 @@ export default function Dashboard() {
                             </div>
 
                             {/* Stats Row */}
-                            <div className="grid grid-cols-3 sm:grid-cols-5 gap-3">
+                            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                                 {[
                                     { label: 'Total Solved', value: stats.solved, icon: Search, gradient: 'from-indigo-500 to-indigo-700' },
                                     { label: 'Mock Exams', value: stats.mockExams, icon: ClipboardList, gradient: 'from-rose-500 to-rose-700' },
@@ -1190,7 +1254,7 @@ export default function Dashboard() {
                                     { label: 'Avg Time', value: stats.avgTime, icon: Clock, suffix: 's', gradient: 'from-cyan-500 to-cyan-700' },
                                     { label: 'Accuracy', value: stats.accuracy, icon: Trophy, suffix: '%', gradient: 'from-pink-500 to-pink-700' },
                                 ].map((stat, i) => (
-                                    <div key={i} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-4 shadow-sm text-center group hover:-translate-y-0.5 transition-all">
+                                    <div key={i} className={`bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-4 shadow-sm text-center group hover:-translate-y-0.5 transition-all ${i === 4 ? 'col-span-2 sm:col-span-1' : ''}`}>
                                         <div className={`w-9 h-9 rounded-xl bg-gradient-to-br ${stat.gradient} flex items-center justify-center mx-auto mb-2 shadow-sm`}>
                                             <stat.icon className="w-4 h-4 text-white" />
                                         </div>
@@ -1607,50 +1671,58 @@ export default function Dashboard() {
                                 </div>
                             </div>
 
-                            {/* WhatsApp Community */}
-                            <div
-                                onClick={() => window.open('https://chat.whatsapp.com/CfVh7u9L6vT7ZFpZwwVa4A', '_blank')}
-                                className="group relative p-5 rounded-2xl bg-[#25D366] text-white cursor-pointer shadow-lg hover:-translate-y-0.5 transition-all border border-white/10 overflow-hidden"
-                            >
-                                <div className="absolute top-0 right-0 w-28 h-28 bg-emerald-400/10 blur-2xl rounded-full -mr-10 -mt-10 group-hover:bg-emerald-400/20 transition-colors" />
-                                <div className="relative z-10 flex items-start justify-between mb-3">
-                                    <div className="flex items-center gap-2">
-                                        <div className="w-9 h-9 rounded-xl bg-white text-[#25D366] flex items-center justify-center shadow-md group-hover:rotate-12 transition-transform">
-                                            <MessageCircle className="w-4 h-4" />
+                            {/* Conditionally shifted Study Plan and WhatsApp */}
+                            {isDashboardAdActive && (
+                                <>
+                                    <StudyPlannerWidget examType={activeExam?.id} />
+                                    
+                                    {/* WhatsApp Community */}
+                                    <div
+                                        onClick={() => window.open('https://chat.whatsapp.com/CfVh7u9L6vT7ZFpZwwVa4A', '_blank')}
+                                        className="group relative p-5 rounded-2xl bg-[#25D366] text-white cursor-pointer shadow-lg hover:-translate-y-0.5 transition-all border border-white/10 overflow-hidden"
+                                    >
+                                        <div className="absolute top-0 right-0 w-28 h-28 bg-emerald-400/10 blur-2xl rounded-full -mr-10 -mt-10 group-hover:bg-emerald-400/20 transition-colors" />
+                                        <div className="relative z-10 flex items-start justify-between mb-3">
+                                            <div className="flex items-center gap-2">
+                                                <div className="w-9 h-9 rounded-xl bg-white text-[#25D366] flex items-center justify-center shadow-md group-hover:rotate-12 transition-transform">
+                                                    <MessageCircle className="w-4 h-4" />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-sm font-black uppercase tracking-tight leading-none">WhatsApp Squad</h4>
+                                                    <div className="flex items-center gap-1.5 mt-0.5">
+                                                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                                        <p className="text-[8px] font-bold text-emerald-100/60 uppercase tracking-widest">Global Hub</p>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         </div>
-                                        <div>
-                                            <h4 className="text-sm font-black uppercase tracking-tight leading-none">WhatsApp Squad</h4>
-                                            <div className="flex items-center gap-1.5 mt-0.5">
-                                                <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                                <p className="text-[8px] font-bold text-emerald-100/60 uppercase tracking-widest">Global Hub</p>
+                                        <p className="relative z-10 text-[10px] font-bold text-emerald-100/80 leading-snug mb-3">
+                                                Prep tips & live updates from <span className="text-white font-black">2000+ Students</span>. 📚✨
+                                        </p>
+                                        <div className="relative z-10 flex items-center justify-between">
+                                            <div className="flex -space-x-2">
+                                                {[1, 2, 3].map((i) => (
+                                                    <div key={i} className="w-6 h-6 rounded-full border-2 border-[#25D366] bg-slate-800 overflow-hidden shadow-md">
+                                                        <img src={`https://i.pravatar.cc/100?img=${i + 20}`} alt="User" className="w-full h-full object-cover opacity-90" />
+                                                    </div>
+                                                ))}
+                                            </div>
+                                            <div className="flex items-center gap-1 text-white/60 group-hover:text-white transition-colors text-[9px] font-black uppercase tracking-widest">
+                                                <span>Join Now</span>
+                                                <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
                                             </div>
                                         </div>
                                     </div>
-                                </div>
-                                <p className="relative z-10 text-[10px] font-bold text-emerald-100/80 leading-snug mb-3">
-                                        Prep tips & live updates from <span className="text-white font-black">2000+ Students</span>. 📚✨
-                                </p>
-                                <div className="relative z-10 flex items-center justify-between">
-                                    <div className="flex -space-x-2">
-                                        {[1, 2, 3].map((i) => (
-                                            <div key={i} className="w-6 h-6 rounded-full border-2 border-[#25D366] bg-slate-800 overflow-hidden shadow-md">
-                                                <img src={`https://i.pravatar.cc/100?img=${i + 20}`} alt="User" className="w-full h-full object-cover opacity-90" />
-                                            </div>
-                                        ))}
-                                    </div>
-                                    <div className="flex items-center gap-1 text-white/60 group-hover:text-white transition-colors text-[9px] font-black uppercase tracking-widest">
-                                        <span>Join Now</span>
-                                        <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
-                                    </div>
-                                </div>
+                                </>
+                            )}
+
+                        </div>
+                        
+                        {!isDashboardAdActive && (
+                            <div className="lg:col-span-12 mt-8">
+                                <StudyPlannerWidget examType={activeExam?.id} />
                             </div>
-
-
-
-                        </div>
-                        <div className="lg:col-span-12 mt-8">
-                             <StudyPlannerWidget examType={activeExam?.id} />
-                        </div>
+                        )}
                     </div>
                 </div>
                 </div>

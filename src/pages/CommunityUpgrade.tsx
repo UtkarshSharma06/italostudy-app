@@ -153,7 +153,7 @@ export default function CommunityUpgrade() {
                 </div>
 
                 <div className="mt-24 text-center">
-                    <p className="text-slate-600 text-xs font-black uppercase tracking-[0.5em] mb-4">Beta Special Access</p>
+                    <p className="text-slate-600 text-xs font-black uppercase tracking-[0.5em] mb-4">Special Access</p>
                     <p className="text-indigo-400/60 text-[10px] font-black uppercase tracking-widest">Upgrade now to secure early-bird benefits</p>
                 </div>
             </div>

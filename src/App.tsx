@@ -6,7 +6,7 @@ import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 import { SpeedInsights as VercelSpeedInsights } from "@vercel/speed-insights/react";
 import { Capacitor } from '@capacitor/core';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, HashRouter, Routes, Route, Navigate, useNavigate } from "react-router-dom";
+import { BrowserRouter, HashRouter, Routes, Route, Navigate, useNavigate, useParams } from "react-router-dom";
 import { AuthProvider } from "@/lib/auth";
 import { ThemeProvider, useTheme } from "next-themes";
 import { lazy, Suspense, useEffect, useState } from "react";
@@ -42,6 +42,7 @@ const readProfileCache = () => {
 
 import { APKOnboarding } from "@/mobile/components/APKOnboarding";
 import { PricingProvider, usePricing } from "@/context/PricingContext";
+import { SystemSettingsProvider } from "@/context/SystemSettingsContext";
 import { usePlanAccess } from "@/hooks/usePlanAccess";
 import { SubscriptionLockout } from "@/components/SubscriptionLockout";
 import GlobalErrorBoundary from "@/components/GlobalErrorBoundary";
@@ -213,6 +214,17 @@ const ForceStaticRedirect = () => {
 const HardRedirect = () => {
   window.location.replace(window.location.pathname);
   return null;
+};
+
+const DynamicRedirect = ({ to }: { to: string }) => {
+  const params = useParams();
+  let path = to;
+  Object.keys(params).forEach(key => {
+    if (params[key]) {
+      path = path.replace(`:${key}`, params[key] as string);
+    }
+  });
+  return <Navigate to={path} replace />;
 };
 
 const StatusRedirect = () => {
@@ -448,18 +460,18 @@ const MobileRouter = ({ user, isNative, authLoading }: { user: any, isNative: bo
         <Route path="/onboarding" element={<Navigate to="/mobile/onboarding" replace />} />
         <Route path="/labs" element={<Navigate to="/mobile/labs" replace />} />
         <Route path="/apply-university" element={<Navigate to="/mobile/apply-university" replace />} />
-        <Route path="/apply-university/status/:id" element={<Navigate to="/mobile/apply-university/status/:id" replace />} />
+        <Route path="/apply-university/status/:id" element={<DynamicRedirect to="/mobile/apply-university/status/:id" />} />
         <Route path="/apply-university/upgrade" element={<Navigate to="/mobile/apply-university/upgrade" replace />} />
         <Route path="/community/upgrade" element={<Navigate to="/mobile/community/upgrade" replace />} />
-        <Route path="/detailed-analysis/:testId" element={<Navigate to="/mobile/detailed-analysis/:testId" replace />} />
+        <Route path="/detailed-analysis/:testId" element={<DynamicRedirect to="/mobile/detailed-analysis/:testId" />} />
         <Route path="/mock-guidelines" element={<Navigate to="/mobile/mock-guidelines" replace />} />
-        <Route path="/reading/:testId" element={<Navigate to="/mobile/reading/:testId" replace />} />
-        <Route path="/listening/:testId" element={<Navigate to="/mobile/listening/:testId" replace />} />
-        <Route path="/writing/:taskId" element={<Navigate to="/mobile/writing/:taskId" replace />} />
+        <Route path="/reading/:testId" element={<DynamicRedirect to="/mobile/reading/:testId" />} />
+        <Route path="/listening/:testId" element={<DynamicRedirect to="/mobile/listening/:testId" />} />
+        <Route path="/writing/:taskId" element={<DynamicRedirect to="/mobile/writing/:taskId" />} />
         <Route path="/speaking" element={<Navigate to="/mobile/speaking" replace />} />
-        <Route path="/speaking/:sessionId" element={<Navigate to="/mobile/speaking/:sessionId" replace />} />
-        <Route path="/student/:id" element={<Navigate to="/mobile/student/:id" replace />} />
-        <Route path="/u/:username" element={<Navigate to="/mobile/u/:username" replace />} />
+        <Route path="/speaking/:sessionId" element={<DynamicRedirect to="/mobile/speaking/:sessionId" />} />
+        <Route path="/student/:id" element={<DynamicRedirect to="/mobile/student/:id" />} />
+        <Route path="/u/:username" element={<DynamicRedirect to="/mobile/u/:username" />} />
         <Route path="/test/:testId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileTest /></ProtectedRoute>} />
         <Route path="/results/:testId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileResults /></ProtectedRoute>} />
         <Route path="/waiting-room/:sessionId" element={<MobileMockWaitingRoom />} />
@@ -674,17 +686,19 @@ const AppProviders = ({ children }: { children: React.ReactNode }) => {
       <ThemeProvider attribute="class" defaultTheme="light" enableSystem={false} disableTransitionOnChange>
         <GlobalErrorBoundary>
           <AuthProvider>
-            <PricingProvider>
-              <ExamProvider>
-                <AIProvider>
-                  <TooltipProvider>
-                    <LiveEditProvider>
-                      {children}
-                    </LiveEditProvider>
-                  </TooltipProvider>
-                </AIProvider>
-              </ExamProvider>
-            </PricingProvider>
+            <SystemSettingsProvider>
+              <PricingProvider>
+                <ExamProvider>
+                  <AIProvider>
+                    <TooltipProvider>
+                      <LiveEditProvider>
+                        {children}
+                      </LiveEditProvider>
+                    </TooltipProvider>
+                  </AIProvider>
+                </ExamProvider>
+              </PricingProvider>
+            </SystemSettingsProvider>
           </AuthProvider>
         </GlobalErrorBoundary>
       </ThemeProvider>

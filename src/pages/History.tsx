@@ -7,6 +7,12 @@ import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   BookOpen,
   Sparkles,
   ArrowRight,
@@ -20,11 +26,15 @@ import {
   FileText,
   Mic,
   Award,
-  Loader2
+  Loader2,
+  Crown,
+  Filter,
+  ChevronDown
 } from 'lucide-react';
 import { useExam } from '@/context/ExamContext';
 import { usePricing } from '@/context/PricingContext';
 import { HistorySkeleton } from '@/components/SkeletonLoader';
+import { SubjectIcon, getSubjectColorClass } from '@/components/ui/SubjectIcon';
 
 interface TestResult {
   id: string;
@@ -58,8 +68,11 @@ export default function History() {
   const { openPricingModal } = usePricing();
   const navigate = useNavigate();
   const [tests, setTests] = useState<TestResult[]>([]);
+  const [selectedSubject, setSelectedSubject] = useState<string>('All Subjects');
   const isIELTS = activeExam?.id === 'ielts-academic';
   const [activeTab, setActiveTab] = useState<string>(isIELTS ? 'writing' : 'practice');
+  const [page, setPage] = useState(0);
+  const PAGE_SIZE = 10;
 
   useEffect(() => {
     if (isIELTS) {
@@ -87,6 +100,7 @@ export default function History() {
     const examIds = [activeExam.id];
     if (activeExam.id === 'cent-s-prep') examIds.push('cent-s');
     if (activeExam.id === 'imat-prep') examIds.push('imat');
+    if (activeExam.id === 'til-i-prep') examIds.push('til-i');
 
     const { data: testsData } = await (supabase as any)
       .from('tests')
@@ -277,40 +291,8 @@ export default function History() {
       })];
     }
 
-    // 5. Cleanup older history to keep DB healthy (Latest 10 only)
-    const cleanupHistory = async () => {
-      if (!user?.id) return;
+    // Cleanup history logic removed to keep all historical tests
 
-      // Cleanup 'tests'
-      const { data: oldTests } = await (supabase as any)
-        .from('tests')
-        .select('id')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .range(10, 50);
-
-      if (oldTests && oldTests.length > 0) {
-        const ids = oldTests.map((t: any) => t.id);
-        await (supabase as any).from('questions').delete().in('test_id', ids);
-        await (supabase as any).from('tests').delete().in('id', ids);
-      }
-
-      // Cleanup 'mock_exam_submissions'
-      const { data: oldMocks } = await (supabase as any)
-        .from('mock_exam_submissions')
-        .select('id')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false })
-        .range(10, 50);
-
-      if (oldMocks && oldMocks.length > 0) {
-        const ids = oldMocks.map((m: any) => m.id);
-        await (supabase as any).from('mock_exam_submissions').delete().in('id', ids);
-      }
-    };
-
-    // Run cleanup silently
-    cleanupHistory();
 
     // ── Deduplicate mock tests: show ONE card per mock session ──────────────────
     // Group by session_id (for live mocks) or by subject (for practice mocks).
@@ -335,9 +317,9 @@ export default function History() {
       return Array.from(seen.values());
     })();
 
-    // Limit display to 10 most recent for each main category
-    const practicePool = unifiedTests.filter(t => t.type !== 'mock' && t.type !== 'Full Mock' && !t.subject.includes('IELTS')).slice(0, 10);
-    const mockPool = dedupedMocks.slice(0, 10);
+    // Keep all historical tests instead of limiting to 10
+    const practicePool = unifiedTests.filter(t => t.type !== 'mock' && t.type !== 'Full Mock' && !t.subject.includes('IELTS'));
+    const mockPool = dedupedMocks;
 
     const finalTests = [...practicePool, ...mockPool].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
@@ -413,8 +395,46 @@ export default function History() {
     );
   };
 
-  const practiceTests = tests.filter(t => t.type !== 'mock' && t.type !== 'Full Mock' && !t.subject.includes('IELTS'));
-  const officialTests = tests.filter(t => t.type === 'mock' || t.type === 'Full Mock' || (isIELTS && t.subject.includes('IELTS')));
+  const uniqueSubjects = Array.from(new Set(tests.filter(t => t.type !== 'mock' && t.type !== 'Full Mock' && !t.subject.includes('IELTS')).map(t => t.subject))).filter(Boolean);
+  const filteredTests = selectedSubject === 'All Subjects' ? tests : tests.filter(t => t.subject === selectedSubject);
+
+  const practiceTests = filteredTests.filter(t => t.type !== 'mock' && t.type !== 'Full Mock' && !t.subject.includes('IELTS'));
+  const officialTests = filteredTests.filter(t => t.type === 'mock' || t.type === 'Full Mock' || (isIELTS && t.subject.includes('IELTS')));
+
+  const renderPaginatedList = (list: TestResult[]) => {
+    const totalPages = Math.ceil(list.length / PAGE_SIZE);
+    const paged = list.slice(page * PAGE_SIZE, (page + 1) * PAGE_SIZE);
+
+    return (
+      <div className="grid gap-4 sm:gap-6 pb-8">
+        {paged.map(test => (
+          <TestCard key={test.id} result={test} onNavigate={navigate} />
+        ))}
+        
+        {totalPages > 1 && (
+          <div className="flex items-center justify-center gap-4 mt-8">
+              <button
+                  onClick={() => setPage(p => Math.max(0, p - 1))}
+                  disabled={page === 0}
+                  className="px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all disabled:opacity-30 disabled:cursor-not-allowed bg-slate-100 text-slate-500 hover:bg-slate-900 hover:text-white"
+              >
+                  ← Prev
+              </button>
+              <span className="text-[11px] font-black text-slate-400 uppercase tracking-widest">
+                  Page {page + 1} of {totalPages}
+              </span>
+              <button
+                  onClick={() => setPage(p => Math.min(totalPages - 1, p + 1))}
+                  disabled={page >= totalPages - 1}
+                  className="px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest transition-all disabled:opacity-30 disabled:cursor-not-allowed bg-slate-900 text-white hover:bg-indigo-600"
+              >
+                  Next →
+              </button>
+          </div>
+        )}
+      </div>
+    );
+  };
 
   if (loading) {
     return (
@@ -445,10 +465,24 @@ EmptyState.displayName = 'EmptyState';
 
 const TestCard = memo(({ result, onNavigate }: { result: any, onNavigate: (path: string) => void }) => {
     const isFailed = result.proctoring_status === 'disqualified' || result.proctoring_status === 'failed';
+    const isPending = result.status === 'pending' || result.status === 'evaluating';
+    const scoreText = isPending ? '...' : (
+      result.score === null ? '—' : (
+        result.raw_score !== undefined && result.max_score !== undefined
+          ? `${result.raw_score}/${result.max_score}`
+          : `${result.score}${result.is_manual ? '' : '%'}`
+      )
+    );
+    const accuracyText = result.score !== null ? `${result.score}%` : '—';
+    const formattedDate = new Date(result.date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    const formattedTime = new Date(result.date).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+    
+    // Extract border color dynamically from subject color class
+    const subjectColor = getSubjectColorClass(result.subject).match(/text-[a-z]+-[0-9]+/)?.[0]?.replace('text-', 'border-t-') || 'border-t-purple-600';
 
     return (
       <div
-        className="bg-white dark:bg-card p-5 sm:p-6 rounded-[1.5rem] sm:rounded-[2rem] border-2 border-slate-100 dark:border-border border-b-[6px] shadow-xl shadow-slate-200/50 hover:border-slate-300 hover:-translate-y-1 hover:shadow-2xl active:border-b-2 active:translate-y-1 transition-all duration-200 cursor-pointer group"
+        className={`bg-white dark:bg-card p-5 sm:p-6 rounded-[1.5rem] border border-slate-200 dark:border-slate-800 border-t-[3px] ${subjectColor} shadow-sm hover:shadow-xl hover:-translate-y-0.5 transition-all duration-300 cursor-pointer flex flex-col md:flex-row items-start md:items-center gap-6 group mb-4 relative overflow-hidden`}
         onClick={() => {
           if (result.is_full_mock) {
             onNavigate(`/mock-results/${result.id}`);
@@ -464,227 +498,268 @@ const TestCard = memo(({ result, onNavigate }: { result: any, onNavigate: (path:
           }
         }}
       >
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-4">
-          <div className="flex items-center gap-4">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 bg-slate-50 dark:bg-muted rounded-xl sm:rounded-2xl border border-slate-100 dark:border-border flex items-center justify-center text-lg sm:text-xl group-hover:bg-indigo-600 group-hover:text-white transition-all duration-300 shrink-0">
-              {result.type === 'mock' || result.is_full_mock || result.subject.includes('Mock') ? '🏆' :
-               result.subject.includes('Writing') ? '✍️' :
-               result.subject.includes('Reading') ? '📖' :
-               result.subject.includes('Listening') ? '🎧' :
-               result.subject.includes('Speaking') ? '🗣️' :
-               result.subject === 'Biology' ? '🧬' :
-               result.subject === 'Chemistry' ? '⚗️' :
-               result.subject === 'Physics' ? '⚛️' :
-               result.subject === 'Mathematics' ? '📐' :
-               result.subject === 'All Subjects' ? '🌍' : '🎯'}
-            </div>
-            <div className="min-w-0">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="font-black text-slate-900 dark:text-slate-100 tracking-tight leading-none uppercase text-xs sm:text-sm truncate">{result.subject}</h3>
-                <span className="text-[7px] sm:text-[8px] px-1.5 py-0.5 bg-slate-100 dark:bg-muted rounded-md font-black text-slate-400 uppercase shrink-0">{result.type}</span>
+        <div className="flex-1 w-full flex flex-col sm:flex-row items-start gap-4 sm:gap-6 min-w-0">
+          <div className={`w-14 h-14 sm:w-16 sm:h-16 rounded-[1.25rem] flex items-center justify-center shrink-0 transition-transform group-hover:scale-105 ${getSubjectColorClass(result.subject)}`}>
+            <SubjectIcon subjectName={result.subject} className="w-7 h-7 sm:w-8 sm:h-8" />
+          </div>
+          
+          <div className="flex-1 min-w-0 space-y-3">
+            <div>
+              <div className="flex flex-wrap items-center gap-2 sm:gap-3 mb-1">
+                <h3 className="font-black text-lg sm:text-xl text-slate-900 dark:text-slate-100 tracking-tight leading-none truncate max-w-full">
+                  {result.subject.length > 25 ? result.subject.substring(0, 25) + '...' : result.subject}
+                </h3>
+                <span className="px-2.5 py-0.5 rounded-full bg-purple-100 dark:bg-purple-500/20 text-purple-700 dark:text-purple-300 text-[10px] font-bold uppercase tracking-widest shrink-0">{result.type}</span>
               </div>
-              <p className="text-[9px] sm:text-[10px] font-bold text-slate-400 uppercase tracking-widest flex items-center gap-2 mt-1.5">
-                <Calendar className="w-3 h-3" /> {formatDate(result.date)}
+              <p className="text-[12px] sm:text-[13px] font-semibold text-slate-500 flex items-center gap-2">
+                <Calendar className="w-3.5 h-3.5 text-slate-400" />
+                {formattedDate} <span className="text-slate-300">•</span> {formattedTime}
               </p>
             </div>
-          </div>
-          <div className="flex items-center justify-between sm:justify-end gap-3 border-t sm:border-0 pt-3 sm:pt-0 border-slate-50">
-            {getStatusBadge(result)}
-            <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-muted flex items-center justify-center group-hover:translate-x-1 transition-transform sm:ml-2">
-              <ChevronRight className="w-4 h-4 text-slate-300" />
+
+            <div className="grid grid-cols-2 sm:flex sm:items-center gap-6 sm:gap-12 pt-1">
+              {result.is_full_mock ? (
+                <>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2">Reading</p>
+                    <p className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tighter">{result.reading_band || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2">Listening</p>
+                    <p className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tighter">{result.listening_band || '—'}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2">Writing</p>
+                    <p className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tighter">{result.writing_band || '—'}</p>
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2">Score</p>
+                    <p className={`text-xl sm:text-2xl font-black tracking-tighter ${isFailed ? 'text-red-600' : 'text-slate-900 dark:text-white'}`}>{scoreText}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2">Accuracy</p>
+                    <p className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tighter">{accuracyText}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest mb-1 sm:mb-2">Time Taken</p>
+                    <p className="text-xl sm:text-2xl font-black text-slate-900 dark:text-white tracking-tighter">{result.time_taken_seconds ? `${Math.floor(result.time_taken_seconds/60)}m ${result.time_taken_seconds%60}s` : '—'}</p>
+                  </div>
+                </>
+              )}
             </div>
           </div>
         </div>
 
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 font-black">
-          <div className="bg-slate-50/50 dark:bg-muted/30 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-50/50 dark:border-border/50">
-            <p className="text-[7px] sm:text-[8px] text-slate-300 dark:text-slate-500 uppercase tracking-widest mb-1 sm:mb-1.5 leading-none">
-              {result.raw_score !== undefined ? 'Raw Score' : 'Band / Score'}
-            </p>
-            <p className={`text-base sm:text-lg tracking-tight leading-none ${isFailed
-              ? 'text-red-600'
-              : (result.score || 0) >= 70 || (result.type === 'Writing' && result.score >= 7)
-                ? 'text-emerald-600'
-                : 'text-slate-900 dark:text-slate-100'
-              }`}>
-              {result.status === 'pending' ? '...' : (
-                result.score === null ? '—' : (
-                  result.raw_score !== undefined && result.max_score !== undefined
-                    ? `${result.raw_score} / ${result.max_score}`
-                    : `${result.score}${result.is_manual ? '' : '%'}`
-                )
-              )}
-            </p>
-            {result.raw_score !== undefined && result.score !== null && (
-              <p className="text-[7px] sm:text-[8px] text-slate-400 uppercase tracking-widest mt-1 leading-none">
-                {result.score}%
-              </p>
-            )}
-          </div>
-
-          {result.is_full_mock ? (
-            <>
-              <div className="bg-slate-50/50 dark:bg-muted/30 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-50/50 dark:border-border/50">
-                <p className="text-[7px] sm:text-[8px] text-blue-500 uppercase tracking-widest mb-1 sm:mb-1.5 leading-none">Reading</p>
-                <p className="text-sm sm:text-base text-blue-600 leading-none">{result.reading_band || '—'}</p>
-              </div>
-              <div className="bg-slate-50/50 dark:bg-muted/30 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-50/50 dark:border-border/50">
-                <p className="text-[7px] sm:text-[8px] text-purple-500 uppercase tracking-widest mb-1 sm:mb-1.5 leading-none">Listening</p>
-                <p className="text-sm sm:text-base text-purple-600 leading-none">{result.listening_band || '—'}</p>
-              </div>
-              <div className="bg-slate-50/50 dark:bg-muted/30 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-50/50 dark:border-border/50">
-                <p className="text-[7px] sm:text-[8px] text-orange-500 uppercase tracking-widest mb-1 sm:mb-1.5 leading-none">Writing</p>
-                <p className="text-sm sm:text-base text-orange-600 leading-none">{result.writing_band || '—'}</p>
-              </div>
-            </>
-          ) : result.type === 'mock' ? (
-            <>
-              <div className="bg-slate-50/50 dark:bg-muted/30 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-50/50 dark:border-border/50">
-                <p className="text-[7px] sm:text-[8px] text-emerald-500 uppercase tracking-widest mb-1 sm:mb-1.5 leading-none">Correct</p>
-                <p className="text-sm sm:text-base text-emerald-600 leading-none">{result.correct_answers || 0}</p>
-              </div>
-              <div className="bg-slate-50/50 dark:bg-muted/30 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-50/50 dark:border-border/50">
-                <p className="text-[7px] sm:text-[8px] text-rose-500 uppercase tracking-widest mb-1 sm:mb-1.5 leading-none">Failed</p>
-                <p className="text-sm sm:text-base text-rose-600 leading-none">{result.wrong_answers || 0}</p>
-              </div>
-              <div className="hidden sm:block bg-slate-50/50 dark:bg-muted/30 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-50/50 dark:border-border/50">
-                <p className="text-[7px] sm:text-[8px] text-slate-400 uppercase tracking-widest mb-1 sm:mb-1.5 leading-none">Skipped</p>
-                <p className="text-sm sm:text-base text-slate-500 leading-none">{result.skipped_answers || 0}</p>
-              </div>
-            </>
+        <div className="flex items-center gap-4 shrink-0 justify-between md:justify-end border-t border-slate-100 dark:border-slate-800 md:border-0 pt-4 md:pt-0 w-full md:w-auto mt-2 md:mt-0">
+          {/* We'll handle the status badge outside getStatusBadge to match the exact design if needed, or rely on it */}
+          {result.status === 'completed' && !isFailed ? (
+             <span className="px-4 py-2 rounded-full bg-emerald-50 text-emerald-600 text-[11px] font-bold tracking-wide flex items-center gap-2 border border-emerald-100">
+               <CheckCircle className="w-3.5 h-3.5" /> Completed
+             </span>
           ) : (
-            <>
-              <div className="bg-slate-50/50 dark:bg-muted/30 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-50/50 dark:border-border/50">
-                <p className="text-[7px] sm:text-[8px] text-slate-300 dark:text-slate-500 uppercase tracking-widest mb-1 sm:mb-1.5 leading-none">Metric</p>
-                <p className="text-[9px] sm:text-[10px] text-slate-900 dark:text-slate-100 tracking-tight uppercase leading-none truncate">
-                  {result.type === 'Writing' ? 'Manual Rev.' :
-                    result.type === 'Reading' ? 'Auto Grade' :
-                      result.type === 'Listening' ? 'Auto Grade' : 'Smart Analysis'}
-                </p>
-              </div>
-              <div className="bg-slate-50/50 dark:bg-muted/30 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-slate-50/50 dark:border-border/50 col-span-2 sm:col-span-1">
-                <p className="text-[7px] sm:text-[8px] text-slate-300 dark:text-slate-500 uppercase tracking-widest mb-1 sm:mb-1.5 leading-none">ID</p>
-                <p className="text-[9px] sm:text-[10px] text-slate-900 dark:text-slate-100 tracking-tight truncate leading-none">{result.id.split('-')[0]}</p>
-              </div>
-            </>
+             <div className="scale-110 origin-left">{getStatusBadge(result)}</div>
           )}
+          
+          <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-[12px] border border-slate-200 dark:border-slate-700 flex items-center justify-center group-hover:bg-purple-600 group-hover:border-purple-600 transition-colors shrink-0 bg-white dark:bg-slate-800 shadow-sm">
+            <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600 group-hover:text-white transition-colors" />
+          </div>
         </div>
       </div>
     );
 });
 TestCard.displayName = 'TestCard';
 
+  // Derived Stats
+  const totalCompleted = tests.filter(t => t.status === 'completed').length;
+  const totalTimeSeconds = tests.reduce((acc, t) => acc + (t.time_taken_seconds || 0), 0);
+  const totalTimeHours = Math.floor(totalTimeSeconds / 3600);
+  const totalTimeMins = Math.floor((totalTimeSeconds % 3600) / 60);
+  const totalTimeStr = totalTimeHours > 0 ? `${totalTimeHours}h ${totalTimeMins}m` : `${totalTimeMins}m`;
+  
+  const testsWithScores = tests.filter(t => t.score !== null && !t.is_manual);
+  const avgScore = testsWithScores.length > 0 
+      ? Math.round(testsWithScores.reduce((acc, t) => acc + t.score, 0) / testsWithScores.length)
+      : 0;
+  
+  const totalMocks = tests.filter(t => t.is_full_mock || t.type === 'mock' || t.type === 'Full Mock').length;
+
   return (
     <Layout isLoading={loading}>
-      <div className="container mx-auto px-4 sm:px-6 py-8 sm:py-16 max-w-5xl">
-        <div className="text-center mb-10 sm:mb-16 space-y-4 animate-in fade-in duration-700">
-          <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-slate-900 dark:text-slate-100 tracking-tighter leading-tight">
-            History <span className="text-indigo-600">Logs</span>
-          </h1>
-          <p className="text-base sm:text-lg text-slate-400 font-bold tracking-tight">Review your evolution through every mission.</p>
+      <div className="container mx-auto px-4 sm:px-6 py-2 sm:py-4 max-w-[1000px]">
+        
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row items-center justify-between mb-6 sm:mb-8 gap-4 animate-in fade-in duration-700">
+          <div className="space-y-1 text-center md:text-left">
+            <div className="inline-flex items-center px-4 py-1.5 rounded-full bg-purple-50 text-indigo-600 text-xs sm:text-sm font-bold tracking-tight mb-2">
+              Your Journey
+            </div>
+            <h1 className="text-4xl sm:text-5xl font-black text-[#0f172a] dark:text-white tracking-tighter">
+              History
+            </h1>
+            <p className="text-base sm:text-lg text-slate-500 font-medium tracking-tight">
+              Track your performance and every step you've taken.
+            </p>
+          </div>
+          <div className="hidden md:block shrink-0 relative">
+            <div className="absolute inset-0 bg-purple-200/50 blur-3xl rounded-full" />
+            <img src="/clock.webp" alt="History Clock" className="w-[180px] h-[180px] object-contain relative z-10 drop-shadow-2xl hover:scale-105 transition-transform duration-500" />
+          </div>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <div className="flex justify-center mb-8 sm:mb-12">
-            <TabsList className="bg-slate-100 dark:bg-muted p-1 sm:p-1.5 rounded-xl sm:rounded-2xl border border-slate-200/50 h-12 sm:h-14 w-full sm:w-auto overflow-x-auto overflow-y-hidden no-scrollbar justify-start sm:justify-center">
+        {/* Statistics Row */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-100 dark:border-slate-800 flex items-center gap-4 shadow-sm">
+                <div className="w-12 h-12 rounded-2xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                    <CheckCircle className="w-6 h-6" />
+                </div>
+                <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Completed</p>
+                    <p className="text-xl font-black text-slate-900 dark:text-white leading-none">{totalCompleted}</p>
+                </div>
+            </div>
+            
+            <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-100 dark:border-slate-800 flex items-center gap-4 shadow-sm">
+                <div className="w-12 h-12 rounded-2xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                    <Target className="w-6 h-6" />
+                </div>
+                <div>
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Avg Score</p>
+                    <p className="text-xl font-black text-slate-900 dark:text-white leading-none">{avgScore}%</p>
+                </div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-100 dark:border-slate-800 flex items-center gap-4 shadow-sm">
+                <div className="w-12 h-12 rounded-2xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
+                    <Clock className="w-6 h-6" />
+                </div>
+                <div className="min-w-0">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Time Spent</p>
+                    <p className="text-lg font-black text-slate-900 dark:text-white leading-tight truncate">{totalTimeStr}</p>
+                </div>
+            </div>
+
+            <div className="bg-white dark:bg-slate-900 p-5 rounded-3xl border border-slate-100 dark:border-slate-800 flex items-center gap-4 shadow-sm">
+                <div className="w-12 h-12 rounded-2xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                    <Award className="w-6 h-6" />
+                </div>
+                <div className="min-w-0">
+                    <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-0.5">Mocks</p>
+                    <p className="text-xl font-black text-slate-900 dark:text-white leading-tight truncate">{totalMocks}</p>
+                </div>
+            </div>
+        </div>
+
+        <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v); setPage(0); }} className="w-full">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-8 border-b border-slate-200 dark:border-slate-800/50">
+            <TabsList className="bg-transparent p-0 border-0 h-auto justify-start w-full sm:w-auto gap-4 sm:gap-8 overflow-x-auto no-scrollbar">
               {isIELTS ? (
                 <>
-                  <TabsTrigger value="reading" className="px-4 sm:px-6 rounded-lg sm:rounded-xl font-black text-[9px] sm:text-[11px] uppercase tracking-widest data-[state=active]:bg-white dark:bg-card data-[state=active]:text-slate-900 dark:text-slate-100 data-[state=active]:shadow-sm flex items-center gap-1.5 sm:gap-2 shrink-0">
-                    <BookOpen className="w-3 sm:w-3.5 h-3 sm:h-3.5" /> Reading
+                  <TabsTrigger value="reading" className="relative pb-4 px-1 sm:px-2 rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-indigo-600 text-slate-500 font-bold text-[13px] sm:text-[15px] tracking-tight hover:text-slate-700 dark:hover:text-slate-300">
+                    Reading <span className="ml-2 bg-slate-100 dark:bg-slate-800 text-slate-500 data-[state=active]:bg-indigo-600 data-[state=active]:text-white rounded-full px-2 py-0.5 text-[10px] font-black">{tests.filter(t => t.type === 'Reading').length}</span>
+                    <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-indigo-600 rounded-t-md opacity-0 data-[state=active]:opacity-100 transition-opacity" />
                   </TabsTrigger>
-                  <TabsTrigger value="listening" className="px-4 sm:px-6 rounded-lg sm:rounded-xl font-black text-[9px] sm:text-[11px] uppercase tracking-widest data-[state=active]:bg-white dark:bg-card data-[state=active]:text-slate-900 dark:text-slate-100 data-[state=active]:shadow-sm flex items-center gap-1.5 sm:gap-2 shrink-0">
-                    <Headphones className="w-3 sm:w-3.5 h-3 sm:h-3.5" /> Listening
+                  <TabsTrigger value="listening" className="relative pb-4 px-1 sm:px-2 rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-indigo-600 text-slate-500 font-bold text-[13px] sm:text-[15px] tracking-tight hover:text-slate-700 dark:hover:text-slate-300">
+                    Listening <span className="ml-2 bg-slate-100 dark:bg-slate-800 text-slate-500 data-[state=active]:bg-indigo-600 data-[state=active]:text-white rounded-full px-2 py-0.5 text-[10px] font-black">{tests.filter(t => t.type === 'Listening').length}</span>
+                    <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-indigo-600 rounded-t-md opacity-0 data-[state=active]:opacity-100 transition-opacity" />
                   </TabsTrigger>
-                  <TabsTrigger value="writing" className="px-4 sm:px-6 rounded-lg sm:rounded-xl font-black text-[9px] sm:text-[11px] uppercase tracking-widest data-[state=active]:bg-white dark:bg-card data-[state=active]:text-slate-900 dark:text-slate-100 data-[state=active]:shadow-sm flex items-center gap-1.5 sm:gap-2 shrink-0">
-                    <FileText className="w-3 sm:w-3.5 h-3 sm:h-3.5" /> Writing
+                  <TabsTrigger value="writing" className="relative pb-4 px-1 sm:px-2 rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-indigo-600 text-slate-500 font-bold text-[13px] sm:text-[15px] tracking-tight hover:text-slate-700 dark:hover:text-slate-300">
+                    Writing <span className="ml-2 bg-slate-100 dark:bg-slate-800 text-slate-500 data-[state=active]:bg-indigo-600 data-[state=active]:text-white rounded-full px-2 py-0.5 text-[10px] font-black">{tests.filter(t => t.type === 'Writing').length}</span>
+                    <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-indigo-600 rounded-t-md opacity-0 data-[state=active]:opacity-100 transition-opacity" />
                   </TabsTrigger>
-                  <TabsTrigger value="speaking" className="px-4 sm:px-6 rounded-lg sm:rounded-xl font-black text-[9px] sm:text-[11px] uppercase tracking-widest data-[state=active]:bg-white dark:bg-card data-[state=active]:text-slate-900 dark:text-slate-100 data-[state=active]:shadow-sm flex items-center gap-1.5 sm:gap-2 shrink-0">
-                    <Mic className="w-3 sm:w-3.5 h-3 sm:h-3.5" /> Speaking
+                  <TabsTrigger value="speaking" className="relative pb-4 px-1 sm:px-2 rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-indigo-600 text-slate-500 font-bold text-[13px] sm:text-[15px] tracking-tight hover:text-slate-700 dark:hover:text-slate-300">
+                    Speaking <span className="ml-2 bg-slate-100 dark:bg-slate-800 text-slate-500 data-[state=active]:bg-indigo-600 data-[state=active]:text-white rounded-full px-2 py-0.5 text-[10px] font-black">{tests.filter(t => t.type === 'Speaking').length}</span>
+                    <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-indigo-600 rounded-t-md opacity-0 data-[state=active]:opacity-100 transition-opacity" />
                   </TabsTrigger>
-                  <TabsTrigger value="mock-exams" className="px-4 sm:px-6 rounded-lg sm:rounded-xl font-black text-[9px] sm:text-[11px] uppercase tracking-widest data-[state=active]:bg-white dark:bg-card data-[state=active]:text-slate-900 dark:text-slate-100 data-[state=active]:shadow-sm flex items-center gap-1.5 sm:gap-2 shrink-0">
-                    <Award className="w-3 sm:w-3.5 h-3 sm:h-3.5" /> Mock
+                  <TabsTrigger value="mock-exams" className="relative pb-4 px-1 sm:px-2 rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-indigo-600 text-slate-500 font-bold text-[13px] sm:text-[15px] tracking-tight hover:text-slate-700 dark:hover:text-slate-300">
+                    Mock <span className="ml-2 bg-slate-100 dark:bg-slate-800 text-slate-500 data-[state=active]:bg-indigo-600 data-[state=active]:text-white rounded-full px-2 py-0.5 text-[10px] font-black">{tests.filter(t => t.is_full_mock).length}</span>
+                    <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-indigo-600 rounded-t-md opacity-0 data-[state=active]:opacity-100 transition-opacity" />
                   </TabsTrigger>
                 </>
               ) : (
                 <>
-                  <TabsTrigger value="practice" className="px-6 sm:px-8 rounded-lg sm:rounded-xl font-black text-[10px] sm:text-[11px] uppercase tracking-widest data-[state=active]:bg-white dark:bg-card data-[state=active]:text-slate-900 dark:text-slate-100 data-[state=active]:shadow-sm shrink-0">
-                    Practice ({practiceTests.length})
+                  <TabsTrigger value="practice" className="relative pb-4 px-1 sm:px-2 rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-indigo-600 text-slate-500 font-bold text-[13px] sm:text-[15px] tracking-tight hover:text-slate-700 dark:hover:text-slate-300">
+                    Practice Tests
+                    <span className={`ml-2 rounded-full px-2.5 py-0.5 text-[10px] font-black transition-colors ${activeTab === 'practice' ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+                      {practiceTests.length}
+                    </span>
+                    <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-indigo-600 rounded-t-md opacity-0 data-[state=active]:opacity-100 transition-opacity" />
                   </TabsTrigger>
-                  <TabsTrigger value="mock" className="px-6 sm:px-8 rounded-lg sm:rounded-xl font-black text-[10px] sm:text-[11px] uppercase tracking-widest data-[state=active]:bg-white dark:bg-card data-[state=active]:text-slate-900 dark:text-slate-100 data-[state=active]:shadow-sm shrink-0">
-                    Mock Simulations ({officialTests.length})
+                  <TabsTrigger value="mock" className="relative pb-4 px-1 sm:px-2 rounded-none data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:text-indigo-600 text-slate-500 font-bold text-[13px] sm:text-[15px] tracking-tight hover:text-slate-700 dark:hover:text-slate-300">
+                    Mock Simulations
+                    <span className={`ml-2 rounded-full px-2.5 py-0.5 text-[10px] font-black transition-colors ${activeTab === 'mock' ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'}`}>
+                      {officialTests.length}
+                    </span>
+                    <div className="absolute bottom-0 left-0 right-0 h-[3px] bg-indigo-600 rounded-t-md opacity-0 data-[state=active]:opacity-100 transition-opacity" />
                   </TabsTrigger>
                 </>
               )}
             </TabsList>
+            
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" className="hidden sm:flex rounded-xl border-slate-200 dark:border-slate-800 mb-4 font-bold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-900 shadow-sm hover:bg-slate-50">
+                  <Filter className="w-4 h-4 mr-2 text-slate-400" /> {selectedSubject} <ChevronDown className="w-4 h-4 ml-2 text-slate-400" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 rounded-xl">
+                <DropdownMenuItem onClick={() => { setSelectedSubject('All Subjects'); setPage(0); }} className="font-bold cursor-pointer rounded-lg">
+                  All Subjects
+                </DropdownMenuItem>
+                {uniqueSubjects.map(sub => (
+                  <DropdownMenuItem key={sub} onClick={() => { setSelectedSubject(sub); setPage(0); }} className="font-bold cursor-pointer rounded-lg">
+                    {sub}
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
 
           {isIELTS ? (
             <>
               <TabsContent value="reading" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="grid gap-4 sm:gap-6">
-                  {tests.filter(t => t.type === 'Reading').length > 0 ? (
-                    tests.filter(t => t.type === 'Reading').map(test => (
-                      <TestCard key={test.id} result={test} onNavigate={navigate} />
-                    ))
-                  ) : (
-                    <EmptyState icon={<BookOpen className="w-8 h-8 text-slate-200" />} title="No Reading Sessions" href="/practice" onNavigate={navigate} />
-                  )}
-                </div>
+                {tests.filter(t => t.type === 'Reading').length > 0 ? (
+                  renderPaginatedList(tests.filter(t => t.type === 'Reading'))
+                ) : (
+                  <EmptyState icon={<BookOpen className="w-8 h-8 text-slate-200" />} title="No Reading Sessions" href="/practice" onNavigate={navigate} />
+                )}
               </TabsContent>
               <TabsContent value="listening" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="grid gap-4 sm:gap-6">
-                  {tests.filter(t => t.type === 'Listening').length > 0 ? (
-                    tests.filter(t => t.type === 'Listening').map(test => (
-                      <TestCard key={test.id} result={test} onNavigate={navigate} />
-                    ))
-                  ) : (
-                    <EmptyState icon={<Headphones className="w-8 h-8 text-slate-200" />} title="No Listening Sessions" href="/practice" onNavigate={navigate} />
-                  )}
-                </div>
+                {tests.filter(t => t.type === 'Listening').length > 0 ? (
+                  renderPaginatedList(tests.filter(t => t.type === 'Listening'))
+                ) : (
+                  <EmptyState icon={<Headphones className="w-8 h-8 text-slate-200" />} title="No Listening Sessions" href="/practice" onNavigate={navigate} />
+                )}
               </TabsContent>
               <TabsContent value="writing" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="grid gap-4 sm:gap-6">
-                  {tests.filter(t => t.type === 'Writing').length > 0 ? (
-                    tests.filter(t => t.type === 'Writing').map(test => (
-                      <TestCard key={test.id} result={test} onNavigate={navigate} />
-                    ))
-                  ) : (
-                    <EmptyState icon={<FileText className="w-8 h-8 text-slate-200" />} title="No Writing Evaluations" href="/writing/lobby" onNavigate={navigate} />
-                  )}
-                </div>
+                {tests.filter(t => t.type === 'Writing').length > 0 ? (
+                  renderPaginatedList(tests.filter(t => t.type === 'Writing'))
+                ) : (
+                  <EmptyState icon={<FileText className="w-8 h-8 text-slate-200" />} title="No Writing Evaluations" href="/writing/lobby" onNavigate={navigate} />
+                )}
               </TabsContent>
               <TabsContent value="speaking" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="grid gap-4 sm:gap-6">
-                  {tests.filter(t => t.type === 'Speaking').length > 0 ? (
-                    tests.filter(t => t.type === 'Speaking').map(test => (
-                      <TestCard key={test.id} result={test} onNavigate={navigate} />
-                    ))
-                  ) : (
-                    <EmptyState icon={<Mic className="w-8 h-8 text-slate-200" />} title="No Speaking Sessions" href="/speaking" onNavigate={navigate} />
-                  )}
-                </div>
+                {tests.filter(t => t.type === 'Speaking').length > 0 ? (
+                  renderPaginatedList(tests.filter(t => t.type === 'Speaking'))
+                ) : (
+                  <EmptyState icon={<Mic className="w-8 h-8 text-slate-200" />} title="No Speaking Sessions" href="/speaking" onNavigate={navigate} />
+                )}
               </TabsContent>
               <TabsContent value="mock-exams" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="grid gap-4 sm:gap-6">
-                  {tests.filter(t => t.is_full_mock).length > 0 ? (
-                    tests.filter(t => t.is_full_mock).map(test => (
-                      <TestCard key={test.id} result={test} onNavigate={navigate} />
-                    ))
-                  ) : (
-                    <EmptyState icon={<Award className="w-8 h-8 text-slate-200" />} title="No Mock Exams" href="/mock-exams" onNavigate={navigate} />
-                  )}
-                </div>
+                {tests.filter(t => t.is_full_mock).length > 0 ? (
+                  renderPaginatedList(tests.filter(t => t.is_full_mock))
+                ) : (
+                  <EmptyState icon={<Award className="w-8 h-8 text-slate-200" />} title="No Mock Exams" href="/mock-exams" onNavigate={navigate} />
+                )}
               </TabsContent>
             </>
           ) : (
             <>
               <TabsContent value="practice" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 {practiceTests.length > 0 ? (
-                  <div className="grid gap-4 sm:gap-6">
-                    {practiceTests.map(test => (
-                      <TestCard key={test.id} result={test} onNavigate={navigate} />
-                    ))}
-                  </div>
+                  renderPaginatedList(practiceTests)
                 ) : (
                   <EmptyState icon={<Target className="w-8 h-8 text-slate-200" />} title="No Practice Missions" href="/practice" onNavigate={navigate} />
                 )}
@@ -692,11 +767,7 @@ TestCard.displayName = 'TestCard';
 
               <TabsContent value="mock" className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                 {officialTests.length > 0 ? (
-                  <div className="grid gap-4 sm:gap-6">
-                    {officialTests.map(test => (
-                      <TestCard key={test.id} result={test} onNavigate={navigate} />
-                    ))}
-                  </div>
+                  renderPaginatedList(officialTests)
                 ) : (
                   <EmptyState icon={<FileText className="w-8 h-8 text-slate-200" />} title="No Mock Simulations" href="/mock-exams" onNavigate={navigate} />
                 )}
@@ -707,29 +778,28 @@ TestCard.displayName = 'TestCard';
 
         {/* Free Tier Upgrade Prompt */}
         {profile?.selected_plan === 'explorer' && (
-          <div className="mt-12 p-8 sm:p-12 rounded-[3rem] bg-indigo-600 shadow-2xl shadow-indigo-200 relative overflow-hidden group">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
-            <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-8">
-              <div className="text-center md:text-left space-y-4">
-                <div className="inline-flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full border border-white/20">
-                  <Sparkles className="w-3.5 h-3.5 text-indigo-200" />
-                  <span className="text-[10px] font-black text-white uppercase tracking-widest leading-none">Unlock Full Logs</span>
-                </div>
-                <h3 className="text-2xl sm:text-3xl font-black text-white tracking-tight uppercase leading-none">
-                  Viewing Limited <span className="text-indigo-200 text-lg sm:text-xl"> (2 Recent)</span>
+          <div className="mt-8 p-6 sm:p-8 rounded-[1.5rem] bg-gradient-to-r from-[#2B1B76] via-[#3F2B96] to-[#2B1B76] shadow-xl relative overflow-hidden group flex flex-col md:flex-row items-center justify-between gap-6">
+            <div className="absolute inset-0 bg-white/5 opacity-50 bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:16px_16px]" />
+            <div className="relative z-10 flex flex-col sm:flex-row items-center gap-6 text-center sm:text-left">
+              <div className="w-16 h-16 rounded-full bg-indigo-500/20 flex items-center justify-center shrink-0 border border-indigo-400/30">
+                <Crown className="w-8 h-8 text-indigo-300" />
+              </div>
+              <div className="space-y-1">
+                <h3 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                  Unlock Full History
                 </h3>
-                <p className="text-sm font-medium text-indigo-100 max-w-sm leading-relaxed">
-                  Upgrade to Exam Prep or Global plan to see your entire performance history across all subjects.
+                <p className="text-sm font-medium text-indigo-200/80 max-w-lg leading-relaxed">
+                  Upgrade to Italo Premium and get complete access to your test history, advanced analytics, and smart insights.
                 </p>
               </div>
-              <Button
-                onClick={openPricingModal}
-                className="h-16 px-10 rounded-2xl bg-white text-indigo-600 hover:bg-slate-50 font-black text-xs uppercase tracking-widest shadow-xl group/btn shrink-0"
-              >
-                Upgrade Now
-                <ArrowRight className="w-4 h-4 ml-2 group-hover/btn:translate-x-1 transition-transform" />
-              </Button>
             </div>
+            <Button
+              onClick={openPricingModal}
+              className="relative z-10 h-14 px-8 rounded-xl bg-white text-[#2B1B76] hover:bg-slate-50 font-bold text-sm shadow-xl group/btn shrink-0 w-full md:w-auto"
+            >
+              Upgrade Now
+              <ArrowRight className="w-4 h-4 ml-2 group-hover/btn:translate-x-1 transition-transform" />
+            </Button>
           </div>
         )}
       </div>

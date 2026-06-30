@@ -304,7 +304,7 @@ export default function StudyPlannerWidget({ examType }: { examType?: string }) 
             if (yesterdayDone && plan) {
                 try {
                     const doneList = JSON.parse(yesterdayDone);
-                    const subjects = EXAM_SUBJECTS[plan.exam as 'imat' | 'cent-s'] || [];
+                    const subjects = EXAM_SUBJECTS[plan.exam as 'imat' | 'cent-s' | 'til-i'] || [];
                     const missed = subjects.filter(s => !doneList.includes(s.name)).map(s => s.name);
                     setMissedYesterday(missed);
                 } catch (_) {}

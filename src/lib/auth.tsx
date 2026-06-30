@@ -266,6 +266,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (subscriptionChanged) {
               // Full replace — a real subscription change happened
               setProfile(newData);
+
+              // Fire premium animation if user was just upgraded from explorer
+              const oldPlan = profile?.selected_plan || 'explorer';
+              const newPlan = newData?.selected_plan;
+              if (oldPlan === 'explorer' && newPlan && newPlan !== 'explorer') {
+                window.dispatchEvent(new Event('premium-upgrade-success'));
+              }
             } else {
               // Selective merge — only safe non-subscription fields changed (e.g., cart)
               setProfile((prev: any) => prev ? { ...prev, ...newData } : newData);

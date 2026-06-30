@@ -114,6 +114,9 @@ export const ExamProvider: React.FC<{ children: React.ReactNode }> = ({ children
         const profileExamId = profile?.selected_exam;
         const targetExamId = profileExamId || savedExamId || 'cent-s-prep';
 
+        // ✅ Guard: only update if actually different (prevents double dashboard refresh)
+        if (activeExam?.id === targetExamId) return;
+
         if (allExams[targetExamId]) {
             setActiveExamState(allExams[targetExamId]);
         } else if (Object.keys(allExams).length > 0) {

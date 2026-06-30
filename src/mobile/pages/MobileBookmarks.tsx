@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
-import { Bookmark, Target, ChevronRight, LayoutGrid, Search, Trash2, Lock, AlertTriangle, Sparkles, BookOpen, X, ArrowLeft } from 'lucide-react';
+import { Bookmark, Target, ChevronRight, LayoutGrid, Search, Trash2, Lock, AlertTriangle, Sparkles, BookOpen, X, ArrowLeft, ChevronDown, Filter, Folder, Clock, Star } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,13 +12,19 @@ import {
     DialogClose,
     DialogTitle,
 } from "@/components/ui/dialog";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { MathText } from '@/components/MathText';
 import { cn } from '@/lib/utils';
 import { Haptics, ImpactStyle } from '@capacitor/haptics';
 import QuestionMedia from '@/components/QuestionMedia';
 import DiagramRenderer from '@/components/DiagramRenderer';
 import { MediaContent, DiagramData } from '@/types/test';
-import { TestListSkeleton } from '@/components/SkeletonLoader';
+import { MobilePageSkeleton } from '@/components/SkeletonLoader';
 import MobileLayout from '../components/MobileLayout';
 
 interface BookmarkedQuestion {
@@ -49,6 +55,12 @@ export default function MobileBookmarks() {
     const [selectedBookmark, setSelectedBookmark] = useState<BookmarkedQuestion | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'all' | 'reported'>('all');
+    
+    // Filtering states matching Desktop
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filterSubject, setFilterSubject] = useState('All Subjects');
+    const [filterStatus, setFilterStatus] = useState('All Status');
+    const [sortOrder, setSortOrder] = useState('Newest First');
 
     useEffect(() => {
         if (user) {
@@ -201,6 +213,62 @@ export default function MobileBookmarks() {
         return '🧠';
     };
 
+    const uniqueSubjectsList = Array.from(new Set(bookmarks.map(b => b.display.subject))).sort();
+
+    // Derived Data for Stats
+    const totalBookmarksCount = bookmarks.length;
+    const totalSubjectsCount = uniqueSubjectsList.length;
+
+    const subjectCounts = bookmarks.reduce((acc, b) => {
+        acc[b.display.subject] = (acc[b.display.subject] || 0) + 1;
+        return acc;
+    }, {} as Record<string, number>);
+    
+    const mostSavedSubjectStr = totalBookmarksCount > 0 
+        ? Object.keys(subjectCounts).reduce((a, b) => subjectCounts[a] > subjectCounts[b] ? a : b, 'None')
+        : 'None';
+    const mostSavedPercent = totalBookmarksCount > 0 ? Math.round((subjectCounts[mostSavedSubjectStr] / totalBookmarksCount) * 100) : 0;
+
+    const lastAddedBookmark = bookmarks.length > 0 ? [...bookmarks].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0] : null;
+    let lastAddedStr = 'None';
+    let lastAddedSubj = '';
+    if (lastAddedBookmark) {
+        lastAddedSubj = lastAddedBookmark.display.subject;
+        const d = new Date(lastAddedBookmark.created_at);
+        const today = new Date();
+        const isToday = d.getDate() === today.getDate() && d.getMonth() === today.getMonth() && d.getFullYear() === today.getFullYear();
+        lastAddedStr = `${isToday ? 'Today' : d.toLocaleDateString('en-US', {month: 'short', day: 'numeric'})}`;
+    }
+
+    const filteredBookmarks = bookmarks.filter(b => {
+        if (activeTab === 'reported' && !b.is_reported_by_user) return false;
+        
+        if (searchQuery.trim()) {
+            const lowerQuery = searchQuery.toLowerCase();
+            if (!b.display.text.toLowerCase().includes(lowerQuery) && !b.display.subject.toLowerCase().includes(lowerQuery)) {
+                return false;
+            }
+        }
+        
+        if (filterSubject !== 'All Subjects' && b.display.subject !== filterSubject) {
+            return false;
+        }
+
+        if (filterStatus !== 'All Status') {
+            if (filterStatus === 'Under Review' && (!b.is_reported_by_user || b.display.is_corrected)) return false;
+            if (filterStatus === 'Fixed' && (!b.is_reported_by_user || !b.display.is_corrected)) return false;
+            if (filterStatus === 'Standard' && b.is_reported_by_user) return false;
+        }
+
+        return true;
+    }).sort((a, b) => {
+        if (sortOrder === 'Newest First') {
+            return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
+        } else {
+            return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+        }
+    });
+
     return (
         <MobileLayout isLoading={loading} hideHeader={true}>
             <div className="min-h-screen bg-slate-50 dark:bg-black pb-24">
@@ -215,7 +283,7 @@ export default function MobileBookmarks() {
                     >
                         <ArrowLeft className="w-5 h-5" />
                     </Button>
-                    <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Saved Assets</h1>
+                    <h1 className="text-xl font-black text-slate-900 dark:text-white tracking-tight">Bookmarks</h1>
                 </div>
 
                 {/* Tabs */}
@@ -244,6 +312,103 @@ export default function MobileBookmarks() {
                         )}
                     </button>
                 </div>
+
+                {/* Stats Row */}
+                <div className="mt-4 flex gap-3 overflow-x-auto hide-scrollbar pb-1">
+                    <div className="flex-none bg-white dark:bg-[#151515] p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-3 w-[140px]">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
+                            <Bookmark className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-tight mb-0.5">Total</p>
+                            <p className="text-lg font-black text-slate-900 dark:text-white leading-none">{totalBookmarksCount}</p>
+                        </div>
+                    </div>
+                    
+                    <div className="flex-none bg-white dark:bg-[#151515] p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-3 w-[140px]">
+                        <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+                            <Folder className="w-5 h-5" />
+                        </div>
+                        <div>
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-tight mb-0.5">Subjects</p>
+                            <p className="text-lg font-black text-slate-900 dark:text-white leading-none">{totalSubjectsCount}</p>
+                        </div>
+                    </div>
+
+                    <div className="flex-none bg-white dark:bg-[#151515] p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-3 w-[160px]">
+                        <div className="w-10 h-10 rounded-xl bg-orange-50 text-orange-600 flex items-center justify-center shrink-0">
+                            <Clock className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-tight mb-0.5">Last Added</p>
+                            <p className="text-sm font-black text-slate-900 dark:text-white leading-tight truncate">{lastAddedStr}</p>
+                        </div>
+                    </div>
+
+                    <div className="flex-none bg-white dark:bg-[#151515] p-3 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm flex items-center gap-3 w-[160px]">
+                        <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center shrink-0">
+                            <Star className="w-5 h-5" />
+                        </div>
+                        <div className="min-w-0">
+                            <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-tight mb-0.5">Most Saved</p>
+                            <p className="text-sm font-black text-slate-900 dark:text-white leading-tight truncate">{mostSavedSubjectStr}</p>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Filter Bar */}
+                <div className="mt-4 flex flex-col gap-3">
+                    <div className="relative">
+                        <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                        <Input 
+                            placeholder="Search bookmarks..." 
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            className="w-full pl-10 h-12 bg-slate-100 dark:bg-white/5 border-none shadow-none rounded-xl focus-visible:ring-0 text-slate-800 dark:text-slate-100 font-medium placeholder:text-slate-400"
+                        />
+                    </div>
+                    
+                    <div className="flex overflow-x-auto hide-scrollbar gap-2 pb-1 items-center">
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-9 px-3 rounded-lg bg-slate-100 dark:bg-white/5 font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 shrink-0 text-xs">
+                                    {filterSubject} <ChevronDown className="w-3 h-3 ml-1.5 opacity-50" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-48 rounded-xl">
+                                <DropdownMenuItem onClick={() => setFilterSubject('All Subjects')} className="font-bold cursor-pointer rounded-lg text-xs">All Subjects</DropdownMenuItem>
+                                {uniqueSubjectsList.map(s => (
+                                    <DropdownMenuItem key={s} onClick={() => setFilterSubject(s)} className="font-bold cursor-pointer rounded-lg text-xs">{s}</DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-9 px-3 rounded-lg bg-slate-100 dark:bg-white/5 font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 shrink-0 text-xs">
+                                    {filterStatus} <ChevronDown className="w-3 h-3 ml-1.5 opacity-50" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-48 rounded-xl">
+                                {['All Status', 'Standard', 'Under Review', 'Fixed'].map(s => (
+                                    <DropdownMenuItem key={s} onClick={() => setFilterStatus(s)} className="font-bold cursor-pointer rounded-lg text-xs">{s}</DropdownMenuItem>
+                                ))}
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+
+                        <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" className="h-9 px-3 rounded-lg bg-slate-100 dark:bg-white/5 font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-white/10 shrink-0 text-xs">
+                                    {sortOrder} <ChevronDown className="w-3 h-3 ml-1.5 opacity-50" />
+                                </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="start" className="w-48 rounded-xl">
+                                <DropdownMenuItem onClick={() => setSortOrder('Newest First')} className="font-bold cursor-pointer rounded-lg text-xs">Newest First</DropdownMenuItem>
+                                <DropdownMenuItem onClick={() => setSortOrder('Oldest First')} className="font-bold cursor-pointer rounded-lg text-xs">Oldest First</DropdownMenuItem>
+                            </DropdownMenuContent>
+                        </DropdownMenu>
+                    </div>
+                </div>
             </div>
 
             {bookmarks.length === 0 ? (
@@ -262,61 +427,88 @@ export default function MobileBookmarks() {
                         Start Mission
                     </Button>
                 </div>
+            ) : filteredBookmarks.length === 0 ? (
+                <div className="flex flex-col items-center justify-center text-center p-8 pt-24">
+                    <div className="w-16 h-16 bg-slate-100 dark:bg-white/5 rounded-2xl flex items-center justify-center mb-4">
+                        <Search className="w-8 h-8 text-slate-300 dark:text-slate-600" />
+                    </div>
+                    <h2 className="text-xl font-black text-slate-900 dark:text-white tracking-tight mb-2">No matching items</h2>
+                    <p className="text-sm font-medium text-slate-500">Try adjusting your filters.</p>
+                </div>
             ) : (
                 <div className="px-4 py-6 space-y-4">
-                    {bookmarks
-                        .filter(b => activeTab === 'all' ? true : b.is_reported_by_user)
-                        .map((bookmark) => (
+                    {filteredBookmarks
+                        .map((bookmark, index) => (
                             <div
                                 key={bookmark.id}
                                 onClick={() => {
                                     Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
                                     setSelectedBookmark(bookmark);
                                 }}
-                                className="bg-white dark:bg-white/5 p-5 rounded-[1.5rem] border border-slate-100 dark:border-white/5 shadow-sm active:scale-[0.98] transition-all"
+                                className="bg-white dark:bg-slate-900 p-5 rounded-[1.5rem] border border-slate-100 dark:border-slate-800 shadow-sm active:scale-[0.98] transition-all flex flex-col relative overflow-hidden"
                             >
-                                <div className="flex items-start justify-between gap-4 mb-3">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-10 h-10 bg-slate-50 dark:bg-white/5 rounded-xl flex items-center justify-center text-xl">
-                                            {getSubjectEmoji(bookmark.display.subject)}
-                                        </div>
-                                        <div>
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <span className="text-[9px] font-black uppercase tracking-widest text-slate-400">
-                                                    {bookmark.display.subject}
-                                                </span>
-                                                {bookmark.display.is_corrected && (
-                                                    <Target className="w-3 h-3 text-emerald-500" />
-                                                )}
-                                                {bookmark.is_reported_by_user && !bookmark.display.is_corrected && (
-                                                    <AlertTriangle className="w-3 h-3 text-amber-500" />
-                                                )}
+                                <div className="flex flex-col gap-3">
+                                    <div className="flex flex-col justify-between gap-3">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <div className="w-8 h-8 bg-indigo-50 dark:bg-indigo-500/10 rounded-lg flex items-center justify-center text-indigo-600 font-black text-sm shrink-0 mr-1">
+                                                {String(index + 1).padStart(2, '0')}
                                             </div>
-                                            <div className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md inline-block ${bookmark.display.difficulty.toLowerCase() === 'easy' ? 'bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400' :
-                                                bookmark.display.difficulty.toLowerCase() === 'medium' ? 'bg-orange-50 dark:bg-orange-500/10 text-orange-600 dark:text-orange-400' :
-                                                    'bg-indigo-50 dark:bg-indigo-500/10 text-indigo-600 dark:text-indigo-400'
-                                                }`}>
+                                            <span className="px-2.5 py-1 bg-indigo-50 dark:bg-indigo-500/10 text-indigo-700 dark:text-indigo-400 text-[9px] font-black uppercase tracking-widest rounded-full">
+                                                {bookmark.display.subject}
+                                            </span>
+                                            <span className="px-2.5 py-1 bg-slate-50 dark:bg-slate-800 text-slate-500 text-[9px] font-black uppercase tracking-widest rounded-full">
                                                 {bookmark.display.difficulty}
-                                            </div>
+                                            </span>
+                                            {bookmark.display.is_corrected && (
+                                                <span className="px-2.5 py-1 bg-emerald-50 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 text-[9px] font-black uppercase tracking-widest rounded-full flex items-center gap-1.5">
+                                                    <Target className="w-3 h-3" /> Fixed
+                                                </span>
+                                            )}
+                                        </div>
+                                        <div className="text-[10px] font-bold text-slate-400 shrink-0">
+                                            Saved on {new Date(bookmark.created_at).toLocaleDateString('en-US', {month: 'short', day: 'numeric', year: 'numeric'})}
                                         </div>
                                     </div>
-                                    <ChevronRight className="w-4 h-4 text-slate-300" />
+
+                                    <MathText 
+                                        content={bookmark.display.text.substring(0, 150) + (bookmark.display.text.length > 150 ? '...' : '')}
+                                        className="text-slate-900 dark:text-slate-100 font-bold leading-relaxed tracking-tight text-sm line-clamp-2 pointer-events-none mt-1"
+                                        variant="default"
+                                    />
+
+                                    {bookmark.admin_message && (
+                                        <div className="mt-2 p-3 bg-indigo-50/50 dark:bg-indigo-500/5 rounded-xl border border-indigo-100 dark:border-indigo-500/20 flex items-start gap-2">
+                                            <Sparkles className="w-3.5 h-3.5 text-indigo-600 shrink-0 mt-0.5" />
+                                            <div>
+                                                <p className="text-[9px] font-black text-indigo-900 dark:text-indigo-400 uppercase tracking-widest mb-0.5">Admin Response</p>
+                                                <p className="text-xs font-bold text-indigo-700 dark:text-indigo-300 italic line-clamp-1">&quot;{bookmark.admin_message}&quot;</p>
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
-
-                                <MathText 
-                                    content={bookmark.display.text.substring(0, 150) + (bookmark.display.text.length > 150 ? '...' : '')}
-                                    className="text-sm font-bold text-slate-700 dark:text-slate-300 line-clamp-2 leading-relaxed mb-3 pointer-events-none"
-                                    variant="default"
-                                />
-
-                                {bookmark.admin_message && (
-                                    <div className="p-3 bg-indigo-50 dark:bg-indigo-500/10 rounded-xl border border-indigo-100 dark:border-indigo-500/20 flex items-center gap-2">
-                                        <Sparkles className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />
-                                        <p className="text-[10px] font-bold text-indigo-700 dark:text-indigo-300 line-clamp-1 italic">
-                                            Admin: "{bookmark.admin_message}"
-                                        </p>
-                                    </div>
-                                )}
+                                <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex justify-end gap-3">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            removeBookmark(bookmark);
+                                        }}
+                                        disabled={bookmark.is_reported_by_user && !bookmark.display.is_corrected}
+                                        className="h-8 w-8 rounded-lg text-slate-400 hover:text-red-600 hover:bg-red-50"
+                                    >
+                                        <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                    <Button
+                                        onClick={() => {
+                                            Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
+                                            setSelectedBookmark(bookmark);
+                                        }}
+                                        className="h-8 rounded-lg bg-slate-900 dark:bg-white text-white dark:text-black font-black text-[10px] uppercase tracking-widest px-4"
+                                    >
+                                        Open
+                                    </Button>
+                                </div>
                             </div>
                         ))}
                 </div>
@@ -351,7 +543,7 @@ export default function MobileBookmarks() {
                                     <p className="text-[9px] font-black text-indigo-900 dark:text-indigo-300 uppercase tracking-widest">Admin Response</p>
                                 </div>
                                 <p className="text-xs font-bold text-indigo-800 dark:text-indigo-200 italic leading-relaxed">
-                                    "{selectedBookmark.admin_message}"
+                                    &quot;{selectedBookmark.admin_message}&quot;
                                 </p>
                             </div>
                         )}

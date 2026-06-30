@@ -107,7 +107,7 @@ export default function MobileConciergeUpgrade() {
                     </button>
 
                     <p className="text-[9px] font-bold text-indigo-400/40 text-center uppercase tracking-widest">
-                        🎉 Beta Special: Premium access included
+                        🎉 Special: Premium access included
                     </p>
                 </div>
             </main>

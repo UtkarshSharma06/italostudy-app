@@ -818,35 +818,102 @@ export default function MobileTest() {
                                 );
                             })}
                         </div>
-                    ) : (
-                        <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-2">
-                            {questions.map((q, idx) => {
-                                const isAnswered = q.user_answer !== undefined && q.user_answer !== null;
-                                const isFlagged = q.is_marked_for_review;
-                                const isActive = idx === currentIndex;
+                    ) : (() => {
+                        const dynamicSections = [];
+                        if (questions.length > 0) {
+                            let currentSectionName = questions[0].section_name || 'General';
+                            let currentSectionQuestions = [];
+                            
+                            for (let i = 0; i < questions.length; i++) {
+                                const q = questions[i];
+                                const qSec = q.section_name || 'General';
+                                
+                                if (qSec !== currentSectionName) {
+                                    dynamicSections.push({ title: currentSectionName, questions: currentSectionQuestions });
+                                    currentSectionName = qSec;
+                                    currentSectionQuestions = [];
+                                }
+                                currentSectionQuestions.push({ ...q, originalIndex: i });
+                            }
+                            if (currentSectionQuestions.length > 0) {
+                                dynamicSections.push({ title: currentSectionName, questions: currentSectionQuestions });
+                            }
+                        }
 
-                                return (
-                                    <button
-                                        key={q.id || idx}
-                                        onClick={() => {
-                                            setCurrentIndex(idx);
-                                            Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
-                                        }}
-                                        className={`aspect-square rounded-xl text-[10px] font-black border-2 transition-all active:scale-95 flex items-center justify-center ${isActive
-                                                ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-600/20'
-                                                : isFlagged
-                                                    ? 'bg-orange-500 border-orange-500 text-white shadow-sm'
-                                                    : isAnswered
-                                                        ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm'
-                                                        : 'bg-slate-50 dark:bg-muted/30 border-slate-100 dark:border-border text-slate-400'
-                                            }`}
-                                    >
-                                        {idx + 1}
-                                    </button>
-                                );
-                            })}
-                        </div>
-                    )}
+                        if (dynamicSections.length <= 1) {
+                            return (
+                                <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-2">
+                                    {questions.map((q, idx) => {
+                                        const isAnswered = q.user_answer !== undefined && q.user_answer !== null;
+                                        const isFlagged = q.is_marked_for_review;
+                                        const isActive = idx === currentIndex;
+
+                                        return (
+                                            <button
+                                                key={q.id || idx}
+                                                onClick={() => {
+                                                    setCurrentIndex(idx);
+                                                    Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
+                                                }}
+                                                className={`aspect-square rounded-xl text-[10px] font-black border-2 transition-all active:scale-95 flex items-center justify-center ${isActive
+                                                        ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+                                                        : isFlagged
+                                                            ? 'bg-orange-500 border-orange-500 text-white shadow-sm'
+                                                            : isAnswered
+                                                                ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm'
+                                                                : 'bg-slate-50 dark:bg-muted/30 border-slate-100 dark:border-border text-slate-400'
+                                                    }`}
+                                            >
+                                                {idx + 1}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            );
+                        }
+
+                        return (
+                            <div className="space-y-6">
+                                {dynamicSections.map((section, secIdx) => {
+                                    if (section.questions.length === 0) return null;
+
+                                    return (
+                                        <div key={section.title + secIdx} className="space-y-3">
+                                            <h4 className="text-[10px] font-bold text-slate-600 dark:text-slate-400 uppercase tracking-wider">{section.title}</h4>
+                                            <div className="grid grid-cols-6 sm:grid-cols-8 md:grid-cols-10 gap-2">
+                                                {section.questions.map((q) => {
+                                                    const idx = q.originalIndex;
+                                                    const isAnswered = q.user_answer !== undefined && q.user_answer !== null;
+                                                    const isFlagged = q.is_marked_for_review;
+                                                    const isActive = idx === currentIndex;
+
+                                                    return (
+                                                        <button
+                                                            key={q.id || idx}
+                                                            onClick={() => {
+                                                                setCurrentIndex(idx);
+                                                                Haptics.impact({ style: ImpactStyle.Light }).catch(() => { });
+                                                            }}
+                                                            className={`aspect-square rounded-xl text-[10px] font-black border-2 transition-all active:scale-95 flex items-center justify-center ${isActive
+                                                                    ? 'bg-indigo-600 border-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+                                                                    : isFlagged
+                                                                        ? 'bg-orange-500 border-orange-500 text-white shadow-sm'
+                                                                        : isAnswered
+                                                                            ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm'
+                                                                            : 'bg-slate-50 dark:bg-muted/30 border-slate-100 dark:border-border text-slate-400'
+                                                                }`}
+                                                        >
+                                                            {idx + 1}
+                                                        </button>
+                                                    );
+                                                })}
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        );
+                    })()}
                 </div>
             </main>
 

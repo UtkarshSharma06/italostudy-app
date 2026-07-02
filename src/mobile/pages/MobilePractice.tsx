@@ -34,6 +34,8 @@ export default function MobilePractice() {
     const [showReviewModal, setShowReviewModal] = useState(false);
     const [userProfile, setUserProfile] = useState<any>(null);
     const [pendingAction, setPendingAction] = useState<(() => void) | null>(null);
+    const [subjectCounts, setSubjectCounts] = useState<Record<string, number>>({});
+    const [solvedCounts, setSolvedCounts] = useState<Record<string, number>>({});
 
     // Safe calculation for remaining limit to avoid NaN
     const safeTotal = totalPracticeCount || 0;
@@ -62,6 +64,40 @@ export default function MobilePractice() {
 
         fetchCollectorSettings();
     }, [user, loading]);
+
+    useEffect(() => {
+        const fetchCounts = async () => {
+            if (!activeExam || activeExam.id === 'ielts-academic' || !user) return;
+            
+            const counts: Record<string, number> = {};
+            const solved: Record<string, number> = {};
+            await Promise.all(activeExam.sections.map(async (section: any) => {
+                const { count } = await (supabase as any)
+                    .from('practice_questions')
+                    .select('*', { count: 'exact', head: true })
+                    .eq('subject', section.name)
+                    .eq('exam_type', activeExam.id);
+                counts[section.name] = count || 0;
+
+                const { data: userResponses } = await (supabase as any)
+                    .from('user_practice_responses')
+                    .select('question_id, practice_questions!inner(subject, exam_type)')
+                    .eq('user_id', user.id)
+                    .eq('practice_questions.subject', section.name)
+                    .eq('practice_questions.exam_type', activeExam.id);
+                    
+                if (userResponses) {
+                    const uniqueQuestionIds = new Set(userResponses.map((r: any) => r.question_id));
+                    solved[section.name] = uniqueQuestionIds.size;
+                } else {
+                    solved[section.name] = 0;
+                }
+            }));
+            setSubjectCounts(counts);
+            setSolvedCounts(solved);
+        };
+        fetchCounts();
+    }, [activeExam, user]);
 
     const handleActionWithReview = (action: () => void) => {
         if (isCollectorEnabled && !userProfile?.has_submitted_review) {
@@ -176,10 +212,15 @@ export default function MobilePractice() {
         });
     };
 
-    const subjects = activeExam.sections.map(section => ({
+    const subjects = activeExam.sections.map((section: any) => ({
         name: section.name,
         icon: section.icon,
-        total: section.questionCount * 10
+        total: activeExam.id !== 'ielts-academic' 
+            ? (subjectCounts[section.name] || 0) 
+            : section.questionCount * 10,
+        solved: activeExam.id !== 'ielts-academic'
+            ? (solvedCounts[section.name] || 0)
+            : getSubjectCount(section.name)
     }));
 
     return (
@@ -259,7 +300,7 @@ export default function MobilePractice() {
                                     <div className="flex-1 min-w-0">
                                         <h3 className="font-bold text-[#0f172a] dark:text-white text-[15px] mb-1 truncate">{subject.name}</h3>
                                         <p className="text-[11px] font-medium text-slate-400">
-                                            <span className="text-[#0f172a] dark:text-slate-300 font-bold">{getSubjectCount(subject.name)}</span> / {subject.total} questions
+                                            <span className="text-[#0f172a] dark:text-slate-300 font-bold">{subject.solved}</span> / {subject.total} questions
                                         </p>
                                     </div>
                                     <div className="w-8 h-8 rounded-full border border-slate-100 dark:border-slate-700 flex items-center justify-center shrink-0 group-hover:border-indigo-100 group-hover:bg-indigo-50 transition-colors">

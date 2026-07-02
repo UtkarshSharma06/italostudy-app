@@ -155,7 +155,7 @@ export default function CheckoutModal({
         setIsLoadingGateways(true);
         for (let i = 0; i < retries; i++) {
             const { data, error } = await (supabase as any).rpc('get_payment_config');
-            
+
             if (data) {
                 setGateways(data);
                 setIsLoadingGateways(false);
@@ -176,7 +176,7 @@ export default function CheckoutModal({
                 }
             }
         }
-        
+
         // All retries failed
         console.error('All attempts to load payment config failed');
         toast.error('Failed to load payment options. Please try again later or contact support.');
@@ -412,7 +412,7 @@ export default function CheckoutModal({
         for (let i = 0; i < retries; i++) {
             const res = await supabase.functions.invoke(fn, { body });
             if (!res.error) return res;
-            
+
             console.warn(`Edge function '${fn}' failed (attempt ${i + 1}/${retries})...`, res.error);
             if (i < retries - 1) {
                 await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i))); // 1s, 2s, 4s
@@ -577,7 +577,7 @@ export default function CheckoutModal({
 
             // 3. Render PayPal JS SDK Subscriptions Button
             toast.info('Please click the PayPal button below to complete payment');
-            
+
             // Clear existing buttons if any
             const container = document.getElementById('paypal-button-container');
             if (container) container.innerHTML = '';
@@ -588,7 +588,7 @@ export default function CheckoutModal({
                     const req: any = {
                         'plan_id': gatewayPlanId
                     };
-                    
+
                     if (discount) {
                         // PayPal requires singular interval_unit: MONTH, DAY, YEAR (NOT MONTHS/DAYS/YEARS)
                         const unitMap: Record<string, string> = {
@@ -970,7 +970,7 @@ export default function CheckoutModal({
 
                             {/* Scrollable Content: 2-column Grid */}
                             <div className="flex-1 overflow-y-auto custom-scrollbar px-5 md:px-8 pb-6 md:pb-8 flex flex-col md:flex-row gap-5 md:gap-8 bg-[#f8f9fc] md:bg-transparent dark:bg-slate-950 md:dark:bg-transparent">
-                                
+
                                 {/* LEFT COLUMN: Plan Details & Features */}
                                 <div className="flex-1 flex flex-col gap-6">
                                     {/* YOU'RE BUYING Card */}
@@ -1038,11 +1038,11 @@ export default function CheckoutModal({
 
                                 {/* RIGHT COLUMN: Coupons & Payments */}
                                 <div className="flex-1 flex flex-col gap-6 w-full max-w-[420px] mx-auto md:mx-0">
-                                    
+
                                     {/* Coupon Code Box */}
                                     <div className="border border-slate-200/60 md:border-slate-200 dark:border-slate-800 md:dark:border-slate-700 rounded-xl md:rounded-2xl bg-white dark:bg-slate-900 md:dark:bg-slate-800 shadow-sm overflow-hidden flex flex-col">
                                         {/* Mobile Accordion Header */}
-                                        <div 
+                                        <div
                                             className="p-3.5 md:p-4 flex items-center justify-between cursor-pointer md:cursor-default"
                                             onClick={() => {
                                                 if (window.innerWidth < 768) {
@@ -1095,7 +1095,7 @@ export default function CheckoutModal({
                                     {/* Payment Methods */}
                                     <div className="flex flex-col gap-2.5 md:gap-3">
                                         <h4 className="text-[10px] font-bold text-slate-400 tracking-widest uppercase ml-1">Choose Payment Method</h4>
-                                        
+
                                         {isLoadingGateways ? (
                                             <div className="space-y-3">
                                                 <div className="w-full h-14 bg-slate-100 dark:bg-slate-800 rounded-xl animate-pulse" />
@@ -1188,7 +1188,7 @@ export default function CheckoutModal({
                                         {/* PayPal Subscriptions JS Button Container */}
                                         <div id="paypal-button-container" className={cn("empty:hidden", selectedGateway === 'paypal' ? "mt-2" : "hidden")}></div>
                                     </div>
-                                    
+
                                     {/* Mobile Secure Banner */}
                                     <div className="md:hidden mt-2 mb-2 w-full bg-[#f6f4ff] dark:bg-indigo-500/10 rounded-xl p-4 flex items-center gap-4 border border-[#e4dfff] dark:border-indigo-500/20">
                                         <div className="w-8 h-8 rounded-full bg-white dark:bg-slate-800 shadow-sm flex items-center justify-center shrink-0 border border-slate-100 dark:border-slate-700">
@@ -1205,25 +1205,25 @@ export default function CheckoutModal({
 
                             {/* Footer / CTA Row */}
                             <div className="bg-white md:bg-slate-50 dark:bg-slate-900 md:dark:bg-slate-800/50 p-4 md:p-6 border-t border-slate-200/80 md:border-slate-200 dark:border-slate-800 md:dark:border-slate-700/50 flex flex-col md:flex-row items-center justify-between gap-4 shrink-0 shadow-[0_-4px_20px_rgba(0,0,0,0.03)] md:shadow-none z-10">
-                                
+
                                 {/* Trust Badges */}
                                 <div className="hidden md:flex items-center gap-6 shrink-0 order-1">
                                     <div className="flex items-center gap-2">
-                                        <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center"><ShieldCheck className="w-3.5 h-3.5"/></div>
+                                        <div className="w-6 h-6 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center"><ShieldCheck className="w-3.5 h-3.5" /></div>
                                         <div className="flex flex-col">
                                             <span className="text-[10px] font-bold text-slate-900 dark:text-white leading-tight">100% Secure</span>
                                             <span className="text-[9px] text-slate-500">SSL Encrypted</span>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center"><Zap className="w-3.5 h-3.5"/></div>
+                                        <div className="w-6 h-6 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center"><Zap className="w-3.5 h-3.5" /></div>
                                         <div className="flex flex-col">
                                             <span className="text-[10px] font-bold text-slate-900 dark:text-white leading-tight">Instant Access</span>
                                             <span className="text-[9px] text-slate-500">Start learning immediately</span>
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-2">
-                                        <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center"><Circle className="w-3 h-3"/></div>
+                                        <div className="w-6 h-6 rounded-full bg-slate-200 text-slate-600 flex items-center justify-center"><Circle className="w-3 h-3" /></div>
                                         <div className="flex flex-col">
                                             <span className="text-[10px] font-bold text-slate-900 dark:text-white leading-tight">Cancel Anytime</span>
                                             <span className="text-[9px] text-slate-500">No questions asked</span>

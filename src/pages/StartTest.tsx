@@ -814,22 +814,22 @@ export default function StartTest() {
                   let colorCls;
                   if (count === 1) {
                       colorCls = "bg-blue-50 dark:bg-blue-500/10";
-                      iconContent = <span className="text-[40px] drop-shadow-sm leading-none">🧩</span>;
+                      iconContent = <span className="text-3xl drop-shadow-sm leading-none">🧩</span>;
                   } else if (count === 5) {
                       colorCls = "bg-purple-50 dark:bg-purple-500/10";
-                      iconContent = <span className="text-[40px] drop-shadow-sm leading-none">📝</span>;
+                      iconContent = <span className="text-3xl drop-shadow-sm leading-none">📝</span>;
                   } else if (count === 10) {
                       colorCls = "bg-green-50 dark:bg-green-500/10";
-                      iconContent = <span className="text-[40px] drop-shadow-sm leading-none">📖</span>;
+                      iconContent = <span className="text-3xl drop-shadow-sm leading-none">📖</span>;
                   } else if (count === 15) {
                       colorCls = "bg-orange-50 dark:bg-orange-500/10";
-                      iconContent = <span className="text-[40px] drop-shadow-sm leading-none">🎯</span>;
+                      iconContent = <span className="text-3xl drop-shadow-sm leading-none">🎯</span>;
                   } else if (count === 20) {
                       colorCls = "bg-purple-50 dark:bg-purple-500/10";
-                      iconContent = <span className="text-[40px] drop-shadow-sm leading-none">🏆</span>;
+                      iconContent = <span className="text-3xl drop-shadow-sm leading-none">🏆</span>;
                   } else {
                       colorCls = "bg-yellow-50 dark:bg-yellow-500/10";
-                      iconContent = <span className="text-[40px] drop-shadow-sm leading-none">👑</span>;
+                      iconContent = <span className="text-3xl drop-shadow-sm leading-none">👑</span>;
                   }
 
                   return (
@@ -859,12 +859,7 @@ export default function StartTest() {
                             </div>
                         </div>
 
-                        {/* Right Icon Radial Background */}
-                        <div className={`absolute right-[-20px] w-36 h-36 rounded-full flex items-center justify-center shrink-0 ${colorCls} transition-transform duration-500 group-hover:scale-110`}>
-                            <div className="mr-4">
-                                {iconContent}
-                            </div>
-                        </div>
+
 
                         {/* Selected / Hover Checkmark Badge */}
                         {!isDisabled && (
@@ -897,8 +892,9 @@ export default function StartTest() {
               )}
             </section>
 
-            {/* Step 4: Time Limit */}
-            <section className="space-y-6">
+            <div className="flex flex-col gap-10">
+              {/* Step 4: Time Limit */}
+              <section className="space-y-6">
               <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <Clock className="w-4 h-4 text-indigo-600" />
@@ -930,7 +926,7 @@ export default function StartTest() {
                 <ShieldCheck className="w-4 h-4 text-indigo-600" />
                 <h3 className="text-[10px] font-black uppercase tracking-widest text-slate-400">Step 5: Difficulty</h3>
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-6">
+              <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:gap-6">
                 {DIFFICULTIES.map((d) => {
                   let displayLabel = d.label;
                   const labels = activeExam?.scoring?.difficulty_labels;
@@ -955,20 +951,17 @@ export default function StartTest() {
                     <button
                         key={d.value}
                         onClick={() => setDifficulty(d.value)}
-                        className={`relative w-full p-5 sm:p-6 rounded-[1.5rem] bg-white dark:bg-slate-900 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] dark:shadow-none transition-all duration-300 text-left flex items-center gap-4 group overflow-hidden border ${
+                        className={`relative w-full p-4 sm:p-5 rounded-[1.25rem] bg-white dark:bg-slate-900 shadow-[0_4px_20px_-4px_rgba(0,0,0,0.05)] dark:shadow-none transition-all duration-300 flex items-center justify-center group overflow-hidden border ${
                             difficulty === d.value
                             ? 'border-indigo-500 ring-2 ring-indigo-500/20'
                             : 'border-slate-100 dark:border-slate-800 hover:border-indigo-500 hover:shadow-[0_8px_30px_-4px_rgba(99,102,241,0.15)] active:scale-95'
                         }`}
                     >
-                        <div className={`w-12 h-12 rounded-2xl flex items-center justify-center shrink-0 ${colorCls} group-hover:scale-110 transition-transform duration-300 shadow-sm border border-white dark:border-transparent`}>
-                            {iconContent}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                            <h3 className={`font-black text-[14px] uppercase tracking-widest ${difficulty === d.value ? 'text-indigo-600' : 'text-slate-600 dark:text-slate-300'}`}>{displayLabel}</h3>
+                        <div className="flex-1 text-center pr-5 pl-2">
+                            <h3 className={`font-black text-[11px] sm:text-[12px] uppercase tracking-wide whitespace-nowrap ${difficulty === d.value ? 'text-indigo-600' : 'text-slate-600 dark:text-slate-300'}`}>{displayLabel}</h3>
                         </div>
                         {difficulty === d.value && (
-                            <div className="absolute top-4 right-4 w-5 h-5 rounded-full bg-indigo-500 text-white flex items-center justify-center shadow-sm z-20">
+                            <div className="absolute top-1/2 -translate-y-1/2 right-3 w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-indigo-500 text-white flex items-center justify-center shadow-sm z-20">
                                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12"></polyline></svg>
                             </div>
                         )}
@@ -977,6 +970,7 @@ export default function StartTest() {
                 })}
               </div>
             </section>
+            </div>
           </div>
 
           <div className="pt-10 border-t border-slate-50">

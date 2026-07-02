@@ -271,6 +271,11 @@ const QuestionMedia = memo(function QuestionMedia({ media, className }: Question
             {renderContent()}
         </div>
     );
+}, (prev, next) => {
+    // Deep comparison of media to prevent unnecessary re-renders
+    return JSON.stringify(prev.media) === JSON.stringify(next.media) && 
+           JSON.stringify(prev.diagram) === JSON.stringify(next.diagram) &&
+           prev.className === next.className;
 });
 
 export default QuestionMedia;

@@ -19,6 +19,7 @@ import { usePlanAccess } from '@/hooks/usePlanAccess';
 import { getOptimizedImageUrl } from '@/lib/image-optimizer';
 import { readDashboardCache, invalidateDashboardCache } from '@/hooks/useDashboardPrefetch';
 import { MathText } from '@/components/MathText';
+import { SubjectIcon } from '@/components/ui/SubjectIcon';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -120,6 +121,47 @@ interface Section {
   questionCount: number;
   durationMinutes: number;
 }
+
+const ExpandablePassage = ({ content }: { content: string }) => {
+    const isLongPassage = content && content.length > 600;
+    const [isExpanded, setIsExpanded] = useState(!isLongPassage);
+    
+    // Automatically expand if passage is short
+    useEffect(() => {
+        setIsExpanded(!isLongPassage);
+    }, [isLongPassage]);
+
+    return (
+        <div className="space-y-4 lg:space-y-6">
+            <div className="pb-3 lg:pb-4 border-b border-slate-200 dark:border-border">
+                <p className="text-[9px] lg:text-[10px] font-black text-indigo-500 uppercase tracking-[0.2em]">Instructional Directive</p>
+                <h5 className="text-xs lg:text-xs lg:text-sm font-black text-slate-900 dark:text-slate-100">Read the passage and answer the question.</h5>
+            </div>
+            <div className="relative group p-5 lg:p-8 bg-slate-50 dark:bg-slate-900/50 rounded-[1.5rem] lg:rounded-[2rem] border-2 border-slate-100 dark:border-border shadow-sm overflow-hidden">
+                <div className="absolute left-0 top-0 bottom-0 w-1.5 lg:w-2 bg-indigo-600 dark:bg-indigo-400 opacity-20" />
+                <div className={cn("relative transition-all duration-300", (!isExpanded && isLongPassage) && "max-h-[180px] lg:max-h-[220px] overflow-hidden")}>
+                    <MathText 
+                        content={content} 
+                        className="text-[15px] lg:text-base leading-[1.7] text-slate-800 dark:text-slate-200 font-medium prose dark:prose-invert max-w-none break-words" 
+                    />
+                    {(!isExpanded && isLongPassage) && (
+                        <div className="absolute bottom-0 left-0 right-0 h-20 bg-gradient-to-t from-slate-50 dark:from-slate-900/90 to-transparent pointer-events-none" />
+                    )}
+                </div>
+                {isLongPassage && (
+                    <div className="mt-2 lg:mt-4 flex justify-center">
+                        <button 
+                            onClick={() => setIsExpanded(!isExpanded)}
+                            className="text-[10px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 bg-indigo-50 dark:bg-indigo-900/30 hover:bg-indigo-100 dark:hover:bg-indigo-900/50 px-5 py-2 rounded-full transition-colors border border-indigo-100 dark:border-indigo-800/50"
+                        >
+                            {isExpanded ? 'Show Less' : 'Read More'}
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
 
 export default function TestPage() {
   const { testId } = useParams<{ testId: string }>();
@@ -1334,7 +1376,7 @@ export default function TestPage() {
       {isMockExam && sections.length > 0 && (
         <div className="space-y-4">
           <h3 className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Exam Blueprint</h3>
-          <div className="space-y-2">
+          <div className="grid grid-cols-2 gap-2">
             {sections.map((section, idx) => {
               const isCompleted = completedSections.includes(idx);
               const isCurrent = idx === currentSectionIndex;
@@ -1348,10 +1390,10 @@ export default function TestPage() {
                   className={cn(
                     "p-4 rounded-2xl border-2 transition-all cursor-pointer", // Always show pointer to indicate interactivity if permitted
                     isCurrent
-                      ? "border-indigo-600 bg-white shadow-xl shadow-indigo-100/50"
+                      ? "border-indigo-600 bg-white dark:bg-indigo-950/20 shadow-xl shadow-indigo-100/50 dark:shadow-none"
                       : isLocked
-                        ? "border-slate-100 bg-slate-50 opacity-40 cursor-not-allowed"
-                        : "border-slate-100 bg-white hover:border-indigo-200"
+                        ? "border-slate-100 dark:border-border bg-slate-50 dark:bg-slate-900/50 opacity-40 cursor-not-allowed"
+                        : "border-slate-100 dark:border-border bg-white dark:bg-card hover:border-indigo-200 dark:hover:border-indigo-500/50"
                   )}
                   onClick={() => {
                       if (isLocked) {
@@ -1508,13 +1550,14 @@ export default function TestPage() {
   return (
     <div className="h-screen bg-background flex flex-col select-none overflow-hidden">
       {/* Top Header - Focused Official Look */}
-      <header className="h-16 lg:h-20 flex items-center shrink-0 border-b border-slate-200 dark:border-border bg-white dark:bg-card z-50 shadow-sm">
+      <header className="h-14 lg:h-16 flex items-center shrink-0 border-b border-slate-200 dark:border-border bg-white dark:bg-card z-50 shadow-sm">
         <div className="w-full px-4 lg:px-8 flex items-center justify-between">
           <div className="flex items-center gap-2 lg:gap-4">
             <div className="flex items-center gap-3">
-              <img src="/logo.webp" alt="Logo" className="h-5 sm:h-7 shrink-0 hidden xs:block" />
+              <img src="/sidebar-logo.webp" alt="Italostudy Logo" className="h-8 sm:h-9 lg:h-10 object-contain shrink-0 dark:hidden" />
+              <img src="/logo-dark-compact.webp" alt="Italostudy Logo" className="h-8 sm:h-9 lg:h-10 object-contain shrink-0 hidden dark:block" />
               <div className="hidden lg:block w-px h-6 bg-slate-200" />
-              <div className="min-w-0">
+              <div className="min-w-0 flex flex-col justify-center">
                 <p className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest leading-none mb-1">Mission: {isMockExam ? 'Official Simulation' : 'Practice Quest'}</p>
                 <h1 className="text-xs lg:text-sm font-black text-slate-900 dark:text-slate-100 uppercase tracking-tight truncate max-w-[120px] sm:max-w-xs">
                   {displaySubject} {test.topic && <span className="text-slate-300 mx-1">/</span>} {test.topic}
@@ -1552,7 +1595,7 @@ export default function TestPage() {
                 variant="default"
                 size="sm"
                 onClick={() => setShowSubmitConfirm(true)}
-                className="bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 rounded-full text-[9px] font-black uppercase tracking-widest h-9 px-5 hover:bg-slate-800 transition-all shadow-lg shadow-slate-200 dark:shadow-none"
+                className="bg-indigo-600 text-white rounded-full text-[9px] font-black uppercase tracking-widest h-8 lg:h-9 px-4 lg:px-5 hover:bg-indigo-700 transition-all shadow-md shadow-indigo-200 dark:shadow-none"
               >
                 End Session
               </Button>
@@ -1566,8 +1609,8 @@ export default function TestPage() {
                     <ListFilter size={18} className="text-slate-500" />
                   </Button>
                 </SheetTrigger>
-                <SheetContent side="right" className="w-[300px] p-0 flex flex-col bg-slate-50">
-                  <SheetHeader className="p-6 border-b bg-white">
+                <SheetContent side="right" className="w-[300px] p-0 flex flex-col bg-slate-50 dark:bg-slate-900">
+                  <SheetHeader className="p-6 border-b bg-white dark:bg-card dark:border-border">
                     <SheetTitle className="text-[10px] font-black uppercase text-slate-400 tracking-widest flex items-center gap-2">
                       <Target size={14} />
                       Mission Navigator
@@ -1587,7 +1630,7 @@ export default function TestPage() {
       {/* Progress Line - Dynamic like Mobile */}
       <div className="h-1.5 w-full bg-slate-200 dark:bg-slate-800 shrink-0 overflow-hidden">
         <div
-          className="h-full bg-primary transition-all duration-700 ease-out shadow-[0_0_10px_rgba(var(--primary),0.5)]"
+          className="h-full bg-indigo-600 transition-all duration-700 ease-out shadow-[0_0_10px_rgba(79,70,229,0.5)]"
           style={{ width: `${progress}%` }}
         />
       </div>
@@ -1631,265 +1674,142 @@ export default function TestPage() {
           </button>
         )}
 
-        {/* Main Content: Official Dual Pane */}
-        <main className="flex-1 overflow-y-auto lg:overflow-hidden bg-white dark:bg-slate-950 flex flex-col lg:flex-row relative">
-          
-          <AnimatePresence mode="wait">
-             {hasSource && (
-                <motion.div 
-                    initial={{ opacity: 0, x: -20 }}
-                    animate={{ opacity: 1, x: 0 }}
-                    exit={{ opacity: 0, x: -20 }}
-                    className={cn(
-                        "h-full flex flex-col bg-slate-50 dark:bg-slate-900/20 border-b lg:border-b-0 lg:border-r border-slate-100 dark:border-border transition-all duration-500 shrink min-w-0",
-                        hasSource ? "lg:w-1/2" : "w-0"
-                    )}
-                >
-                    
-                    <div className={cn(
-                        "flex-1 overflow-y-auto custom-scrollbar overscroll-contain transition-all duration-500",
-                        isSidebarOpen ? "p-6 lg:p-8" : "p-6 lg:p-12"
-                    )}>
-                        <motion.div 
-                            key={currentIndex + '_passage'}
-                            initial={{ opacity: 0, y: 10 }}
-                            animate={{ opacity: 1, y: 0 }}
-                            className="max-w-3xl mx-auto space-y-10"
-                        >
-                            {currentQuestion.passage && (
-                                <div className="space-y-6">
-                                    <div className="pb-4 border-b border-slate-200 dark:border-border">
-                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Instructional Directive</p>
-                                        <h5 className="text-sm font-black text-slate-900 dark:text-slate-100">Read the passage and answer the question.</h5>
-                                    </div>
-                                    <div className="relative group p-8 lg:p-14 bg-white dark:bg-slate-900/50 rounded-[3rem] border-2 border-slate-100 dark:border-border shadow-md overflow-hidden">
-                                        <div className="absolute left-0 top-0 bottom-0 w-2 bg-slate-900 dark:bg-slate-100 opacity-20" />
-                                        <MathText 
-                                            content={currentQuestion.passage} 
-                                            className="text-lg lg:text-xl leading-[1.8] text-slate-800 dark:text-slate-200 font-medium prose dark:prose-invert max-w-none break-words" 
-                                        />
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* ALL Media: Table, Graph, Chart, Pie, Image, Diagram */}
-                            {(() => {
-                                const media = currentQuestion.media as any;
-                                if (!media) return null;
-                                const type = media.type;
-                                // Robust check: Render if anything looks like media with actual values
-                                const hasActualContent = (() => {
-                                    const type = media.type;
-                                    const hasUrl = !!(media.url || media.imageUrl || media.image_url || media.src || (media as any).image?.url);
-                                    
-                                    if (type === 'image') return hasUrl;
-                                    if (type === 'table') return !!(media.table?.rows || (media as any).data?.rows || media.rows);
-                                    if (['chart', 'graph', 'pie', 'bar', 'line', 'scatter'].includes(type)) {
-                                        return !!((media as any).data || (media as any).chart?.data || hasUrl);
-                                    }
-                                    if (type === 'diagram') return !!(media.diagram || (media as any).svg || (media as any).description);
-                                    // Fallback for objects missing type but having data
-                                    return !!(hasUrl || media.data || media.table || media.diagram);
-                                })();
-
-                                if (!hasActualContent) return null;
-
-                                return (
-                                    <div className="space-y-6">
-                                        <div className="pb-4 border-b border-slate-200 dark:border-border">
-                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
-                                                {['table', 'graph', 'chart', 'pie'].includes(type)
-                                                    ? 'Data Analysis Directive'
-                                                    : 'Visual Reference Directive'}
-                                            </p>
-                                            <h5 className="text-sm font-black text-slate-900 dark:text-slate-100">
-                                                {['table'].includes(type)
-                                                    ? 'Analyse the table and answer the question.'
-                                                    : ['graph', 'chart', 'pie'].includes(type)
-                                                    ? `Analyse the ${type} and answer the question.`
-                                                    : 'Examine the reference material and answer the question.'}
-                                            </h5>
-                                        </div>
-                                        <div className={cn(
-                                            "bg-white dark:bg-card shadow-xl",
-                                            ['table', 'graph', 'chart', 'pie'].includes(type)
-                                                ? "rounded-[2.5rem] border-2 border-slate-900"
-                                                : "rounded-[2rem] border-2 border-slate-100 dark:border-border p-4 lg:p-8"
-                                        )}>
-                                            <QuestionMedia media={media} className="w-full h-auto" />
-                                        </div>
-                                    </div>
-                                );
-                            })()}
-
-                            {/* Diagram (separate from media field) */}
-                            {(() => {
-                                const diagram = currentQuestion.diagram;
-                                if (!diagram) return null;
-                                // Simple existence check for diagram is usually enough as it's a dedicated field
-                                
-                                return (
-                                    <div className="space-y-6">
-                                        <div className="pb-4 border-b border-slate-200 dark:border-border">
-                                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">Visual Reference Directive</p>
-                                            <h5 className="text-sm font-black text-slate-900 dark:text-slate-100">
-                                                Examine the diagram and answer the question.
-                                            </h5>
-                                        </div>
-                                        <div className="rounded-[2rem] border-2 border-slate-100 dark:border-border p-4 lg:p-8 bg-white dark:bg-slate-900/10 shadow-sm">
-                                            <DiagramRenderer diagram={diagram} className="w-full" />
-                                        </div>
-                                    </div>
-                                );
-                            })()}
-
-                            <div className="pt-8 border-t border-slate-200 dark:border-border flex items-center gap-4 opacity-30">
-                                <div className="p-2 bg-slate-200 dark:bg-slate-800 rounded-lg"><Maximize2 size={14} /></div>
-                                <span className="text-[9px] font-black uppercase tracking-widest leading-none">End of Reference material</span>
-                            </div>
-                        </motion.div>
-                    </div>
-                </motion.div>
-            )}
-          </AnimatePresence>
-
-          {/* Right Pane: Question Area */}
-          <div className={cn(
-              "h-full flex flex-col bg-white dark:bg-card transition-all duration-500 shrink min-w-0",
-               hasSource ? "lg:w-1/2" : "w-full flex-1"
+        {/* Left Content Area (Main Content + Footer) */}
+        <div className="flex-1 flex flex-col min-w-0 bg-white dark:bg-slate-950 overflow-hidden relative">
+          <main className={cn(
+              "flex-1 overflow-y-auto custom-scrollbar overscroll-contain flex flex-col transition-all duration-500 relative",
+              isSidebarOpen ? "p-4 lg:p-6" : "p-5 lg:p-8"
           )}>
-
-              <div className={cn(
-                  "flex-1 overflow-y-auto custom-scrollbar overscroll-contain pb-40 transition-all duration-500",
-                  isSidebarOpen ? "p-6 lg:p-10" : "p-6 lg:p-12"
-              )}>
-                  <motion.div
-                      key={currentIndex + '_question'}
-                      initial={{ opacity: 0, x: 20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      className="max-w-2xl mx-auto space-y-8 lg:space-y-12"
-                  >
-                      {/* Sub-Header */}
-                      <div className="flex items-center justify-between pb-6 border-b-2 border-slate-100 dark:border-border">
-                         <div className="flex items-center gap-3">
-                            <div className="flex flex-col">
-                                 <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Current Question</span>
-                                <div className="text-xl font-black text-slate-900 dark:text-white tabular-nums">
-                                    {String(currentIndex + 1).padStart(2, '0')}<span className="text-slate-200 dark:text-slate-800 mx-1">/</span>{String(questions.length).padStart(2, '0')}
-                                </div>
-                            </div>
-                            {currentSection && (
-                                <div className="hidden sm:flex flex-col border-l border-slate-100 dark:border-border pl-3">
-                                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Domain Module</span>
-                                    <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 truncate max-w-[120px]">
-                                        {currentSection.name}
-                                    </span>
-                                </div>
-                            )}
-                         </div>
-
-                         <div className="flex gap-2">
-                            {currentQuestion.is_reported_by_user ? (
-                                <div className="flex items-center gap-1.5 px-3 py-1 bg-rose-50 border border-rose-100 rounded-xl text-rose-600 h-9">
-                                    <AlertTriangle size={14} />
-                                    <span className="text-[9px] font-black uppercase tracking-widest">Reported</span>
-                                </div>
-                            ) : (
-                                <ReportQuestionDialog
-                                    onReport={async (reason, details) => handleReport(details ? `${reason}: ${details}` : reason)}
-                                    trigger={
-                                        <Button variant="ghost" size="icon" className="h-9 w-9 rounded-xl border text-slate-300 hover:text-rose-500 transition-all">
-                                            <AlertTriangle size={14} />
-                                        </Button>
-                                    }
-                                />
-                            )}
-                            <Button
-                                onClick={handleBookmark}
-                                variant="ghost"
-                                size="icon"
-                                className={cn(
-                                    "h-9 w-9 rounded-xl border transition-all",
-                                    currentQuestion.is_saved ? "bg-indigo-50 border-indigo-200 text-indigo-600" : "text-slate-300 hover:text-indigo-500"
-                                )}
-                            >
-                                <Bookmark size={14} className={cn(currentQuestion.is_saved && "fill-current")} />
-                            </Button>
-                            <Button
-                                onClick={handleMarkForReview}
-                                variant="ghost"
-                                size="icon"
-                                className={cn(
-                                    "h-9 w-9 rounded-xl border transition-all",
-                                    currentQuestion.is_marked ? "bg-orange-50 border-orange-200 text-orange-600" : "text-slate-300 hover:text-orange-500"
-                                )}
-                            >
-                                <Flag size={14} className={cn(currentQuestion.is_marked && "fill-current")} />
-                            </Button>
-                         </div>
+            <div
+                key="static-question-container"
+                className="max-w-4xl mx-auto w-full space-y-8 lg:space-y-12 pb-20"
+            >
+                {/* Sub-Header */}
+                <div className="flex items-center justify-between pb-6 border-b-2 border-slate-100 dark:border-border">
+                   <div className="flex items-center gap-3">
+                      <div className="flex flex-col">
+                           <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Current Question</span>
+                          <div className="text-xl font-black text-slate-900 dark:text-white tabular-nums">
+                              {String(currentIndex + 1).padStart(2, '0')}<span className="text-slate-200 dark:text-slate-800 mx-1">/</span>{String(questions.length).padStart(2, '0')}
+                          </div>
                       </div>
+                      {currentSection && (
+                          <div className="hidden sm:flex flex-col border-l border-slate-100 dark:border-border pl-3">
+                              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none mb-1">Domain Module</span>
+                              <span className="text-xs font-black text-indigo-600 dark:text-indigo-400 truncate max-w-[120px]">
+                                  {currentSection.name}
+                              </span>
+                          </div>
+                      )}
+                   </div>
 
-                      {/* Question Content */}
-                      <div className="space-y-8">
+                   <div className="flex gap-2">
+                      {currentQuestion.is_reported_by_user ? (
+                          <div className="flex items-center gap-1.5 px-3 py-1 bg-rose-50 border border-rose-100 rounded-xl text-rose-600 h-9">
+                              <AlertTriangle size={14} />
+                              <span className="text-[9px] font-black uppercase tracking-widest">Reported</span>
+                          </div>
+                      ) : (
+                          <div className="flex flex-col items-center gap-1.5">
+                              <ReportQuestionDialog
+                                  onReport={async (reason, details) => handleReport(details ? `${reason}: ${details}` : reason)}
+                                  trigger={
+                                      <Button variant="ghost" size="icon" className="h-10 w-10 rounded-[0.85rem] border border-indigo-100 text-indigo-500 hover:text-indigo-700 hover:bg-indigo-50 transition-all shadow-sm">
+                                          <AlertTriangle size={16} />
+                                      </Button>
+                                  }
+                              />
+                              <span className="text-[9px] font-black uppercase text-slate-600 dark:text-slate-400 tracking-wider">Report</span>
+                          </div>
+                      )}
+                      <div className="flex flex-col items-center gap-1.5">
+                          <Button
+                              onClick={handleBookmark}
+                              variant="ghost"
+                              size="icon"
+                              className={cn(
+                                  "h-10 w-10 rounded-[0.85rem] border transition-all shadow-sm",
+                                  currentQuestion.is_saved ? "bg-indigo-50 dark:bg-indigo-900/40 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300" : "bg-white dark:bg-slate-900/50 border-indigo-100 dark:border-indigo-900/30 text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/50"
+                              )}
+                          >
+                              <Bookmark size={16} className={cn(currentQuestion.is_saved && "fill-current")} />
+                          </Button>
+                          <span className="text-[9px] font-black uppercase text-slate-600 dark:text-slate-400 tracking-wider">Bookmark</span>
+                      </div>
+                      <div className="flex flex-col items-center gap-1.5">
+                          <Button
+                              onClick={handleMarkForReview}
+                              variant="ghost"
+                              size="icon"
+                              className={cn(
+                                  "h-10 w-10 rounded-[0.85rem] border transition-all shadow-sm",
+                                  currentQuestion.is_marked ? "bg-indigo-50 dark:bg-indigo-900/40 border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300" : "bg-white dark:bg-slate-900/50 border-indigo-100 dark:border-indigo-900/30 text-indigo-500 dark:text-indigo-400 hover:text-indigo-700 dark:hover:text-indigo-300 hover:bg-indigo-50 dark:hover:bg-indigo-900/50"
+                              )}
+                          >
+                              <Flag size={16} className={cn(currentQuestion.is_marked && "fill-current")} />
+                          </Button>
+                          <span className="text-[9px] font-black uppercase text-slate-600 dark:text-slate-400 tracking-wider">Mark</span>
+                      </div>
+                   </div>
+                </div>
+
+                {/* 1. Passage (If exists, render above question text) */}
+                {currentQuestion.passage && <ExpandablePassage content={currentQuestion.passage} />}
+
+                {/* 2. Question Text */}
+                <div className="flex gap-4 lg:gap-6 items-start">
+                    <div className="w-12 h-12 lg:w-16 lg:h-16 shrink-0 rounded-2xl bg-indigo-50 dark:bg-indigo-900/30 flex items-center justify-center border border-indigo-100 dark:border-indigo-800/50 shadow-sm mt-1">
+                        <span className="text-sm lg:text-lg font-black text-indigo-600 dark:text-indigo-400">
+                            Q{currentIndex + 1}
+                        </span>
+                    </div>
+                    <div className="flex-1 min-w-0 pt-2">
                          <MathText 
                             content={currentQuestion.question_text || "[Question content is missing]"} 
-                            className={cn(
-                                "font-black text-slate-900 dark:text-white leading-[1.25] lg:leading-[1.15] tracking-tight transition-all duration-500",
-                                isSidebarOpen ? "text-2xl lg:text-3xl" : "text-2xl lg:text-4xl"
-                            )}
+                            className="font-black text-slate-900 dark:text-white leading-[1.25] lg:leading-[1.4] tracking-tight text-xl lg:text-2xl"
                          />
-                       {/* FALLBACK MEDIA: Show here if left pane is hidden or media fails source detection */}
-                       {(() => {
-                           const media = currentQuestion.media as any;
-                           if (!media || !hasSource) {
-                               if (!media) return null;
-                                                      // Robust check: Render if anything looks like media with actual values
-                               const hasActualContent = (() => {
-                                   if (!media) return false;
-                                   const type = media.type;
-                                   const hasUrl = !!(media.url || media.imageUrl || media.image_url || media.src || (media as any).image?.url);
+                    </div>
+                </div>
 
-                                   if (type === 'image') return hasUrl;
-                                   if (type === 'table') return !!(media.table?.rows || (media as any).data?.rows || media.rows);
-                                   if (['chart', 'graph', 'pie', 'bar', 'line', 'scatter'].includes(type)) {
-                                       return !!((media as any).data || (media as any).chart?.data || hasUrl);
-                                   }
-                                   if (type === 'diagram') return !!(media.diagram || (media as any).svg || (media as any).description);
-                                   // Fallback for objects missing type but having data
-                                   return !!(hasUrl || media.data || media.table || media.diagram);
-                               })();
+                {/* 3. Media & Options */}
+                {(() => {
+                    const media = currentQuestion.media as any;
+                    const diagram = currentQuestion.diagram;
+                    
+                    const hasActualContent = (() => {
+                        if (!media) return false;
+                        const type = media.type;
+                        const hasUrl = !!(media.url || media.imageUrl || media.image_url || media.src || (media as any).image?.url);
+                        if (type === 'image') return hasUrl;
+                        if (type === 'table') return !!(media.table?.rows || (media as any).data?.rows || media.rows);
+                        if (['chart', 'graph', 'pie', 'bar', 'line', 'scatter'].includes(type)) {
+                            return !!((media as any).data || (media as any).chart?.data || hasUrl);
+                        }
+                        if (type === 'diagram') return !!(media.diagram || (media as any).svg || (media as any).description);
+                        return !!(hasUrl || media.data || media.table || media.diagram);
+                    })();
+                    
+                    const showMedia = hasActualContent || !!diagram;
 
-                               if (!hasActualContent) return null;
-
-                               return (
-                                   <div className="bg-white dark:bg-card rounded-3xl lg:rounded-[2.5rem] border-2 border-slate-100 dark:border-border p-6 lg:p-8 shadow-sm overflow-hidden">
-                                       <QuestionMedia media={media} />
-                                   </div>
-                               );
-                           }
-                           return null;
-                       })()}
-                      </div>
-
-                      {/* Options Matrix */}
-                      <div className="grid grid-cols-1 gap-4 lg:gap-6 pb-20">
-                            {currentQuestion.options.map((option, idx) => {
+                    const OptionsComponent = (
+                        <div className="grid grid-cols-1 gap-4 lg:gap-5">
+                            {(currentQuestion.options || []).map((option, idx) => {
                                 const isSelected = currentQuestion.user_answer === idx;
                                 return (
                                     <button
                                         key={idx}
                                         onClick={() => handleSelectAnswer(idx)}
                                         className={cn(
-                                            "group relative flex items-center gap-5 p-6 lg:p-8 rounded-[2rem] border-2 transition-all duration-300 text-left active:scale-[0.98] overflow-hidden",
+                                            "group relative flex items-center gap-4 lg:gap-5 p-4 lg:p-5 rounded-[1.25rem] lg:rounded-[1.5rem] border-2 transition-all duration-300 text-left active:scale-[0.98] overflow-hidden w-full",
                                             isSelected
-                                                ? "bg-slate-900 border-slate-900 dark:bg-white dark:border-white shadow-2xl shadow-slate-300 dark:shadow-none"
-                                                : "bg-white border-slate-100 dark:bg-slate-900 dark:border-border hover:border-slate-900 dark:hover:border-white"
+                                                ? "bg-indigo-600 border-indigo-600 shadow-lg shadow-indigo-200 dark:shadow-none"
+                                                : "bg-white border-slate-100 dark:bg-slate-900 dark:border-border hover:border-indigo-600 dark:hover:border-indigo-400"
                                         )}
                                     >
                                         <div className={cn(
-                                            "w-10 h-10 lg:w-14 lg:h-14 rounded-2xl flex items-center justify-center text-sm lg:text-base font-black shrink-0 transition-all",
+                                            "w-10 h-10 lg:w-12 lg:h-12 rounded-2xl flex items-center justify-center text-sm lg:text-base font-black shrink-0 transition-all",
                                             isSelected 
-                                                ? "bg-white/10 text-white dark:bg-slate-200 dark:text-slate-900" 
+                                                ? "bg-white/20 text-white" 
                                                 : "bg-slate-50 dark:bg-slate-800 text-slate-400 border border-slate-100 dark:border-border"
                                         )}>
                                             {String.fromCharCode(65 + idx)}
@@ -1899,19 +1819,116 @@ export default function TestPage() {
                                                 content={option} 
                                                 variant="default"
                                                 className={cn(
-                                                    "text-base lg:text-lg font-bold leading-relaxed tracking-tight break-words",
-                                                    isSelected ? "text-white dark:text-slate-900" : "text-slate-600 dark:text-slate-300"
+                                                    "text-base font-bold leading-relaxed tracking-tight break-words",
+                                                    isSelected ? "text-white" : "text-slate-600 dark:text-slate-300"
                                                 )} 
                                             />
                                         </div>
                                     </button>
                                 );
                             })}
-                      </div>
-                  </motion.div>
+                        </div>
+                    );
+
+                    if (showMedia) {
+                        return (
+                            <div className="flex flex-col lg:flex-row gap-8 lg:gap-10 pt-4">
+                                {/* Left Side: Media/Diagram */}
+                                <div className="w-full lg:w-[45%] shrink-0">
+                                    <div className="bg-white dark:bg-card rounded-[2rem] lg:rounded-[2.5rem] border-2 border-slate-100 dark:border-border p-4 lg:p-6 shadow-sm overflow-hidden sticky top-4">
+                                        {hasActualContent && <QuestionMedia media={media} className="w-full h-auto" />}
+                                        {!!diagram && !hasActualContent && <DiagramRenderer diagram={diagram} className="w-full" />}
+                                    </div>
+                                </div>
+                                {/* Right Side: Options */}
+                                <div className="w-full lg:flex-1 min-w-0">
+                                    {OptionsComponent}
+                                </div>
+                            </div>
+                        );
+                    }
+
+                    return (
+                        <div className="w-full pt-4">
+                            {OptionsComponent}
+                        </div>
+                    );
+                })()}
+
+            </div>
+          </main>
+
+          {/* Navigation Footer - Integrated at bottom of content column */}
+          <footer className="h-14 lg:h-16 shrink-0 bg-white dark:bg-card border-t border-slate-200 dark:border-border px-4 lg:px-12 flex items-center z-[10]">
+            <div className="w-full flex items-center justify-between max-w-5xl mx-auto">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (isMockExam && currentSection && currentIndex === currentSection.startIndex) return;
+                  handleNavigate(Math.max(0, currentIndex - 1));
+                }}
+                disabled={currentIndex === 0 || (isMockExam && currentSection && currentIndex === currentSection.startIndex)}
+                className="h-9 lg:h-10 px-4 lg:px-6 rounded-xl font-black text-[10px] uppercase tracking-widest border-slate-200"
+              >
+                <ChevronLeft size={16} className="mr-2" />
+                <span className="hidden xs:inline">Previous Step</span>
+                <span className="xs:hidden">Back</span>
+              </Button>
+
+              <div className="hidden lg:flex flex-col items-center">
+                <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none mb-1">Question Progress</span>
+                <span className="text-sm font-black text-slate-900 dark:text-slate-100 tabular-nums">
+                  {currentIndex + 1} <span className="text-slate-300 mx-1">/</span> {questions.length}
+                </span>
               </div>
-          </div>
-        </main>
+
+              <div className="flex items-center gap-3">
+                {isMockExam && currentSection && currentIndex === currentSection.endIndex ? (
+                    currentSectionIndex === sections.length - 1 ? (
+                    <Button
+                        onClick={() => setShowSubmitConfirm(true)}
+                        className="h-9 lg:h-10 px-8 lg:px-12 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 font-black text-[10px] lg:text-[11px] uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 active:scale-95 transition-all"
+                    >
+                        Final Submission
+                    </Button>
+                    ) : (
+                    (test?.exam_type === 'imat-prep') ? (
+                      <Button
+                        onClick={() => handleCompleteSection()}
+                        className="h-9 lg:h-10 px-8 lg:px-12 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 font-black text-[10px] lg:text-[11px] uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 active:scale-95 transition-all"
+                      >
+                        Next Section
+                      </Button>
+                    ) : (
+                      <Button
+                        onClick={() => setShowSectionComplete(true)}
+                        className="h-9 lg:h-10 px-8 lg:px-12 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 font-black text-[10px] lg:text-[11px] uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 active:scale-95 transition-all"
+                      >
+                        Lock & Proceed
+                      </Button>
+                    )
+                    )
+                ) : currentIndex === questions.length - 1 ? (
+                    <Button
+                    onClick={() => setShowSubmitConfirm(true)}
+                    className="h-9 lg:h-10 px-8 lg:px-12 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 font-black text-[10px] lg:text-[11px] uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 active:scale-95 transition-all"
+                    >
+                    Submit Mission
+                    </Button>
+                ) : (
+                    <Button
+                    onClick={() => handleNavigate(Math.min(questions.length - 1, currentIndex + 1))}
+                    className="h-9 lg:h-10 px-8 lg:px-12 rounded-2xl bg-indigo-600 text-white border-none font-black text-[10px] lg:text-[11px] uppercase tracking-[0.2em] shadow-md shadow-indigo-200 dark:shadow-none hover:bg-indigo-700 active:scale-95 transition-all flex items-center gap-2"
+                    >
+                    <span className="hidden xs:inline">Confirm & Next</span>
+                    <span className="xs:hidden">Next</span>
+                    <ChevronRight size={16} />
+                    </Button>
+                )}
+              </div>
+            </div>
+          </footer>
+        </div>
 
         {/* Sidebar System (Desktop Only) */}
         <aside className={cn(
@@ -1933,77 +1950,6 @@ export default function TestPage() {
           </div>
         </aside>
       </div>
-
-      {/* Navigation Footer - Focused Official Control */}
-      <footer className="h-20 lg:h-24 shrink-0 bg-white dark:bg-card border-t border-slate-200 dark:border-border px-4 lg:px-12 flex items-center shadow-[0_-4px_20px_rgba(0,0,0,0.03)] z-[100]">
-        <div className="w-full flex items-center justify-between max-w-7xl mx-auto">
-          <Button
-            variant="outline"
-            onClick={() => {
-              if (isMockExam && currentSection && currentIndex === currentSection.startIndex) return;
-              handleNavigate(Math.max(0, currentIndex - 1));
-            }}
-            disabled={currentIndex === 0 || (isMockExam && currentSection && currentIndex === currentSection.startIndex)}
-            className="h-10 lg:h-12 px-4 lg:px-8 rounded-xl font-black text-[10px] uppercase tracking-widest border-slate-200"
-          >
-            <ChevronLeft size={16} className="mr-2" />
-            <span className="hidden xs:inline">Previous Step</span>
-            <span className="xs:hidden">Back</span>
-          </Button>
-
-          <div className="hidden lg:flex flex-col items-center">
-            <span className="text-[10px] font-black uppercase text-slate-400 tracking-widest leading-none mb-1">Question Progress</span>
-            <span className="text-sm font-black text-slate-900 dark:text-slate-100 tabular-nums">
-              {currentIndex + 1} <span className="text-slate-300 mx-1">/</span> {questions.length}
-            </span>
-          </div>
-
-          <div className="flex items-center gap-3">
-            {isMockExam && currentSection && currentIndex === currentSection.endIndex ? (
-                currentSectionIndex === sections.length - 1 ? (
-                <Button
-                    onClick={() => setShowSubmitConfirm(true)}
-                    className="h-12 lg:h-14 px-8 lg:px-12 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 font-black text-[10px] lg:text-[11px] uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 active:scale-95 transition-all"
-                >
-                    Final Submission
-                </Button>
-                ) : (
-                (test?.exam_type === 'imat-prep') ? (
-                  <Button
-                    onClick={() => handleCompleteSection()}
-                    className="h-12 lg:h-14 px-8 lg:px-12 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 font-black text-[10px] lg:text-[11px] uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 active:scale-95 transition-all"
-                  >
-                    Next Section
-                  </Button>
-                ) : (
-                  <Button
-                    onClick={() => setShowSectionComplete(true)}
-                    className="h-12 lg:h-14 px-8 lg:px-12 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 font-black text-[10px] lg:text-[11px] uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 active:scale-95 transition-all"
-                  >
-                    Lock & Proceed
-                  </Button>
-                )
-                )
-            ) : currentIndex === questions.length - 1 ? (
-                <Button
-                onClick={() => setShowSubmitConfirm(true)}
-                className="h-12 lg:h-14 px-8 lg:px-12 rounded-2xl bg-indigo-600 text-white hover:bg-indigo-700 font-black text-[10px] lg:text-[11px] uppercase tracking-[0.2em] shadow-xl shadow-indigo-100 active:scale-95 transition-all"
-                >
-                Submit Mission
-                </Button>
-            ) : (
-                <Button
-                onClick={() => handleNavigate(Math.min(questions.length - 1, currentIndex + 1))}
-                className="h-12 lg:h-14 px-8 lg:px-12 rounded-2xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 border-none font-black text-[10px] lg:text-[11px] uppercase tracking-[0.2em] shadow-xl shadow-slate-200 dark:shadow-none active:scale-95 transition-all flex items-center gap-2"
-                >
-                <span className="hidden xs:inline">Confirm & Next</span>
-                <span className="xs:hidden">Next</span>
-                <ChevronRight size={16} />
-                </Button>
-            )}
-          </div>
-        </div>
-      </footer>
       </>
       )}
 
@@ -2055,7 +2001,7 @@ export default function TestPage() {
             <div className="grid gap-3">
               <Button
                 onClick={() => handleCompleteSection()}
-                className="w-full h-14 bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 dark:hover:bg-white font-black text-[10px] uppercase tracking-[0.2em] rounded-2xl shadow-xl active:scale-95 transition-all"
+                className="w-full h-14 bg-slate-900 dark:bg-slate-100 text-white hover:bg-slate-800 dark:hover:bg-white font-black text-[10px] uppercase tracking-[0.2em] rounded-2xl shadow-xl active:scale-95 transition-all"
               >
                 Seal & Proceed
               </Button>
@@ -2124,7 +2070,7 @@ export default function TestPage() {
               <Button
                 onClick={() => submitTest('manual')}
                 disabled={isSubmitting}
-                className="h-12 rounded-xl bg-slate-900 dark:bg-slate-100 text-white dark:text-slate-900 hover:bg-slate-800 font-semibold text-sm"
+                className="h-12 rounded-xl bg-slate-900 dark:bg-slate-100 text-white hover:bg-slate-800 font-semibold text-sm"
               >
                 {isSubmitting ? (
                   <Loader2 className="w-4 h-4 animate-spin" />

@@ -149,4 +149,4 @@ export const MathText = memo(({ content, className, isHtml = false, variant = 'p
             />
         </>
     );
-});
+}, (prev, next) => prev.content === next.content && prev.className === next.className && prev.isHtml === next.isHtml && prev.variant === next.variant);

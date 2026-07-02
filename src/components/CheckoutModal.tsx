@@ -952,9 +952,9 @@ export default function CheckoutModal({
                         initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
-                        className="fixed inset-0 flex items-center justify-center z-[210] p-4 md:p-6 pointer-events-none"
+                        className="fixed inset-0 flex items-center justify-center z-[210] p-0 pointer-events-none"
                     >
-                        <div className="w-full h-[100dvh] md:h-auto max-w-[1000px] md:max-h-[95vh] bg-[#f8f9fc] md:bg-white dark:bg-slate-950 md:dark:bg-slate-900 rounded-none md:rounded-[2rem] shadow-2xl overflow-hidden pointer-events-auto border-0 md:border border-slate-100 dark:border-slate-800 flex flex-col relative font-sans">
+                        <div className="w-full h-[100dvh] max-w-[1000px] max-h-[100dvh] bg-[#f8f9fc] md:bg-white dark:bg-slate-950 md:dark:bg-slate-900 rounded-none shadow-2xl overflow-hidden pointer-events-auto border-0 md:border-x border-slate-100 dark:border-slate-800 flex flex-col relative font-sans">
                             {/* Header row (Title + Close) */}
                             <div className="px-5 md:px-8 pt-12 md:pt-8 pb-4 flex items-start justify-between shrink-0 bg-[#f8f9fc] md:bg-transparent dark:bg-slate-950 md:dark:bg-transparent">
                                 <div className="flex flex-col">

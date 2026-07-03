@@ -93,7 +93,20 @@ export default function MobileStartTest() {
                 if (data) {
                     const counts: Record<string, number> = {};
                     data.forEach((q: any) => { if (q.topic) counts[q.topic] = (counts[q.topic] || 0) + 1; });
+
+                    // ── Syllabus Guard ─────────────────────────────────────────────
+                    // Only show topics that are listed in the exam syllabus for this
+                    // subject. Orphaned topics from deleted chapters are suppressed.
+                    // Fallback: if no syllabus configured for this subject, show all.
+                    const syllabusTopicNames: string[] =
+                        (activeExam.syllabus?.[subject] as any[] | undefined)?.map(
+                            (t: any) => t.name as string
+                        ) ?? [];
+
                     const sorted = Object.entries(counts)
+                        .filter(([name]) =>
+                            syllabusTopicNames.length === 0 || syllabusTopicNames.includes(name)
+                        )
                         .map(([name, count]) => ({ name, count }))
                         .sort((a, b) => b.count - a.count);
                     setAvailableTopics(sorted);

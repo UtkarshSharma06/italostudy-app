@@ -78,7 +78,21 @@ export default function StartTest() {
             }
           });
 
+          // ── Syllabus Guard ────────────────────────────────────────────────
+          // Only show topics that are currently listed in the exam's syllabus
+          // for this subject. This prevents orphaned topics (from chapters
+          // deleted in the Exam Model) from appearing here even though their
+          // questions still exist in the practice_questions table.
+          // Fallback: if no syllabus is configured for this subject, show all.
+          const syllabusTopicNames: string[] =
+            (activeExam.syllabus?.[subject] as any[] | undefined)?.map(
+              (t: any) => t.name as string
+            ) ?? [];
+
           const sortedTopics = Object.entries(counts)
+            .filter(([name]) =>
+              syllabusTopicNames.length === 0 || syllabusTopicNames.includes(name)
+            )
             .map(([name, count]) => ({ name, count }))
             .sort((a, b) => b.count - a.count);
 

@@ -1671,50 +1671,48 @@ export default function Dashboard() {
                                 </div>
                             </div>
 
-                            {/* Conditionally shifted Study Plan and WhatsApp */}
+                            {/* Conditionally shifted Study Plan */}
                             {isDashboardAdActive && (
-                                <>
-                                    <StudyPlannerWidget examType={activeExam?.id} />
-                                    
-                                    {/* WhatsApp Community */}
-                                    <div
-                                        onClick={() => window.open('https://chat.whatsapp.com/CfVh7u9L6vT7ZFpZwwVa4A', '_blank')}
-                                        className="group relative p-5 rounded-2xl bg-[#25D366] text-white cursor-pointer shadow-lg hover:-translate-y-0.5 transition-all border border-white/10 overflow-hidden"
-                                    >
-                                        <div className="absolute top-0 right-0 w-28 h-28 bg-emerald-400/10 blur-2xl rounded-full -mr-10 -mt-10 group-hover:bg-emerald-400/20 transition-colors" />
-                                        <div className="relative z-10 flex items-start justify-between mb-3">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-9 h-9 rounded-xl bg-white text-[#25D366] flex items-center justify-center shadow-md group-hover:rotate-12 transition-transform">
-                                                    <MessageCircle className="w-4 h-4" />
-                                                </div>
-                                                <div>
-                                                    <h4 className="text-sm font-black uppercase tracking-tight leading-none">WhatsApp Squad</h4>
-                                                    <div className="flex items-center gap-1.5 mt-0.5">
-                                                        <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                                                        <p className="text-[8px] font-bold text-emerald-100/60 uppercase tracking-widest">Global Hub</p>
-                                                    </div>
-                                                </div>
-                                            </div>
+                                <StudyPlannerWidget examType={activeExam?.id} />
+                            )}
+
+                            {/* WhatsApp Community (Always visible) */}
+                            <div
+                                onClick={() => window.open('https://chat.whatsapp.com/CfVh7u9L6vT7ZFpZwwVa4A', '_blank')}
+                                className="group relative p-5 rounded-2xl bg-[#25D366] text-white cursor-pointer shadow-lg hover:-translate-y-0.5 transition-all border border-white/10 overflow-hidden"
+                            >
+                                <div className="absolute top-0 right-0 w-28 h-28 bg-emerald-400/10 blur-2xl rounded-full -mr-10 -mt-10 group-hover:bg-emerald-400/20 transition-colors" />
+                                <div className="relative z-10 flex items-start justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                        <div className="w-9 h-9 rounded-xl bg-white text-[#25D366] flex items-center justify-center shadow-md group-hover:rotate-12 transition-transform">
+                                            <MessageCircle className="w-4 h-4" />
                                         </div>
-                                        <p className="relative z-10 text-[10px] font-bold text-emerald-100/80 leading-snug mb-3">
-                                                Prep tips & live updates from <span className="text-white font-black">2000+ Students</span>. 📚✨
-                                        </p>
-                                        <div className="relative z-10 flex items-center justify-between">
-                                            <div className="flex -space-x-2">
-                                                {[1, 2, 3].map((i) => (
-                                                    <div key={i} className="w-6 h-6 rounded-full border-2 border-[#25D366] bg-slate-800 overflow-hidden shadow-md">
-                                                        <img src={`https://i.pravatar.cc/100?img=${i + 20}`} alt="User" className="w-full h-full object-cover opacity-90" />
-                                                    </div>
-                                                ))}
-                                            </div>
-                                            <div className="flex items-center gap-1 text-white/60 group-hover:text-white transition-colors text-[9px] font-black uppercase tracking-widest">
-                                                <span>Join Now</span>
-                                                <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                                        <div>
+                                            <h4 className="text-sm font-black uppercase tracking-tight leading-none">WhatsApp Squad</h4>
+                                            <div className="flex items-center gap-1.5 mt-0.5">
+                                                <div className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                                                <p className="text-[8px] font-bold text-emerald-100/60 uppercase tracking-widest">Global Hub</p>
                                             </div>
                                         </div>
                                     </div>
-                                </>
-                            )}
+                                </div>
+                                <p className="relative z-10 text-[10px] font-bold text-emerald-100/80 leading-snug mb-3">
+                                        Prep tips & live updates from <span className="text-white font-black">2000+ Students</span>. 📚✨
+                                </p>
+                                <div className="relative z-10 flex items-center justify-between">
+                                    <div className="flex -space-x-2">
+                                        {[1, 2, 3].map((i) => (
+                                            <div key={i} className="w-6 h-6 rounded-full border-2 border-[#25D366] bg-slate-800 overflow-hidden shadow-md">
+                                                <img src={`https://i.pravatar.cc/100?img=${i + 20}`} alt="User" className="w-full h-full object-cover opacity-90" />
+                                            </div>
+                                        ))}
+                                    </div>
+                                    <div className="flex items-center gap-1 text-white/60 group-hover:text-white transition-colors text-[9px] font-black uppercase tracking-widest">
+                                        <span>Join Now</span>
+                                        <ArrowRight className="w-3 h-3 group-hover:translate-x-0.5 transition-transform" />
+                                    </div>
+                                </div>
+                            </div>
 
                         </div>
                         

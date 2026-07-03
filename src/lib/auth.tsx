@@ -259,24 +259,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             const SUBSCRIPTION_FIELDS = [
               'selected_plan', 'subscription_tier', 'subscription_expiry_date', 'is_banned', 'role'
             ];
-            const subscriptionChanged = SUBSCRIPTION_FIELDS.some(
-              (f) => newData[f] !== profile?.[f]
-            );
 
-            if (subscriptionChanged) {
-              // Full replace — a real subscription change happened
-              setProfile(newData);
+            setProfile((prev: any) => {
+              const subscriptionChanged = prev ? SUBSCRIPTION_FIELDS.some(
+                (f) => newData[f] !== prev[f]
+              ) : true;
 
-              // Fire premium animation if user was just upgraded from explorer
-              const oldPlan = profile?.selected_plan || 'explorer';
-              const newPlan = newData?.selected_plan;
-              if (oldPlan === 'explorer' && newPlan && newPlan !== 'explorer') {
-                window.dispatchEvent(new Event('premium-upgrade-success'));
+              if (subscriptionChanged) {
+                // Fire premium animation if user was just upgraded from explorer
+                const oldPlan = prev?.selected_plan || 'explorer';
+                const newPlan = newData?.selected_plan;
+                if (oldPlan === 'explorer' && newPlan && newPlan !== 'explorer') {
+                  window.dispatchEvent(new Event('premium-upgrade-success'));
+                }
+                return newData; // Full replace
+              } else {
+                // Selective merge — only safe non-subscription fields changed (e.g., cart, selected_exam)
+                return prev ? { ...prev, ...newData } : newData;
               }
-            } else {
-              // Selective merge — only safe non-subscription fields changed (e.g., cart)
-              setProfile((prev: any) => prev ? { ...prev, ...newData } : newData);
-            }
+            });
 
             // Refresh permissions if role changed
             if (newData.role === 'sub_admin' || newData.role === 'admin') {

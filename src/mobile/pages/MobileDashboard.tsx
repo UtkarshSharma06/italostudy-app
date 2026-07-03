@@ -1187,7 +1187,7 @@ const MobileDashboard: React.FC = () => {
                         {/* List */}
                         <div className="divide-y divide-slate-50 dark:divide-slate-800/50">
                             {(rankingView === 'all-time' ? topStudents : liveRankings).length > 0 ? (
-                                (rankingView === 'all-time' ? topStudents : liveRankings).slice(0, 7).map((student, i) => (
+                                (rankingView === 'all-time' ? topStudents : liveRankings).slice(0, 10).map((student, i) => (
                                     <div
                                         key={student.id}
                                         onClick={() => navigate(`/mobile/student/${student.id}`)}

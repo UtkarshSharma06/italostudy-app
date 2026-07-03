@@ -1443,7 +1443,7 @@ export default function TestPage() {
           </div>
         </div>
 
-        {test?.exam_type?.toLowerCase().includes('iat') || test?.exam_type?.toLowerCase().includes('imat') ? (
+        {isMockExam && (test?.exam_type?.toLowerCase().includes('iat') || test?.exam_type?.toLowerCase().includes('imat')) ? (
             <div className="space-y-6">
                 {[
                     { title: "Logical Reasoning & General Knowledge", count: 9 },

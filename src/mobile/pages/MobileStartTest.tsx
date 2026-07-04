@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useExam } from '@/context/ExamContext';
-import { usePlanAccess } from '@/hooks/usePlanAccess';
+import { usePlanAccess, invalidatePlanCache } from '@/hooks/usePlanAccess';
 import { cn } from '@/lib/utils';
 // EXAMS import removed
 import { UpgradeModal } from '@/components/UpgradeModal';
@@ -84,15 +84,40 @@ export default function MobileStartTest() {
             }
             setIsLoadingTopics(true);
             try {
-                const { data } = await (supabase as any)
-                    .from('practice_questions')
-                    .select('topic')
-                    .eq('exam_type', activeExam.id)
-                    .eq('subject', subject);
+                let allData: any[] = [];
+                let from = 0;
+                let to = 999;
+                let hasMore = true;
 
-                if (data) {
+                while (hasMore) {
+                    const { data, error } = await (supabase as any)
+                        .from('practice_questions')
+                        .select('topic')
+                        .eq('exam_type', activeExam.id)
+                        .eq('subject', subject)
+                        .range(from, to);
+
+                    if (error) {
+                        console.error('Error fetching topics:', error);
+                        break;
+                    }
+
+                    if (data && data.length > 0) {
+                        allData = [...allData, ...data];
+                        if (data.length < 1000) {
+                            hasMore = false;
+                        } else {
+                            from += 1000;
+                            to += 1000;
+                        }
+                    } else {
+                        hasMore = false;
+                    }
+                }
+
+                if (allData.length > 0) {
                     const counts: Record<string, number> = {};
-                    data.forEach((q: any) => { if (q.topic) counts[q.topic] = (counts[q.topic] || 0) + 1; });
+                    allData.forEach((q: any) => { if (q.topic) counts[q.topic] = (counts[q.topic] || 0) + 1; });
 
                     // ── Syllabus Guard ─────────────────────────────────────────────
                     // Only show topics that are listed in the exam syllabus for this
@@ -404,6 +429,29 @@ export default function MobileStartTest() {
             if (qsError) {
                 console.error('Supabase Questions Insert Error Details:', qsError);
                 throw qsError;
+            }
+
+            // Pre-sync practice responses to immediately consume limit and mark questions as seen
+            if (user) {
+                const practiceResponsesToInsert = questions.map((q: any) => ({
+                    user_id: user.id,
+                    question_id: q.practice_question_id || q.id,
+                    exam_type: activeExam.id,
+                    subject: q.subject || subject,
+                    topic: q.topic || (topic !== 'all' ? topic : null) || subject,
+                    is_correct: false,
+                    created_at: new Date().toISOString()
+                }));
+
+                const { error: syncError } = await (supabase as any)
+                    .from('user_practice_responses')
+                    .upsert(practiceResponsesToInsert, { onConflict: 'user_id,question_id' });
+                    
+                if (syncError) {
+                    console.error('Error pre-syncing practice responses:', syncError);
+                } else {
+                    invalidatePlanCache();
+                }
             }
 
             toast({ title: "Test Started", description: "Curriculum loaded." });

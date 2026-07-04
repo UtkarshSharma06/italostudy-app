@@ -9,6 +9,12 @@ let globalUsagePromise: Promise<any> | null = null;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 let lastFetchTime = 0;
 
+export function invalidatePlanCache() {
+    globalUsageCache = null;
+    globalUsagePromise = null;
+    lastFetchTime = 0;
+}
+
 export function usePlanAccess() {
     const { profile, user } = useAuth();
     const { openPricingModal } = usePricing();

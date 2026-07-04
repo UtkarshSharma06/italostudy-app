@@ -22,7 +22,7 @@ import {
   Crown
 } from 'lucide-react';
 import { useExam } from '@/context/ExamContext';
-import { usePlanAccess } from '@/hooks/usePlanAccess';
+import { usePlanAccess, invalidatePlanCache } from '@/hooks/usePlanAccess';
 import Layout from '@/components/Layout';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { useActiveTest } from '@/hooks/useActiveTest';
@@ -64,43 +64,66 @@ export default function StartTest() {
       setIsLoadingTopics(true);
 
       try {
-        const { data, error } = await (supabase as any)
-          .from('practice_questions')
-          .select('topic')
-          .eq('exam_type', activeExam.id)
-          .eq('subject', subject);
+        let allData: any[] = [];
+        let from = 0;
+        let to = 999;
+        let hasMore = true;
 
-        if (!error && data) {
-          const counts: Record<string, number> = {};
-          data.forEach((q: any) => {
-            if (q.topic) {
-              counts[q.topic] = (counts[q.topic] || 0) + 1;
-            }
-          });
+        while (hasMore) {
+          const { data, error } = await (supabase as any)
+            .from('practice_questions')
+            .select('topic')
+            .eq('exam_type', activeExam.id)
+            .eq('subject', subject)
+            .range(from, to);
 
-          // ── Syllabus Guard ────────────────────────────────────────────────
-          // Only show topics that are currently listed in the exam's syllabus
-          // for this subject. This prevents orphaned topics (from chapters
-          // deleted in the Exam Model) from appearing here even though their
-          // questions still exist in the practice_questions table.
-          // Fallback: if no syllabus is configured for this subject, show all.
-          const syllabusTopicNames: string[] =
-            (activeExam.syllabus?.[subject] as any[] | undefined)?.map(
-              (t: any) => t.name as string
-            ) ?? [];
-
-          const sortedTopics = Object.entries(counts)
-            .filter(([name]) =>
-              syllabusTopicNames.length === 0 || syllabusTopicNames.includes(name)
-            )
-            .map(([name, count]) => ({ name, count }))
-            .sort((a, b) => b.count - a.count);
-
-          setAvailableTopics(sortedTopics);
-          // Only reset topic if current topic is not in the new list and not 'all'
-          if (topic !== 'all' && !counts[topic]) {
-            setTopic('all');
+          if (error) {
+            console.error('Error fetching topics:', error);
+            break;
           }
+
+          if (data && data.length > 0) {
+            allData = [...allData, ...data];
+            if (data.length < 1000) {
+              hasMore = false;
+            } else {
+              from += 1000;
+              to += 1000;
+            }
+          } else {
+            hasMore = false;
+          }
+        }
+
+        const counts: Record<string, number> = {};
+        allData.forEach((q: any) => {
+          if (q.topic) {
+            counts[q.topic] = (counts[q.topic] || 0) + 1;
+          }
+        });
+
+        // ── Syllabus Guard ────────────────────────────────────────────────
+        // Only show topics that are currently listed in the exam's syllabus
+        // for this subject. This prevents orphaned topics (from chapters
+        // deleted in the Exam Model) from appearing here even though their
+        // questions still exist in the practice_questions table.
+        // Fallback: if no syllabus is configured for this subject, show all.
+        const syllabusTopicNames: string[] =
+          (activeExam.syllabus?.[subject] as any[] | undefined)?.map(
+            (t: any) => t.name as string
+          ) ?? [];
+
+        const sortedTopics = Object.entries(counts)
+          .filter(([name]) =>
+            syllabusTopicNames.length === 0 || syllabusTopicNames.includes(name)
+          )
+          .map(([name, count]) => ({ name, count }))
+          .sort((a, b) => b.count - a.count);
+
+        setAvailableTopics(sortedTopics);
+        // Only reset topic if current topic is not in the new list and not 'all'
+        if (topic !== 'all' && !counts[topic]) {
+          setTopic('all');
         }
       } catch (err) {
         console.error('Error fetching topics:', err);
@@ -595,6 +618,30 @@ export default function StartTest() {
       if (questionsError) {
         console.error('Supabase Questions Insert Error:', questionsError);
         throw questionsError;
+      }
+
+      // Pre-sync practice responses to immediately consume limit and mark questions as seen
+      if (user && !isMockMode) {
+        const practiceResponsesToInsert = questions.map((q: any) => ({
+          user_id: user.id,
+          question_id: q.practice_question_id || q.id,
+          exam_type: activeExam.id,
+          subject: q.subject || finalSubject,
+          topic: q.topic || (topic !== 'all' ? topic : null) || finalSubject,
+          is_correct: false,
+          created_at: new Date().toISOString()
+        }));
+
+        const { error: syncError } = await supabase
+          .from('user_practice_responses')
+          .upsert(practiceResponsesToInsert, { onConflict: 'user_id,question_id' });
+          
+        if (syncError) {
+          console.error('Error pre-syncing practice responses:', syncError);
+        } else {
+          // Immediately invalidate the cache so returning to /practice shows updated limit
+          invalidatePlanCache();
+        }
       }
 
       toast({

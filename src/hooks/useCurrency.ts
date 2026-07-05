@@ -13,14 +13,17 @@ const DEFAULT_CURRENCY: CurrencyInfo = {
 };
 
 const COUNTRY_TO_CURRENCY: Record<string, string> = {
-    IT: 'EUR', DE: 'EUR', FR: 'EUR', ES: 'EUR', AT: 'EUR', NL: 'EUR', BE: 'EUR', PT: 'EUR',
-    US: 'USD', GB: 'GBP', IN: 'INR', NG: 'NGN', EG: 'EGP', PK: 'PKR', BD: 'BDT',
-    TR: 'TRY', BR: 'BRL', CA: 'CAD', AU: 'AUD', SG: 'SGD', AE: 'AED', SA: 'SAR'
+    IN: 'INR', 
+    PK: 'PKR', 
+    BD: 'BDT'
+    // All other countries will naturally fall back to 'EUR' in the code below
 };
 
 export const SUPPORTED_CURRENCIES = [
     { code: 'EUR', symbol: '€', name: 'Euro' },
-    { code: 'INR', symbol: '₹', name: 'Indian Rupee' }
+    { code: 'INR', symbol: '₹', name: 'Indian Rupee' },
+    { code: 'PKR', symbol: '₨', name: 'Pakistani Rupee' },
+    { code: 'BDT', symbol: '৳', name: 'Bangladeshi Taka' }
 ];
 
 export function useCurrency() {
@@ -37,7 +40,7 @@ export function useCurrency() {
             country: 'MANUAL'
         };
         setCurrency(newCurrency);
-        localStorage.setItem('userCurrency', JSON.stringify({
+        localStorage.setItem('userCurrency_v2', JSON.stringify({
             data: newCurrency,
             timestamp: Date.now(),
             isManual: true
@@ -48,7 +51,7 @@ export function useCurrency() {
         const detectCurrency = async () => {
             try {
                 // 1. Check sessionStorage (fastest, prevents any re-fetch during active session)
-                const sessionCached = sessionStorage.getItem('userCurrency');
+                const sessionCached = sessionStorage.getItem('userCurrency_v2');
                 if (sessionCached) {
                     try {
                         const parsedCache = JSON.parse(sessionCached);
@@ -63,14 +66,14 @@ export function useCurrency() {
                 }
 
                 // 2. Check localStorage cache (prevents fetch across tabs/reloads for 24 hours)
-                const cached = localStorage.getItem('userCurrency');
+                const cached = localStorage.getItem('userCurrency_v2');
                 if (cached) {
                     try {
                         const parsedCache = JSON.parse(cached);
                         const cacheAge = Date.now() - parsedCache.timestamp;
                         if (parsedCache.data && cacheAge < 24 * 60 * 60 * 1000) {
                             setCurrency(parsedCache.data);
-                            sessionStorage.setItem('userCurrency', JSON.stringify(parsedCache)); // upgrade to session
+                        sessionStorage.setItem('userCurrency_v2', JSON.stringify(parsedCache)); // upgrade to session
                             setIsLoading(false);
                             return;
                         }
@@ -79,29 +82,36 @@ export function useCurrency() {
                     }
                 }
 
-                // 3. PRIMARY API: ipapi.co (HTTPS stable)
+                // 3. PRIMARY API: api.country.is (Best for localhost, CORS-friendly)
                 let data: any = null;
                 try {
-                    const response = await fetch('https://ipapi.co/json/');
+                    const response = await fetch('https://api.country.is/');
                     data = await response.json();
                 } catch (e) {
-                    // 3. SECONDARY API FALLBACK: ipwhois.app (HTTPS)
+                    // SECONDARY API: ipapi.co
                     try {
-                        console.log('Primary IP API failed, trying ipwhois...');
-                        const response = await fetch('https://ipwhois.app/json/');
+                        const response = await fetch('https://ipapi.co/json/');
                         data = await response.json();
                     } catch (e2) {
-                        console.error('All IP detection APIs failed');
+                        // TERTIARY API: ipwhois.app
+                        try {
+                            const response = await fetch('https://ipwhois.app/json/');
+                            data = await response.json();
+                        } catch (e3) {
+                            console.error('All IP detection APIs failed');
+                        }
                     }
                 }
 
-                if (data && (data.status === 'success' || data.success !== false || data.status !== 'fail')) {
+                if (data && (data.status === 'success' || data.success !== false || data.status !== 'fail' || data.country)) {
                     const countryCode = data.countryCode || data.country_code || data.country;
                     
-                    const isIndia = countryCode === 'IN';
+                    const currencyCode = COUNTRY_TO_CURRENCY[countryCode] || 'EUR';
+                    const symbolMap: Record<string, string> = { 'EUR': '€', 'INR': '₹', 'USD': '$', 'GBP': '£', 'PKR': '₨', 'BDT': '৳' };
+                    
                     const currencyInfo: CurrencyInfo = {
-                        code: isIndia ? 'INR' : 'EUR',
-                        symbol: isIndia ? '₹' : '€',
+                        code: currencyCode,
+                        symbol: symbolMap[currencyCode] || currencyCode,
                         country: countryCode || 'XX'
                     };
 
@@ -111,18 +121,20 @@ export function useCurrency() {
                         timestamp: Date.now(),
                         isManual: false
                     });
-                    localStorage.setItem('userCurrency', cachePayload);
-                    sessionStorage.setItem('userCurrency', cachePayload);
+                    localStorage.setItem('userCurrency_v2', cachePayload);
+                    sessionStorage.setItem('userCurrency_v2', cachePayload);
 
                     setCurrency(currencyInfo);
                 } else {
                     // Final Guess: Navigator Language
                     const language = navigator.language;
                     const region = language.split('-')[1];
-                    const isIndia = region === 'IN';
+                    const currencyCode = COUNTRY_TO_CURRENCY[region] || 'EUR';
+                    const symbolMap: Record<string, string> = { 'EUR': '€', 'INR': '₹', 'USD': '$', 'GBP': '£', 'PKR': '₨', 'BDT': '৳' };
+                    
                     const guessedInfo = {
-                        code: isIndia ? 'INR' : 'EUR',
-                        symbol: isIndia ? '₹' : '€',
+                        code: currencyCode,
+                        symbol: symbolMap[currencyCode] || currencyCode,
                         country: region || 'XX'
                     };
                     setCurrency(guessedInfo);

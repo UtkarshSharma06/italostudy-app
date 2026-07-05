@@ -23,18 +23,11 @@ export async function getCountryCode(): Promise<string> {
     }
 
     try {
-        console.log('Country detection: Fetching from ipapi.co...');
-        const response = await fetch('https://ipapi.co/json/', {
-            // Further reduced timeout for mobile networks
-            signal: AbortSignal.timeout(2000)
-        });
-
-        if (!response.ok) {
-            throw new Error(`HTTP error! status: ${response.status}`);
-        }
-
+        // Try api.country.is first
+        const response = await fetch('https://api.country.is/');
         const data = await response.json();
-        const country = data.country_code || 'XX';
+        
+        const country = data.country || 'XX';
 
         // Cache the result
         sessionStorage.setItem('user_country', country);

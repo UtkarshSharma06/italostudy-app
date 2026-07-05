@@ -25,6 +25,8 @@ export interface Plan {
         razorpayId?: string; // Auto-Pay Plan ID for Razorpay
         paypalId?: string; // Auto-Pay Plan ID for PayPal
         dodoId?: string; // Auto-Pay Plan ID for Dodo Payments
+        dodoPkrId?: string; // Auto-Pay Plan ID for Dodo Payments (PKR)
+        dodoBdtId?: string; // Auto-Pay Plan ID for Dodo Payments (BDT)
         regionalPrices?: Record<string, number>; // New: Fixed regional prices for this specific cycle
     }[];
 }

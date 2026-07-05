@@ -86,10 +86,24 @@ export default function Auth() {
 
     const checkIPStatus = async () => {
         try {
-            const geoResponse = await fetch('https://ipapi.co/json/');
-            const geoData = await geoResponse.json();
-            const ip = geoData.ip;
-            const country = geoData.country_name;
+            let ip = null;
+            let country = null;
+
+            try {
+                // Try localhost-friendly API first
+                const geoResponse = await fetch('https://api.country.is/');
+                const geoData = await geoResponse.json();
+                ip = geoData.ip;
+                country = geoData.country; // This is a 2-letter code like 'PK'
+            } catch (fallbackError) {
+                // Original API as backup (for production)
+                const backupResponse = await fetch('https://ipapi.co/json/');
+                const backupData = await backupResponse.json();
+                ip = backupData.ip;
+                country = backupData.country_name;
+            }
+
+            if (!ip) return { isBanned: false, ip: null, country: null };
 
             const { data: isBanned } = await (supabase as any).rpc('check_ip_banned', { check_ip: ip });
 

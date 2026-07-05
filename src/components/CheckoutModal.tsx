@@ -148,8 +148,22 @@ export default function CheckoutModal({
     useEffect(() => {
         if (isOpen) {
             fetchGateways();
+        } else {
+            // Reset selection when modal closes so it auto-selects again next time
+            setSelectedGateway(null);
         }
     }, [isOpen]);
+
+    // Auto-select recommended gateway
+    useEffect(() => {
+        if (isOpen && !isLoadingGateways && !selectedGateway) {
+            if (targetCurrency === 'INR' && gateways.razorpay?.enabled) {
+                setSelectedGateway('razorpay');
+            } else if (targetCurrency !== 'INR' && gateways.dodo?.enabled) {
+                setSelectedGateway('dodo');
+            }
+        }
+    }, [isOpen, isLoadingGateways, selectedGateway, targetCurrency, gateways]);
 
     const fetchGateways = async (retries = 3) => {
         setIsLoadingGateways(true);
@@ -752,7 +766,13 @@ export default function CheckoutModal({
             // 1. Get the Gateway Plan ID for Dodo Subscriptions
             const plan = config?.plans.find(p => p.id === planId);
             const matchedCycle = findMatchingCycle(plan);
-            const gatewayPlanId = matchedCycle?.dodoId ?? null;
+            
+            let gatewayPlanId = matchedCycle?.dodoId ?? null;
+            if (targetCurrency === 'PKR' && matchedCycle?.dodoPkrId) {
+                gatewayPlanId = matchedCycle.dodoPkrId;
+            } else if (targetCurrency === 'BDT' && matchedCycle?.dodoBdtId) {
+                gatewayPlanId = matchedCycle.dodoBdtId;
+            }
 
             if (!gatewayPlanId) {
                 throw new Error('Dodo Subscription Plan ID is not configured for this cycle. Please contact support.');
@@ -943,6 +963,8 @@ export default function CheckoutModal({
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         exit={{ opacity: 0 }}
+                        transition={{ duration: 0.2, ease: "easeOut" }}
+                        style={{ willChange: 'opacity' }}
                         onClick={onClose}
                         className="fixed inset-0 bg-slate-900/40 optimize-blur z-[200]"
                     />
@@ -952,9 +974,11 @@ export default function CheckoutModal({
                         initial={{ opacity: 0, scale: 0.95, y: 20 }}
                         animate={{ opacity: 1, scale: 1, y: 0 }}
                         exit={{ opacity: 0, scale: 0.95, y: 20 }}
+                        transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
+                        style={{ willChange: 'transform, opacity' }}
                         className="fixed inset-0 flex items-center justify-center z-[210] p-0 pointer-events-none"
                     >
-                        <div className="w-full h-[100dvh] max-w-[1000px] max-h-[100dvh] bg-[#f8f9fc] md:bg-white dark:bg-slate-950 md:dark:bg-slate-900 rounded-none shadow-2xl overflow-hidden pointer-events-auto border-0 md:border-x border-slate-100 dark:border-slate-800 flex flex-col relative font-sans">
+                        <div className="w-full h-[100dvh] md:h-auto md:min-h-[600px] max-w-[1000px] max-h-[100dvh] bg-[#f8f9fc] md:bg-white dark:bg-slate-950 md:dark:bg-slate-900 md:rounded-2xl shadow-2xl overflow-hidden pointer-events-auto border-0 md:border md:border-slate-100 dark:border-slate-800 flex flex-col relative font-sans">
                             {/* Header row (Title + Close) */}
                             <div className="px-5 md:px-8 pt-12 md:pt-8 pb-4 flex items-start justify-between shrink-0 bg-[#f8f9fc] md:bg-transparent dark:bg-slate-950 md:dark:bg-transparent">
                                 <div className="flex flex-col">
@@ -1109,28 +1133,35 @@ export default function CheckoutModal({
                                                         <button
                                                             onClick={() => setSelectedGateway('razorpay')}
                                                             className={cn(
-                                                                "w-full h-[52px] md:h-16 px-4 rounded-xl border flex items-center justify-between transition-all group bg-white dark:bg-slate-900 md:bg-transparent",
+                                                                "w-full h-[52px] md:h-[92px] px-4 md:px-5 rounded-xl border flex items-center justify-between transition-all group bg-white dark:bg-slate-900 md:bg-transparent",
                                                                 selectedGateway === 'razorpay' ? "border-[#5022f5] md:border-indigo-600 bg-[#fbfaff] md:bg-indigo-50/30 dark:bg-indigo-500/10 shadow-sm" : "border-slate-200/80 md:border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
                                                             )}
                                                         >
-                                                            <div className="flex items-center gap-3">
-                                                                <div className={cn("w-4 h-4 rounded-full border-[1.5px] md:border-2 flex items-center justify-center shrink-0", selectedGateway === 'razorpay' ? "border-[#5022f5] md:border-indigo-600" : "border-slate-300 dark:border-slate-600")}>
-                                                                    {selectedGateway === 'razorpay' && <div className="w-2 h-2 rounded-full bg-[#5022f5] md:bg-indigo-600" />}
+                                                            <div className="flex items-center gap-3 md:gap-5">
+                                                                <div className={cn("w-4 h-4 md:w-5 md:h-5 rounded-full border-[1.5px] md:border-2 flex items-center justify-center shrink-0", selectedGateway === 'razorpay' ? "border-[#5022f5] md:border-indigo-600" : "border-slate-300 dark:border-slate-600")}>
+                                                                    {selectedGateway === 'razorpay' && <div className="w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-[#5022f5] md:bg-indigo-600" />}
                                                                 </div>
-                                                                <img src="/payments/razorpay.webp" alt="Razorpay" className="h-3.5 md:h-4 w-auto object-contain" />
+                                                                <div className="flex flex-col items-start gap-0.5 md:gap-1.5 mt-0.5 md:mt-0">
+                                                                    <div className="flex items-center gap-2">
+                                                                        <img src="/payments/razorpay.webp" alt="Razorpay" className="h-3.5 md:h-6 w-auto object-contain" />
+                                                                    </div>
+                                                                    <div className="hidden md:flex items-center gap-1.5 opacity-60">
+                                                                        <img src="/payments/upi.webp" alt="UPI" className="h-3 w-auto dark:invert" />
+                                                                        <img src="/payments/visa.webp" alt="Visa" className="h-3 w-auto" />
+                                                                        <img src="/payments/mastercard.webp" alt="MC" className="h-3 w-auto" />
+                                                                        <img src="/payments/amex.webp" alt="Amex" className="h-3 w-auto" />
+                                                                    </div>
+                                                                </div>
                                                                 <div className="md:hidden flex items-center gap-1.5 opacity-80 ml-1">
-                                                                    <img src="/payments/upi.webp" alt="UPI" className="h-2.5 w-auto" />
+                                                                    <img src="/payments/upi.webp" alt="UPI" className="h-2.5 w-auto dark:invert" />
                                                                     <img src="/payments/visa.webp" alt="Visa" className="h-2.5 w-auto" />
                                                                     <img src="/payments/mastercard.webp" alt="MC" className="h-2.5 w-auto" />
+                                                                    <img src="/payments/amex.webp" alt="Amex" className="h-2.5 w-auto" />
                                                                 </div>
                                                             </div>
+                                                            
                                                             <div className="flex items-center gap-3 shrink-0">
-                                                                <div className="hidden md:flex items-center gap-1.5 opacity-70">
-                                                                    <img src="/payments/upi.webp" alt="UPI" className="h-3.5 w-auto" />
-                                                                    <img src="/payments/visa.webp" alt="Visa" className="h-3.5 w-auto" />
-                                                                    <img src="/payments/mastercard.webp" alt="MC" className="h-3.5 w-auto" />
-                                                                </div>
-                                                                <div className="bg-emerald-50 md:bg-emerald-100 text-emerald-600 md:text-emerald-700 text-[8px] md:text-[9px] font-bold px-1.5 md:px-2 py-0.5 rounded uppercase tracking-wider">Recommended</div>
+                                                                <div className="bg-emerald-50 md:bg-emerald-100/80 text-emerald-600 md:text-emerald-700 text-[8px] md:text-[10px] font-black px-1.5 md:px-2.5 py-0.5 md:py-1 rounded uppercase tracking-wider">Recommended</div>
                                                             </div>
                                                         </button>
 
@@ -1142,23 +1173,31 @@ export default function CheckoutModal({
                                                     <button
                                                         onClick={() => setSelectedGateway('dodo')}
                                                         className={cn(
-                                                            "w-full h-[52px] md:h-16 px-4 rounded-xl border flex items-center justify-between transition-all group bg-white dark:bg-slate-900 md:bg-transparent",
+                                                            "w-full h-[52px] md:h-[92px] px-4 md:px-5 rounded-xl border flex items-center justify-between transition-all group bg-white dark:bg-slate-900 md:bg-transparent",
                                                             selectedGateway === 'dodo' ? "border-[#5022f5] md:border-indigo-600 bg-indigo-50/10 md:bg-indigo-50/30 dark:bg-indigo-500/10 shadow-sm" : "border-slate-200/80 md:border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
                                                         )}
                                                     >
-                                                        <div className="flex items-center gap-3">
-                                                            <div className={cn("w-4 h-4 rounded-full border-[1.5px] md:border-2 flex items-center justify-center", selectedGateway === 'dodo' ? "border-[#5022f5] md:border-indigo-600" : "border-slate-300 dark:border-slate-600")}>
-                                                                {selectedGateway === 'dodo' && <div className="w-2 h-2 rounded-full bg-[#5022f5] md:bg-indigo-600" />}
+                                                        <div className="flex items-center gap-3 md:gap-5">
+                                                            <div className={cn("w-4 h-4 md:w-5 md:h-5 rounded-full border-[1.5px] md:border-2 flex items-center justify-center shrink-0", selectedGateway === 'dodo' ? "border-[#5022f5] md:border-indigo-600" : "border-slate-300 dark:border-slate-600")}>
+                                                                {selectedGateway === 'dodo' && <div className="w-2 h-2 md:w-2.5 md:h-2.5 rounded-full bg-[#5022f5] md:bg-indigo-600" />}
                                                             </div>
-                                                            <img src="/payments/dodopayments.webp" alt="Dodo Payments" className="h-3.5 md:h-4 w-auto object-contain" />
+                                                            <div className="flex flex-col items-start gap-0.5 md:gap-1.5 mt-0.5 md:mt-0">
+                                                                <div className="flex items-center gap-2">
+                                                                    <img src="/payments/dodopayments.webp" alt="Dodo Payments" className="h-3.5 md:h-6 w-auto object-contain" />
+                                                                </div>
+                                                                <div className="hidden md:flex items-center gap-1.5 opacity-60">
+                                                                    <img src="/payments/stripe.webp" alt="Stripe" className="h-3 w-auto" />
+                                                                    <img src="/payments/visa.webp" alt="Visa" className="h-3 w-auto" />
+                                                                    <img src="/payments/mastercard.webp" alt="MC" className="h-3 w-auto" />
+                                                                    <img src="/payments/amex.webp" alt="Amex" className="h-3 w-auto" />
+                                                                    <img src="/payments/googlepay.webp" alt="Google Pay" className="h-3 w-auto dark:invert" />
+                                                                    <img src="/payments/applepay.webp" alt="Apple Pay" className="h-3 w-auto dark:invert" />
+                                                                </div>
+                                                            </div>
                                                         </div>
-                                                        <div className="flex items-center gap-3">
-                                                            <div className="hidden md:flex items-center gap-1.5 opacity-70">
-                                                                <img src="/payments/visa.webp" alt="Visa" className="h-3.5 w-auto" />
-                                                                <img src="/payments/mastercard.webp" alt="MC" className="h-3.5 w-auto" />
-                                                                <img src="/payments/applepay.webp" alt="Apple Pay" className="h-3.5 w-auto dark:invert" />
-                                                            </div>
-                                                            <div className="bg-emerald-50 md:bg-emerald-100 text-emerald-600 md:text-emerald-700 text-[8px] md:text-[9px] font-bold px-1.5 md:px-2 py-0.5 rounded uppercase tracking-wider">Recommended</div>
+                                                        
+                                                        <div className="flex items-center gap-3 shrink-0">
+                                                            <div className="bg-emerald-50 md:bg-emerald-100/80 text-emerald-600 md:text-emerald-700 text-[8px] md:text-[10px] font-black px-1.5 md:px-2.5 py-0.5 md:py-1 rounded uppercase tracking-wider">Recommended</div>
                                                         </div>
                                                     </button>
                                                 )}

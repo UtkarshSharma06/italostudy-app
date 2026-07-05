@@ -125,10 +125,11 @@ export default function MobileOnboarding() {
     useEffect(() => {
         const detectCountry = async () => {
             try {
-                const response = await fetch('https://ipapi.co/json/');
+                const response = await fetch('https://api.country.is/');
                 const data = await response.json();
-                if (data.country_code) {
-                    const country = countries.find(c => c.code.toLowerCase() === data.country_code.toLowerCase());
+                const countryCode = data.country;
+                if (countryCode) {
+                    const country = countries.find(c => c.code.toLowerCase() === countryCode.toLowerCase());
                     if (country) {
                         setCountryCode(country.code.toLowerCase());
                         setCountryDial(country.dial);

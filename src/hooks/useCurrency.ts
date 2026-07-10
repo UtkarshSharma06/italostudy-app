@@ -13,8 +13,8 @@ const DEFAULT_CURRENCY: CurrencyInfo = {
 };
 
 const COUNTRY_TO_CURRENCY: Record<string, string> = {
-    IN: 'INR', 
-    PK: 'PKR', 
+    IN: 'INR',
+    PK: 'PKR',
     BD: 'BDT'
     // All other countries will naturally fall back to 'EUR' in the code below
 };
@@ -40,7 +40,7 @@ export function useCurrency() {
             country: 'MANUAL'
         };
         setCurrency(newCurrency);
-        localStorage.setItem('userCurrency_v2', JSON.stringify({
+        localStorage.setItem('userCurrency_v3', JSON.stringify({
             data: newCurrency,
             timestamp: Date.now(),
             isManual: true
@@ -50,8 +50,8 @@ export function useCurrency() {
     useEffect(() => {
         const detectCurrency = async () => {
             try {
-                // 1. Check sessionStorage (fastest, prevents any re-fetch during active session)
-                const sessionCached = sessionStorage.getItem('userCurrency_v2');
+                // 1. Check sessionStorage (fastest, prevents re-fetch during active session)
+                const sessionCached = sessionStorage.getItem('userCurrency_v3');
                 if (sessionCached) {
                     try {
                         const parsedCache = JSON.parse(sessionCached);
@@ -65,15 +65,15 @@ export function useCurrency() {
                     }
                 }
 
-                // 2. Check localStorage cache (prevents fetch across tabs/reloads for 24 hours)
-                const cached = localStorage.getItem('userCurrency_v2');
+                // 2. Check localStorage cache (24-hour TTL, across tabs/reloads)
+                const cached = localStorage.getItem('userCurrency_v3');
                 if (cached) {
                     try {
                         const parsedCache = JSON.parse(cached);
                         const cacheAge = Date.now() - parsedCache.timestamp;
                         if (parsedCache.data && cacheAge < 24 * 60 * 60 * 1000) {
                             setCurrency(parsedCache.data);
-                        sessionStorage.setItem('userCurrency_v2', JSON.stringify(parsedCache)); // upgrade to session
+                            sessionStorage.setItem('userCurrency_v3', JSON.stringify(parsedCache)); // upgrade to session
                             setIsLoading(false);
                             return;
                         }
@@ -82,37 +82,54 @@ export function useCurrency() {
                     }
                 }
 
-                // 3. PRIMARY API: api.country.is (Best for localhost, CORS-friendly)
-                let data: any = null;
-                try {
-                    const response = await fetch('https://api.country.is/');
-                    data = await response.json();
-                } catch (e) {
-                    // SECONDARY API: ipapi.co
+                // 3. Sequential API waterfall with individual timeouts
+                //    Each API is tried independently — if one fails/times out,
+                //    the next one is tried immediately. Never nested catch blocks.
+                const TIMEOUT_MS = 4000;
+
+                const fetchWithTimeout = async (url: string): Promise<any> => {
+                    const controller = new AbortController();
+                    const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
                     try {
-                        const response = await fetch('https://ipapi.co/json/');
-                        data = await response.json();
-                    } catch (e2) {
-                        // TERTIARY API: ipwhois.app
-                        try {
-                            const response = await fetch('https://ipwhois.app/json/');
-                            data = await response.json();
-                        } catch (e3) {
-                            console.error('All IP detection APIs failed');
+                        const res = await fetch(url, { signal: controller.signal });
+                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        return await res.json();
+                    } finally {
+                        clearTimeout(timer);
+                    }
+                };
+
+                // Each entry has a dedicated field extractor for its specific response shape
+                const apis: Array<{ url: string; getCode: (d: any) => string | undefined }> = [
+                    { url: 'https://api.country.is/', getCode: (d) => d?.country },
+                    { url: 'https://ipapi.co/json/', getCode: (d) => d?.country_code },
+                    { url: 'https://ipwhois.app/json/', getCode: (d) => d?.country_code },
+                ];
+
+                let countryCode: string | undefined;
+                for (const api of apis) {
+                    try {
+                        const data = await fetchWithTimeout(api.url);
+                        const code = api.getCode(data);
+                        // Strictly validate: must be a non-empty 2-letter ISO country code
+                        if (code && typeof code === 'string' && code.trim().length === 2) {
+                            countryCode = code.trim().toUpperCase();
+                            break; // Valid code found — stop trying
                         }
+                    } catch {
+                        // API failed, timed out, returned bad data, or non-ok status — try next
+                        continue;
                     }
                 }
 
-                if (data && (data.status === 'success' || data.success !== false || data.status !== 'fail' || data.country)) {
-                    const countryCode = data.countryCode || data.country_code || data.country;
-                    
+                if (countryCode) {
                     const currencyCode = COUNTRY_TO_CURRENCY[countryCode] || 'EUR';
                     const symbolMap: Record<string, string> = { 'EUR': '€', 'INR': '₹', 'USD': '$', 'GBP': '£', 'PKR': '₨', 'BDT': '৳' };
-                    
+
                     const currencyInfo: CurrencyInfo = {
                         code: currencyCode,
                         symbol: symbolMap[currencyCode] || currencyCode,
-                        country: countryCode || 'XX'
+                        country: countryCode
                     };
 
                     // Cache the result in both storages
@@ -121,18 +138,18 @@ export function useCurrency() {
                         timestamp: Date.now(),
                         isManual: false
                     });
-                    localStorage.setItem('userCurrency_v2', cachePayload);
-                    sessionStorage.setItem('userCurrency_v2', cachePayload);
+                    localStorage.setItem('userCurrency_v3', cachePayload);
+                    sessionStorage.setItem('userCurrency_v3', cachePayload);
 
                     setCurrency(currencyInfo);
                 } else {
-                    // Final Guess: Navigator Language
+                    // All APIs failed — final fallback: Navigator Language
                     const language = navigator.language;
                     const region = language.split('-')[1];
-                    const currencyCode = COUNTRY_TO_CURRENCY[region] || 'EUR';
+                    const currencyCode = (region && COUNTRY_TO_CURRENCY[region.toUpperCase()]) || 'EUR';
                     const symbolMap: Record<string, string> = { 'EUR': '€', 'INR': '₹', 'USD': '$', 'GBP': '£', 'PKR': '₨', 'BDT': '৳' };
-                    
-                    const guessedInfo = {
+
+                    const guessedInfo: CurrencyInfo = {
                         code: currencyCode,
                         symbol: symbolMap[currencyCode] || currencyCode,
                         country: region || 'XX'
@@ -170,7 +187,6 @@ export function useCurrency() {
 
             // 2. Fetch Live Rates
             try {
-                // Use a reliable proxy/API
                 const response = await fetch('https://api.exchangerate-api.com/v4/latest/EUR');
                 const data = await response.json();
 
@@ -191,7 +207,14 @@ export function useCurrency() {
 
     const convertPrice = useCallback((priceInEUR: number): number => {
         const fallbackRates: Record<string, number> = {
-            'EUR': 1, 'USD': 1.08, 'GBP': 0.86, 'INR': 106.6, 'NGN': 1750, 'TRY': 33.5
+            'EUR': 1,
+            'USD': 1.08,
+            'GBP': 0.86,
+            'INR': 106.6,
+            'PKR': 302.0,
+            'BDT': 117.0,
+            'NGN': 1750,
+            'TRY': 33.5
         };
 
         const rate = rates[currency.code] || fallbackRates[currency.code];
@@ -205,7 +228,14 @@ export function useCurrency() {
 
     const getPaymentDetails = useCallback((amountInEUR: number) => {
         const fallbackRates: Record<string, number> = {
-            'EUR': 1, 'USD': 1.08, 'GBP': 0.86, 'INR': 106.6, 'NGN': 1750, 'TRY': 33.5
+            'EUR': 1,
+            'USD': 1.08,
+            'GBP': 0.86,
+            'INR': 106.6,
+            'PKR': 302.0,
+            'BDT': 117.0,
+            'NGN': 1750,
+            'TRY': 33.5
         };
         const rate = rates[currency.code] || fallbackRates[currency.code];
 
@@ -233,7 +263,7 @@ export function useCurrency() {
             return new Intl.NumberFormat(undefined, {
                 style: 'currency',
                 currency: details.currency,
-                minimumFractionDigits: (details.currency === 'INR' || details.currency === 'IDR' || details.currency === 'TRY') ? 0 : 2,
+                minimumFractionDigits: (details.currency === 'INR' || details.currency === 'IDR' || details.currency === 'TRY' || details.currency === 'PKR' || details.currency === 'BDT') ? 0 : 2,
                 maximumFractionDigits: 2
             }).format(details.amount);
         } catch (e) {

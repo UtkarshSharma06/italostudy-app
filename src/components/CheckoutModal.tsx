@@ -9,6 +9,7 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { usePricing } from '@/context/PricingContext';
 import { useCurrency } from '@/hooks/useCurrency';
+import { useAuth } from '@/lib/auth';
 import { DodoPayments } from 'dodopayments-checkout';
 
 interface CheckoutModalProps {
@@ -125,6 +126,23 @@ export default function CheckoutModal({
     const [isProcessing, setIsProcessing] = useState(false);
     const [selectedGateway, setSelectedGateway] = useState<string | null>(null);
     const { getPaymentDetails, formatPrice, getRegionalPrice, currency: currentCurrency } = useCurrency();
+    const { user } = useAuth() as any;
+    const [hasLoggedAbandonment, setHasLoggedAbandonment] = useState(false);
+
+    useEffect(() => {
+        if (isOpen) {
+            setHasLoggedAbandonment(false);
+        } else if (!isOpen && !isProcessing && !hasLoggedAbandonment && user) {
+            setHasLoggedAbandonment(true);
+            supabase.from('checkout_abandonments').insert({
+                user_id: user.id,
+                email: user.email,
+                plan_name: planName
+            }).then(({ error }) => {
+                if (error) console.error("Failed to log checkout abandonment:", error);
+            });
+        }
+    }, [isOpen, isProcessing, hasLoggedAbandonment, user, planName]);
 
     const getDurationLabel = () => {
         if (actualDurationValue && actualDurationUnit) {
@@ -978,7 +996,7 @@ export default function CheckoutModal({
                         style={{ willChange: 'transform, opacity' }}
                         className="fixed inset-0 flex items-center justify-center z-[210] p-0 pointer-events-none"
                     >
-                        <div className="w-full h-[100dvh] md:h-auto md:min-h-[600px] max-w-[1000px] max-h-[100dvh] bg-[#f8f9fc] md:bg-white dark:bg-slate-950 md:dark:bg-slate-900 md:rounded-2xl shadow-2xl overflow-hidden pointer-events-auto border-0 md:border md:border-slate-100 dark:border-slate-800 flex flex-col relative font-sans">
+                        <div className="w-full h-[100dvh] md:h-auto md:min-h-[600px] max-w-[1000px] max-h-[100dvh] bg-[#f8f9fc] md:bg-white dark:bg-slate-950 md:dark:bg-slate-900 md:rounded-none shadow-2xl overflow-hidden pointer-events-auto border-0 md:border md:border-slate-100 dark:border-slate-800 flex flex-col relative font-sans">
                             {/* Header row (Title + Close) */}
                             <div className="px-5 md:px-8 pt-12 md:pt-8 pb-4 flex items-start justify-between shrink-0 bg-[#f8f9fc] md:bg-transparent dark:bg-slate-950 md:dark:bg-transparent">
                                 <div className="flex flex-col">

@@ -111,6 +111,10 @@
         @apply border-border;
     }
 
+    html {
+        overflow-y: scroll;
+    }
+
     body {
         @apply bg-background text-foreground antialiased tracking-tight;
         font-family: 'Outfit', 'Inter', sans-serif;

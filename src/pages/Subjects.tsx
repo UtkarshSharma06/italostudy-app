@@ -207,7 +207,7 @@ export default function Subjects() {
         <Layout isLoading={loading}>
             <div className="container mx-auto px-4 sm:px-6 py-8 max-w-7xl">
                 {/* Header (Sleek Modern) */}
-                <div className="text-center mb-10 space-y-4 animate-in fade-in fill-mode-both duration-700">
+                <div className="text-center mb-10 space-y-4">
                     <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black tracking-tighter text-slate-900 dark:text-slate-100 leading-tight">
                         <span className="bg-gradient-to-r from-indigo-600 to-indigo-400 bg-clip-text text-transparent">
                             {activeExam?.name}

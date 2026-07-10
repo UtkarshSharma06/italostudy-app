@@ -55,6 +55,30 @@ export default function BundleCheckoutModal({ course, plan, onClose }: BundleChe
     const paypalContainerRef = useRef<HTMLDivElement>(null);
     const paypalRendered = useRef(false);
 
+    const abandonmentTracked = useRef(false);
+    const isProcessingRef = useRef(isProcessing);
+    const stateRef = useRef(state);
+    
+    useEffect(() => {
+        isProcessingRef.current = isProcessing;
+        stateRef.current = state;
+    }, [isProcessing, state]);
+
+    useEffect(() => {
+        return () => {
+            if (!isProcessingRef.current && !abandonmentTracked.current && user && stateRef.current === 'select') {
+                abandonmentTracked.current = true;
+                supabase.from('checkout_abandonments').insert({
+                    user_id: user.id,
+                    email: user.email,
+                    plan_name: `Bundle: ${course.title} + ${plan.name}`
+                }).then(({ error }) => {
+                    if (error) console.error("Failed to log checkout abandonment:", error);
+                });
+            }
+        };
+    }, [user, course.title, plan.name]);
+
     const getPlanCycle = (plan: Plan) => {
         if (plan.cycles && plan.cycles.length > 0) {
             const index = billingCycle === 'monthly' ? 0 : 1;

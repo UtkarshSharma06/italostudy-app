@@ -562,10 +562,10 @@ export default function PricingModal() {
                                 const regionalInfo = getRegionalPrice(planPrice, globalCycle?.regionalPrices || globalPlan?.regionalPrices);
 
                                 const leftFeatures = [
-                                    { title: "Unlimited Practice", sub: "Access unlimited practice questions", icon: FileText, color: "bg-indigo-600", iconColor: "text-white" },
+                                    { title: "Unlimited Practice", sub: "Access unlimited practice questions", icon: Brain, color: "bg-indigo-600", iconColor: "text-white" },
                                     { title: "Mock Simulations", sub: "Full-length mocks with analysis", icon: Target, color: "bg-blue-500", iconColor: "text-white" },
-                                    { title: "Detailed Explanations", sub: "Step-by-step solutions", icon: FileText, color: "bg-teal-500", iconColor: "text-white" },
-                                    { title: "Premium Learning", sub: "Watch all concept videos", icon: PlaySquare, color: "bg-rose-500", iconColor: "text-white" },
+                                    { title: "Detailed Explanations", sub: "Step-by-step solutions", icon: Sparkles, color: "bg-teal-500", iconColor: "text-white" },
+                                    { title: "Premium Notes & PDFs", sub: "Download high-quality study material", icon: FileText, color: "bg-orange-500", iconColor: "text-white" },
                                     { title: "Advanced Analytics", sub: "Track performance in detail", icon: BarChart2, color: "bg-amber-500", iconColor: "text-white" },
                                     { title: "24/7 Cent-s Slot Tracker", sub: "Never miss a test slot", icon: Zap, color: "bg-purple-500", iconColor: "text-white" },
                                     { title: "Multi-Device", sub: "Learn on any screen", icon: Globe, color: "bg-cyan-500", iconColor: "text-white" },

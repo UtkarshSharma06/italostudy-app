@@ -1033,13 +1033,11 @@ export default function Dashboard() {
     // This prevents the Sidebar/Header from flickering between Auth Loading and Data Loading.
     return (
         <Layout isLoading={loading || isDashboardLoading}>
-            {!(loading || isDashboardLoading) && (
-                <>
-                    <LatestNotificationPopup />
+            {/* Notifications outside the main colored wrapper so they sit at the very top under the header */}
+            <LatestNotificationPopup />
 
-
-                    {/* Active Test Resume Strip */}
-            {activeTest && !isTestNotificationDismissed && (
+            {/* Active Test Resume Strip */}
+            {!loading && !isDashboardLoading && activeTest && !isTestNotificationDismissed && (
                 <div className="sticky top-0 z-50 bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 shadow-lg shadow-indigo-900/20 border-b border-white/10">
                     <div className="max-w-7xl mx-auto px-4 md:px-6">
                         <div className="flex items-center gap-3 py-2.5">
@@ -1084,7 +1082,7 @@ export default function Dashboard() {
             )}
 
             {/* Resolved Question Reports Banner */}
-            {resolvedReports.length > 0 && (
+            {!loading && !isDashboardLoading && resolvedReports.length > 0 && (
                 <div className="bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-500/30">
                     <div className="max-w-7xl mx-auto px-4 md:px-6 py-3 flex items-center justify-between gap-4">
                         <div className="flex items-center gap-3">
@@ -1108,6 +1106,10 @@ export default function Dashboard() {
             )}
 
             <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+                {(loading || isDashboardLoading) ? (
+                    <DesktopDashboardSkeleton />
+                ) : (
+                    <>
                 {/* â”€â”€ HERO GREETING BANNER â”€â”€ */}
                 <div className="relative overflow-hidden bg-gradient-to-r from-orange-400 via-rose-500 to-purple-600 dark:from-orange-600 dark:via-rose-700 dark:to-purple-800">
                     <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_50%,rgba(255,255,255,0.08),transparent_60%)]" />
@@ -1204,15 +1206,15 @@ export default function Dashboard() {
                             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-5 shadow-sm">
                                 <div className="flex items-center overflow-x-auto gap-4 pb-1 scrollbar-none">
                                     {[
-                                        { label: 'Learning', icon: GraduationCap, path: '/learning', color: 'bg-violet-100 dark:bg-violet-900/30 text-violet-600', isSoon: true },
-                                        { label: 'Practice', icon: Pencil, path: '/practice', color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600' },
+                                        { label: 'Courses', icon: GraduationCap, path: '/courses', color: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600' },
+                                        { label: 'Practice', icon: Pencil, path: '/practice', color: 'bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600' },
                                         { label: 'Mocks', icon: ClipboardList, path: '/mock-exams', color: 'bg-rose-100 dark:bg-rose-900/30 text-rose-600' },
-                                        { label: 'Bookmarks', icon: Bookmark, path: '/bookmarks', color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-600' },
-                                        { label: 'Resources', icon: FileText, path: '/resources', color: 'bg-pink-100 dark:bg-pink-900/30 text-pink-600' },
+                                        { label: 'Bookmarks', icon: Bookmark, path: '/bookmarks', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600' },
+                                        { label: 'Resources', icon: FileText, path: '/resources', color: 'bg-fuchsia-100 dark:bg-fuchsia-900/30 text-fuchsia-600' },
                                         { label: 'History', icon: History, path: '/history', color: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-600' },
                                         { label: 'Analytics', icon: BarChart3, path: '/analytics', color: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600' },
                                         { label: 'Chat', icon: MessageCircle, path: '/community', color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600' },
-                                        { label: 'Blogs', icon: BookOpen, path: '/blog', color: 'bg-amber-100 dark:bg-amber-900/30 text-amber-600' },
+                                        { label: 'Blogs', icon: BookOpen, path: '/blog', color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-600' },
                                     ]
                                     .map((item) => {
                                         const isExternalStatic = ['/resources', '/blog'].includes(item.path);
@@ -1248,7 +1250,7 @@ export default function Dashboard() {
                             {/* Stats Row */}
                             <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
                                 {[
-                                    { label: 'Total Solved', value: stats.solved, icon: Search, gradient: 'from-indigo-500 to-indigo-700' },
+                                    { label: 'Total Solved', value: stats.solved, icon: CheckCircle2, gradient: 'from-indigo-500 to-indigo-700' },
                                     { label: 'Mock Exams', value: stats.mockExams, icon: ClipboardList, gradient: 'from-rose-500 to-rose-700' },
                                     { label: 'Streak', value: stats.streak, icon: Zap, suffix: 'd', gradient: 'from-orange-500 to-orange-700' },
                                     { label: 'Avg Time', value: stats.avgTime, icon: Clock, suffix: 's', gradient: 'from-cyan-500 to-cyan-700' },
@@ -1304,26 +1306,23 @@ export default function Dashboard() {
                                             <div className="flex items-center gap-2 mb-3">
                                                 <Play className="w-4 h-4 text-white fill-white" />
                                                 <span className="text-[10px] font-black text-white/80 uppercase tracking-widest">
-                                                    {lastProgress ? 'Continue Learning' : 'Start Learning'}
+                                                    {lastProgress ? 'Continue Course' : 'Start Course'}
                                                 </span>
                                                 <span className="ml-auto text-[8px] bg-white/20 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-widest">Video</span>
                                             </div>
                                             <h3 className="text-white font-black text-base leading-tight mb-1 truncate">
-                                                {lastProgress?.title || 'Start Video Lessons'}
+                                                {lastProgress?.title || 'Explore Courses'}
                                             </h3>
                                             <p className="text-white/70 text-xs font-bold mb-4">
-                                                {lastProgress ? 'Pick up right where you left off' : 'Jump into your first video lesson'}
+                                                {lastProgress ? 'Pick up right where you left off' : 'Jump into your first course'}
                                             </p>
                                             <button
                                                 onClick={() => {
-                                                    toast({
-                                                        title: 'Under Development',
-                                                        description: 'Video courses are currently under development and will be available soon.',
-                                                    });
+                                                    navigate('/courses');
                                                 }}
                                                 className="flex items-center gap-2 bg-white text-orange-600 font-black text-xs uppercase tracking-widest px-4 py-2 rounded-xl hover:bg-orange-50 transition-colors shadow-sm"
                                             >
-                                                {lastProgress ? 'Resume Lecture' : 'Start Watching'} <ArrowRight className="w-3 h-3" />
+                                                {lastProgress ? 'Resume Course' : 'Start Watching'} <ArrowRight className="w-3 h-3" />
                                             </button>
                                         </div>
                                     </div>
@@ -1337,17 +1336,14 @@ export default function Dashboard() {
                                                 <span className="ml-auto text-[8px] bg-white/20 text-white px-2 py-0.5 rounded-full font-black uppercase tracking-widest">Courses</span>
                                             </div>
                                             <h3 className="text-white font-black text-base leading-tight mb-1">
-                                                Start Video Lessons
+                                                Explore Courses
                                             </h3>
                                             <p className="text-white/80 text-xs font-bold mb-4 pr-4 leading-tight">
-                                                Browse expert-led video courses and unlock full study materials.
+                                                Browse expert-led courses and unlock full study materials.
                                             </p>
                                             <button
                                                 onClick={() => {
-                                                    toast({
-                                                        title: 'Under Development',
-                                                        description: 'Video courses are currently under development and will be available soon.',
-                                                    });
+                                                    navigate('/courses');
                                                 }}
                                                 className="w-full sm:w-auto flex justify-center items-center gap-2 bg-white text-indigo-600 font-black text-xs uppercase tracking-widest px-4 py-2 rounded-xl hover:bg-indigo-50 transition-colors shadow-sm"
                                             >
@@ -1723,9 +1719,9 @@ export default function Dashboard() {
                         )}
                     </div>
                 </div>
-                </div>
-                </>
-            )}
+                    </>
+                )}
+            </div>
 
             <SeatTrackerModal isOpen={isTrackerModalOpen} onClose={() => setIsTrackerModalOpen(false)} isGlobal={isElite || isGlobal} isExpired={isSubscriptionExpired} />
             <TrustpilotReviewModal

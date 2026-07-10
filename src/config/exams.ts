@@ -14,7 +14,8 @@ export interface ExamSection {
 }
 
 export interface ExamConfig {
-    id: string;
+    id: string; // The slug (e.g. 'cent-s')
+    dbId?: string; // The UUID in the exams table
     name: string;
     durationMinutes: number;
     totalQuestions: number;

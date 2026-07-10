@@ -80,6 +80,7 @@ const MobileSidebar: React.FC<MobileSidebarProps> = ({ isOpen, onOpenChange }) =
 
     const learningActions = [
         { icon: BookOpen, label: 'Subjects', sub: 'Explore all topics', path: '/mobile/subjects', color: 'text-indigo-600 dark:text-indigo-400', bg: 'bg-indigo-100 dark:bg-indigo-500/20' },
+        { icon: FileText, label: 'Notes & PDFs', sub: 'Study materials', path: '/mobile/notes', color: 'text-purple-600 dark:text-purple-400', bg: 'bg-purple-100 dark:bg-purple-500/20' },
         { icon: ClipboardList, label: 'Exams', sub: 'Past year papers', path: '/exams', color: 'text-rose-600 dark:text-rose-400', bg: 'bg-rose-100 dark:bg-rose-500/20' },
         { icon: History, label: 'History', sub: 'Your activity', path: '/mobile/history', color: 'text-emerald-600 dark:text-emerald-400', bg: 'bg-emerald-100 dark:bg-emerald-500/20' },
         { icon: Bookmark, label: 'Bookmarks', sub: 'Saved content', path: '/mobile/bookmarks', color: 'text-blue-600 dark:text-blue-400', bg: 'bg-blue-100 dark:bg-blue-500/20' },

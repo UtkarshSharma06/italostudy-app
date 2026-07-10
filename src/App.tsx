@@ -6,7 +6,7 @@ import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 import { SpeedInsights as VercelSpeedInsights } from "@vercel/speed-insights/react";
 import { Capacitor } from '@capacitor/core';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, HashRouter, Routes, Route, Navigate, useNavigate, useParams } from "react-router-dom";
+import { BrowserRouter, HashRouter, Routes, Route, Navigate, useNavigate, useParams, Outlet } from "react-router-dom";
 import { AuthProvider } from "@/lib/auth";
 import { ThemeProvider, useTheme } from "next-themes";
 import { lazy, Suspense, useEffect, useState } from "react";
@@ -49,20 +49,26 @@ import GlobalErrorBoundary from "@/components/GlobalErrorBoundary";
 import { useDashboardPrefetch } from "@/hooks/useDashboardPrefetch";
 // Delayed Import for better TTI
 const PricingModal = lazy(() => import("@/components/PricingModal"));
+import Layout from "@/components/Layout";
+
+import Dashboard from "./pages/Dashboard";
+import Practice from "./pages/Practice";
+import MockExams from "./pages/MockExams";
+import Analytics from "./pages/Analytics";
+import History from "./pages/History";
+import Bookmarks from "./pages/Bookmarks";
+import NotesAndPdfs from "./pages/NotesAndPdfs";
+import Community from "./pages/Community";
+import Courses from "./pages/Courses";
 
 // Lazy Load Pages
 const Auth = lazy(() => import("./pages/Auth"));
-const Dashboard = lazy(() => import("./pages/Dashboard"));
 const Subjects = lazy(() => import("./pages/Subjects"));
-const Practice = lazy(() => import("./pages/Practice"));
-const MockExams = lazy(() => import("./pages/MockExams"));
-const Analytics = lazy(() => import("./pages/Analytics"));
 const Labs = lazy(() => import("./pages/Labs"));
 const Test = lazy(() => import("./pages/Test"));
 const Results = lazy(() => import("./pages/Results"));
-const History = lazy(() => import("./pages/History"));
 const ResetPassword = lazy(() => import("./pages/ResetPassword"));
-const Bookmarks = lazy(() => import("./pages/Bookmarks"));
+const SubjectNotes = lazy(() => import("./pages/SubjectNotes"));
 
 const InternationalMockWaitingRoom = lazy(() => import("./pages/InternationalMockWaitingRoom"));
 const NotFound = lazy(() => import("./pages/NotFound"));
@@ -84,7 +90,6 @@ const Settings = lazy(() => import("./pages/Settings"));
 const IELTSFlow = lazy(() => import("./pages/IELTSFlow"));
 const MockExamResults = lazy(() => import("./pages/MockExamResults"));
 const MockGuidelines = lazy(() => import("./pages/MockGuidelines"));
-const Community = lazy(() => import("./pages/Community"));
 const Onboarding = lazy(() => import("./pages/Onboarding"));
 const Concierge = lazy(() => import("./pages/Concierge"));
 const ConsultantDashboard = lazy(() => import("./pages/ConsultantDashboard"));
@@ -104,7 +109,6 @@ const Billing = lazy(() => import("./pages/Billing"));
 const DetailedAnalysis = lazy(() => import("./pages/DetailedAnalysis"));
 const StudyPlanner = lazy(() => import("./pages/StudyPlanner"));
 const PaymentCallback = lazy(() => import("./pages/PaymentCallback"));
-const Courses = lazy(() => import("./pages/Courses"));
 const CourseDetail = lazy(() => import("./pages/CourseDetail"));
 const CourseCheckout = lazy(() => import("./pages/CourseCheckout"));
 const CourseSubjectView = lazy(() => import("./pages/CourseSubjectView"));
@@ -157,6 +161,8 @@ const MobileMockGuidelines = lazy(() => import("./mobile/pages/MobileMockGuideli
 const PublicSolutions = lazy(() => import("./pages/PublicSolutions"));
 
 const MobileBookmarks = lazy(() => import("./mobile/pages/MobileBookmarks"));
+const MobileNotesAndPdfs = lazy(() => import("./mobile/pages/MobileNotesAndPdfs"));
+const MobileSubjectNotes = lazy(() => import("./mobile/pages/MobileSubjectNotes"));
 const MobileLayout = lazy(() => import("./mobile/components/MobileLayout"));
 const MobileIELTSPlayer = lazy(() => import("./mobile/pages/MobileIELTSPlayer"));
 const MobileSpeakingLobby = lazy(() => import("./mobile/pages/MobileSpeakingLobby"));
@@ -278,37 +284,40 @@ const WebRouter = ({ user, authLoading }: { user: any, authLoading: boolean }) =
     {/* Entry Points */}
     <Route path="/" element={
       authLoading ? <PageLoader /> : 
-      user ? <ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin']}><Dashboard /></ProtectedRoute> : 
+      user ? <Navigate to="/dashboard" replace /> : 
       <Navigate to="/auth" replace />
     } />
-    <Route path="/dashboard" element={<Navigate to="/" replace />} />
     <Route path="/auth" element={<Auth />} />
     <Route path="/reset-password" element={<ResetPassword />} />
     
     {/* Core Student Features */}
     <Route path="/onboarding" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Onboarding /></ProtectedRoute>} />
-    <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin']}><Dashboard /></ProtectedRoute>} />
-    <Route path="/community" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Community /></ProtectedRoute>} />
     <Route path="/community/upgrade" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><CommunityUpgrade /></ProtectedRoute>} />
-    <Route path="/subjects" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Subjects /></ProtectedRoute>} />
-    <Route path="/practice" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Practice /></ProtectedRoute>} />
-    <Route path="/mock-exams" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MockExams /></ProtectedRoute>} />
-    <Route path="/analytics" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Analytics /></ProtectedRoute>} />
     <Route path="/labs" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Labs /></ProtectedRoute>} />
     <Route path="/test/:testId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Test /></ProtectedRoute>} />
     <Route path="/results/:testId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Results /></ProtectedRoute>} />
-    <Route path="/history" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><History /></ProtectedRoute>} />
-    <Route path="/settings" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Settings /></ProtectedRoute>} />
     <Route path="/billing" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Billing /></ProtectedRoute>} />
-    <Route path="/bookmarks" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Bookmarks /></ProtectedRoute>} />
+    <Route path="/notes/:subjectId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><SubjectNotes /></ProtectedRoute>} />
     <Route path="/study-planner" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><StudyPlanner /></ProtectedRoute>} />
-
-    {/* Study & Content Cluster */}
     <Route path="/learning" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Learning /></ProtectedRoute>} />
     <Route path="/start-test" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><StartTest /></ProtectedRoute>} />
 
+    {/* Persistent Sidebar Tabs (No Flicker) */}
+    <Route element={<Layout><Outlet /></Layout>}>
+      <Route path="/dashboard" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin']}><Dashboard /></ProtectedRoute>} />
+      <Route path="/subjects" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Subjects /></ProtectedRoute>} />
+      <Route path="/community" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Community /></ProtectedRoute>} />
+      <Route path="/practice" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Practice /></ProtectedRoute>} />
+      <Route path="/mock-exams" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MockExams /></ProtectedRoute>} />
+      <Route path="/analytics" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Analytics /></ProtectedRoute>} />
+      <Route path="/history" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><History /></ProtectedRoute>} />
+      <Route path="/settings" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Settings /></ProtectedRoute>} />
+      <Route path="/bookmarks" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Bookmarks /></ProtectedRoute>} />
+      <Route path="/notes" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><NotesAndPdfs /></ProtectedRoute>} />
+      <Route path="/courses" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Courses /></ProtectedRoute>} />
+    </Route>
+
     {/* Courses Cluster */}
-    <Route path="/courses" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Courses /></ProtectedRoute>} />
     <Route path="/courses/:courseId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><CourseDetail /></ProtectedRoute>} />
     <Route path="/courses/:courseId/checkout" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><CourseCheckout /></ProtectedRoute>} />
     <Route path="/courses/:courseId/subject/:subjectId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><CourseSubjectView /></ProtectedRoute>} />
@@ -409,6 +418,8 @@ const MobileRouter = ({ user, isNative, authLoading }: { user: any, isNative: bo
         <Route path="/mobile/mock-exams" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileMockExams /></ProtectedRoute>} />
         <Route path="/mobile/history" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileHistory /></ProtectedRoute>} />
         <Route path="/mobile/bookmarks" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileBookmarks /></ProtectedRoute>} />
+        <Route path="/mobile/notes" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileNotesAndPdfs /></ProtectedRoute>} />
+        <Route path="/mobile/notes/:subjectId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileSubjectNotes /></ProtectedRoute>} />
 
         {/* Consultant & University (Mobile Native) */}
         <Route path="/mobile/apply-university" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileConcierge /></ProtectedRoute>} />
@@ -451,6 +462,7 @@ const MobileRouter = ({ user, isNative, authLoading }: { user: any, isNative: bo
         <Route path="/mock-exams" element={<Navigate to="/mobile/mock-exams" replace />} />
         <Route path="/history" element={<Navigate to="/mobile/history" replace />} />
         <Route path="/bookmarks" element={<Navigate to="/mobile/bookmarks" replace />} />
+        <Route path="/notes" element={<Navigate to="/mobile/notes" replace />} />
         <Route path="/study-planner" element={<Navigate to="/mobile/study-planner" replace />} />
         <Route path="/practice" element={<Navigate to="/mobile/practice" replace />} />
         <Route path="/analytics" element={<Navigate to="/mobile/analytics" replace />} />

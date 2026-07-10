@@ -16,7 +16,7 @@ const ExamContext = createContext<ExamContextType | undefined>(undefined);
 // ─── Exam Cache ──────────────────────────────────────────────────────────────
 // Exam structure (sections, scoring, syllabus) almost never changes.
 // Cache it in localStorage for 1 hour to eliminate a Supabase call on every navigation.
-const EXAM_CACHE_KEY = 'italostudy_exams_cache';
+const EXAM_CACHE_KEY = 'italostudy_exams_cache_v2';
 const EXAM_CACHE_TTL = 1000 * 60 * 60; // 1 hour
 
 function readExamCache(): Record<string, ExamConfig> | null {
@@ -64,6 +64,7 @@ export const ExamProvider: React.FC<{ children: React.ReactNode }> = ({ children
             data?.forEach(exam => {
                 examsMap[exam.slug] = {
                     id: exam.slug,
+                    dbId: exam.id,
                     name: exam.name,
                     durationMinutes: exam.duration_minutes,
                     totalQuestions: exam.total_questions,

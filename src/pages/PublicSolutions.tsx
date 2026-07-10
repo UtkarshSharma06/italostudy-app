@@ -20,7 +20,8 @@ import {
     Star,
     PlayCircle,
     Copy,
-    Check
+    Check,
+    Lock
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Question, MediaContent } from '@/types/test';
@@ -29,6 +30,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useAuth } from '@/lib/auth';
 import { AuthModal } from '@/components/auth/AuthModal';
 import { useToast } from '@/hooks/use-toast';
+import { usePricing } from '@/context/PricingContext';
 import {
   Sheet,
   SheetContent,
@@ -40,8 +42,9 @@ import {
 export default function PublicSolutions() {
     const { sessionId } = useParams<{ sessionId: string }>();
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const { user, profile } = useAuth() as any;
     const { toast } = useToast();
+    const { openPricingModal } = usePricing();
     
     const [session, setSession] = useState<any>(null);
     const [questions, setQuestions] = useState<any[]>([]);
@@ -51,6 +54,7 @@ export default function PublicSolutions() {
     const [activeTab, setActiveTab] = useState<'quest' | 'passage'>('passage');
     const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
     const [isShared, setIsShared] = useState(false);
+    const [pendingUpgrade, setPendingUpgrade] = useState(false);
 
     useEffect(() => {
         if (sessionId) {
@@ -104,6 +108,16 @@ export default function PublicSolutions() {
             else setActiveTab('quest');
         }
     }, [currentIndex]);
+
+    // Handle pending upgrade after login
+    useEffect(() => {
+        if (pendingUpgrade && user && profile) {
+            setPendingUpgrade(false);
+            if (profile.selected_plan !== 'global' && profile.selected_plan !== 'premium') {
+                openPricingModal();
+            }
+        }
+    }, [user, profile, pendingUpgrade, openPricingModal]);
 
     const handleAttemptMock = () => {
         navigate(`/waiting-room/${sessionId}`);
@@ -217,7 +231,9 @@ export default function PublicSolutions() {
             <AuthModal 
                 isOpen={isAuthModalOpen} 
                 onClose={() => setIsAuthModalOpen(false)} 
-                onSuccess={() => navigate(`/waiting-room/${sessionId}`)}
+                onSuccess={() => {
+                    setIsAuthModalOpen(false);
+                }}
             />
 
             {/* --- Premium Navbar --- */}
@@ -330,7 +346,7 @@ export default function PublicSolutions() {
                 </AnimatePresence>
 
                 {/* --- Main Solution Content --- */}
-                <main className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-hidden bg-white relative">
+                <main className="flex-1 min-h-0 flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden bg-white relative">
                     {/* Passage Pane (Desktop: Left, Mobile: Stacks on top) */}
                     <AnimatePresence mode="wait">
                         {currentQuestion.passage && (
@@ -338,7 +354,7 @@ export default function PublicSolutions() {
                                 initial={{ opacity: 0, y: 20 }}
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -20 }}
-                                className="w-full lg:w-1/2 flex flex-col bg-slate-50 border-b lg:border-b-0 lg:border-r border-slate-100 shrink-0 overflow-hidden"
+                                className="w-full lg:w-1/2 flex flex-col bg-slate-50 border-b lg:border-b-0 lg:border-r border-slate-100 shrink-0 lg:overflow-hidden"
                             >
                                 <div className="h-12 border-b bg-white/50 px-6 flex items-center shrink-0">
                                     <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600 flex items-center gap-2">
@@ -347,7 +363,7 @@ export default function PublicSolutions() {
                                     </h4>
                                 </div>
                                 
-                                <div ref={passageRef} className="flex-1 overflow-y-auto p-6 lg:p-12 custom-scrollbar">
+                                <div ref={passageRef} className="lg:flex-1 lg:overflow-y-auto p-6 lg:p-12 custom-scrollbar">
                                     <motion.div 
                                         key={currentIndex + '_passage'}
                                         initial={{ opacity: 0 }}
@@ -372,7 +388,7 @@ export default function PublicSolutions() {
                     </AnimatePresence>
 
                     {/* Question Pane (Desktop: Right, Mobile: Stacks below passage) */}
-                    <div className="flex-1 min-h-0 flex flex-col bg-white overflow-hidden">
+                    <div className="flex-1 min-h-0 flex flex-col bg-white lg:overflow-hidden">
                         <div className="h-12 border-b px-6 flex items-center shrink-0 bg-white z-10">
                             <h4 className="text-[10px] font-black uppercase tracking-[0.2em] text-indigo-600 flex items-center gap-2">
                                 <CheckCircle2 size={14} />
@@ -380,7 +396,7 @@ export default function PublicSolutions() {
                             </h4>
                         </div>
 
-                        <div ref={contentRef} className="flex-1 overflow-y-auto p-6 lg:p-12 custom-scrollbar pb-32">
+                        <div ref={contentRef} className="lg:flex-1 lg:overflow-y-auto p-6 lg:p-12 custom-scrollbar pb-32">
                             <motion.div
                                 key={currentIndex + '_question'}
                                 initial={{ opacity: 0, x: 20 }}
@@ -462,21 +478,69 @@ export default function PublicSolutions() {
                                     <div className="absolute -inset-4 lg:-inset-10 bg-indigo-600/5 rounded-[2rem] lg:rounded-[3rem] -z-10" />
                                     
                                     <div className="space-y-4 lg:space-y-6">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-8 h-8 lg:w-10 lg:h-10 bg-indigo-600 rounded-xl lg:rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-200">
-                                                <Info size={16} />
+                                        <div className="flex items-center justify-between">
+                                            <div className="flex items-center gap-4">
+                                                <div className="w-8 h-8 lg:w-10 lg:h-10 bg-indigo-600 rounded-xl lg:rounded-2xl flex items-center justify-center text-white shadow-xl shadow-indigo-200">
+                                                    <Info size={16} />
+                                                </div>
+                                                <div>
+                                                    <h4 className="text-[10px] lg:text-[11px] font-black uppercase text-indigo-600 tracking-[0.25em] leading-none">Logic & Explanation</h4>
+                                                    <p className="text-[10px] text-slate-400 mt-1">Verified Expert Walkthrough</p>
+                                                </div>
                                             </div>
-                                            <div>
-                                                <h4 className="text-[10px] lg:text-[11px] font-black uppercase text-indigo-600 tracking-[0.25em] leading-none">Logic & Explanation</h4>
-                                                <p className="text-[10px] text-slate-400 mt-1">Verified Expert Walkthrough</p>
-                                            </div>
+                                            {!(user && profile && (profile.selected_plan === 'global' || profile.selected_plan === 'premium')) && (
+                                                <div className="flex items-center gap-2 px-3 py-1.5 bg-rose-50 text-rose-600 rounded-full text-[10px] font-black uppercase tracking-widest">
+                                                    <Lock size={12} />
+                                                    <span>Premium</span>
+                                                </div>
+                                            )}
                                         </div>
 
-                                        <div className="relative p-5 lg:p-8 bg-white border border-indigo-100 shadow-xl shadow-indigo-600/5 rounded-2xl lg:rounded-3xl">
-                                             <MathText 
-                                                content={currentQuestion.explanation || "No expert explanation provided for this question yet."} 
-                                                className="text-sm sm:text-base lg:text-lg leading-[1.6] text-slate-700 prose prose-indigo max-w-none" 
-                                            />
+                                        <div className={cn(
+                                            "relative p-5 lg:p-8 bg-white border border-indigo-100 shadow-xl shadow-indigo-600/5 rounded-2xl lg:rounded-3xl overflow-hidden group",
+                                            !(user && profile && (profile.selected_plan === 'global' || profile.selected_plan === 'premium')) && "min-h-[320px]"
+                                        )}>
+                                            {/* Gated Content Blur Overlay */}
+                                            {!(user && profile && (profile.selected_plan === 'global' || profile.selected_plan === 'premium')) && (
+                                                <div className="absolute inset-0 z-10 backdrop-blur-[6px] bg-white/40 flex flex-col items-center justify-center opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity duration-300">
+                                                    <div className="bg-white p-6 rounded-3xl shadow-2xl border border-slate-100 text-center max-w-sm mx-4 transform translate-y-0 lg:translate-y-4 lg:group-hover:translate-y-0 transition-transform duration-300">
+                                                        <div className="w-12 h-12 bg-rose-100 text-rose-600 rounded-full flex items-center justify-center mx-auto mb-4">
+                                                            <Lock size={20} />
+                                                        </div>
+                                                        <h5 className="text-sm font-black text-slate-800 mb-2 uppercase tracking-tight">Unlock Explanations</h5>
+                                                        <p className="text-xs text-slate-500 mb-6 leading-relaxed">
+                                                            {user ? "Upgrade to Global or Premium plan to view detailed step-by-step logic." : "Login and upgrade to view detailed step-by-step logic."}
+                                                        </p>
+                                                        <Button 
+                                                            onClick={() => {
+                                                                if (!user) {
+                                                                    toast({
+                                                                        title: "Login Required",
+                                                                        description: "You are not logged in. Login first to upgrade.",
+                                                                        variant: "destructive"
+                                                                    });
+                                                                    setPendingUpgrade(true);
+                                                                    setIsAuthModalOpen(true);
+                                                                } else {
+                                                                    openPricingModal();
+                                                                }
+                                                            }}
+                                                            className="w-full bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-[10px] h-10 uppercase tracking-widest shadow-lg shadow-indigo-200"
+                                                        >
+                                                            Upgrade Now
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                            
+                                            <div className={cn("transition-all duration-300", !(user && profile && (profile.selected_plan === 'global' || profile.selected_plan === 'premium')) && "blur-[4px] select-none opacity-50")}>
+                                                <MathText 
+                                                    content={(user && profile && (profile.selected_plan === 'global' || profile.selected_plan === 'premium'))
+                                                        ? (currentQuestion.explanation || "No expert explanation provided for this question yet.")
+                                                        : "This is a comprehensive premium explanation that breaks down the logic, formulas, and reasoning step-by-step. Upgrading to the Global or Premium plan unlocks all expert walkthroughs to ensure you fully understand the concepts."} 
+                                                    className="text-sm sm:text-base lg:text-lg leading-[1.6] text-slate-700 prose prose-indigo max-w-none" 
+                                                />
+                                            </div>
                                         </div>
                                     </div>
                                 </div>

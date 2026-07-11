@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/lib/auth';
 import { 
     FileText, Lock, Unlock, Download, Loader2, ArrowLeft
@@ -42,6 +43,7 @@ export default function SubjectNotes() {
     const [chapters, setChapters] = useState<Chapter[]>([]);
     const [materials, setMaterials] = useState<Material[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
     const isGlobalPlan = profile?.selected_plan === 'global' || profile?.subscription_tier === 'global' || profile?.role === 'admin' || profile?.role === 'sub_admin';
 
@@ -70,11 +72,14 @@ export default function SubjectNotes() {
         setIsLoading(false);
     };
 
-    const handleMaterialClick = (material: Material) => {
+    const handleMaterialClick = async (material: Material) => {
         if (!material.is_free && !isGlobalPlan) {
             openPricingModal();
             return;
         }
+        
+        setDownloadingId(material.id);
+        await new Promise(resolve => setTimeout(resolve, 50));
         
         let downloadUrl = material.pdf_url;
         let isDriveLink = false;
@@ -103,13 +108,44 @@ export default function SubjectNotes() {
         } else {
             window.open(downloadUrl, '_blank');
         }
+        
+        setTimeout(() => setDownloadingId(null), 2000);
     };
 
     if (authLoading || isLoading) {
         return (
             <Layout>
-                <div className="flex h-[60vh] items-center justify-center">
-                    <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+                <div className="w-full max-w-5xl mx-auto px-4 lg:px-8 py-8 md:py-10">
+                    <Skeleton className="w-32 h-5 mb-6" />
+                    <div className="mb-10">
+                        <Skeleton className="w-64 h-10 mb-2" />
+                        <Skeleton className="w-96 h-5" />
+                    </div>
+                    <div className="space-y-8">
+                        {Array.from({ length: 2 }).map((_, i) => (
+                            <div key={i} className="space-y-4">
+                                <div className="flex items-center gap-3 border-b border-slate-200 dark:border-slate-800 pb-2">
+                                    <Skeleton className="w-8 h-8 rounded-full shrink-0" />
+                                    <Skeleton className="w-48 h-7" />
+                                    <Skeleton className="ml-auto w-16 h-6 rounded-full" />
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 pl-2 md:pl-4">
+                                    {Array.from({ length: 3 }).map((_, j) => (
+                                        <div key={j} className="flex flex-col p-5 rounded-[24px] border-2 border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm h-40">
+                                            <div className="flex items-start justify-between w-full mb-4">
+                                                <Skeleton className="w-12 h-12 rounded-[16px] shrink-0" />
+                                                <Skeleton className="w-10 h-10 rounded-full shrink-0" />
+                                            </div>
+                                            <div className="mt-auto">
+                                                <Skeleton className="h-5 w-full mb-2" />
+                                                <Skeleton className="h-4 w-24" />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </Layout>
         );
@@ -198,7 +234,7 @@ export default function SubjectNotes() {
                                                                 "w-10 h-10 rounded-full flex items-center justify-center shrink-0 transition-colors",
                                                                 isLocked ? "bg-slate-50 text-slate-400 dark:bg-slate-800 group-hover:bg-indigo-100 group-hover:text-indigo-600" : "bg-slate-50 text-slate-400 dark:bg-slate-800 group-hover:bg-emerald-100 group-hover:text-emerald-600"
                                                             )}>
-                                                                {isLocked ? <Lock className="w-5 h-5" /> : <Download className="w-5 h-5" />}
+                                                                {downloadingId === material.id ? <Loader2 className="w-5 h-5 animate-spin" /> : isLocked ? <Lock className="w-5 h-5" /> : <Download className="w-5 h-5" />}
                                                             </div>
                                                         </div>
                                                         

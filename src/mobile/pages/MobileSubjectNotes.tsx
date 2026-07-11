@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import MobileLayout from '@/mobile/components/MobileLayout';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/lib/auth';
 import { 
     FileText, Lock, Unlock, Download, Loader2, ArrowLeft
@@ -42,6 +43,7 @@ export default function MobileSubjectNotes() {
     const [chapters, setChapters] = useState<Chapter[]>([]);
     const [materials, setMaterials] = useState<Material[]>([]);
     const [isLoading, setIsLoading] = useState(true);
+    const [downloadingId, setDownloadingId] = useState<string | null>(null);
 
     const isGlobalPlan = profile?.selected_plan === 'global' || profile?.subscription_tier === 'global' || profile?.role === 'admin' || profile?.role === 'sub_admin';
 
@@ -65,19 +67,80 @@ export default function MobileSubjectNotes() {
         setIsLoading(false);
     };
 
-    const handleMaterialClick = (material: Material) => {
+    const handleMaterialClick = async (material: Material) => {
         if (!material.is_free && !isGlobalPlan) {
             openPricingModal();
             return;
         }
-        window.open(material.pdf_url, '_blank');
+        
+        setDownloadingId(material.id);
+        await new Promise(resolve => setTimeout(resolve, 50));
+        
+        let downloadUrl = material.pdf_url;
+        let isDriveLink = false;
+        
+        if (downloadUrl.includes('drive.google.com/file/d/')) {
+            const match = downloadUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+            if (match && match[1]) {
+                downloadUrl = `https://drive.google.com/uc?export=download&id=${match[1]}`;
+                isDriveLink = true;
+            }
+        } else if (downloadUrl.includes('drive.google.com/open?id=')) {
+             const match = downloadUrl.match(/id=([a-zA-Z0-9_-]+)/);
+             if (match && match[1]) {
+                 downloadUrl = `https://drive.google.com/uc?export=download&id=${match[1]}`;
+                 isDriveLink = true;
+             }
+        }
+        
+        if (isDriveLink) {
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.setAttribute('download', `${material.title}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } else {
+            window.open(downloadUrl, '_blank');
+        }
+        
+        setTimeout(() => setDownloadingId(null), 2000);
     };
 
     if (authLoading || isLoading) {
         return (
             <MobileLayout>
-                <div className="flex h-[80vh] items-center justify-center">
-                    <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
+                <div className="w-full px-4 pt-4 pb-24">
+                    <Skeleton className="w-24 h-4 mb-4" />
+                    <div className="mb-6">
+                        <Skeleton className="w-48 h-8 mb-1" />
+                        <Skeleton className="w-64 h-4" />
+                    </div>
+                    <div className="space-y-6">
+                        {Array.from({ length: 2 }).map((_, i) => (
+                            <div key={i} className="space-y-3">
+                                <div className="flex items-center gap-2 border-b border-slate-200 dark:border-slate-800 pb-2">
+                                    <Skeleton className="w-6 h-6 rounded-full shrink-0" />
+                                    <Skeleton className="w-32 h-5" />
+                                    <Skeleton className="ml-auto w-12 h-4 rounded-full" />
+                                </div>
+                                <div className="grid grid-cols-1 gap-2 pl-1">
+                                    {Array.from({ length: 3 }).map((_, j) => (
+                                        <div key={j} className="flex items-center justify-between p-3 rounded-2xl border-2 border-slate-100 dark:border-slate-800 bg-white dark:bg-slate-900 shadow-sm">
+                                            <div className="flex items-center gap-3 w-full min-w-0">
+                                                <Skeleton className="w-10 h-10 rounded-[12px] shrink-0" />
+                                                <div className="flex-1 min-w-0 pr-2">
+                                                    <Skeleton className="h-4 w-3/4 mb-1" />
+                                                    <Skeleton className="h-3 w-1/3" />
+                                                </div>
+                                                <Skeleton className="w-8 h-8 rounded-full shrink-0" />
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </MobileLayout>
         );
@@ -176,7 +239,7 @@ export default function MobileSubjectNotes() {
                                                                 "w-8 h-8 rounded-full flex items-center justify-center shrink-0",
                                                                 isLocked ? "bg-indigo-100 text-indigo-600 dark:bg-indigo-900/50 dark:text-indigo-400" : "bg-emerald-100 text-emerald-600 dark:bg-emerald-900/50 dark:text-emerald-400"
                                                             )}>
-                                                                {isLocked ? <Lock className="w-4 h-4" /> : <Download className="w-4 h-4" />}
+                                                                {downloadingId === material.id ? <Loader2 className="w-4 h-4 animate-spin" /> : isLocked ? <Lock className="w-4 h-4" /> : <Download className="w-4 h-4" />}
                                                             </div>
                                                         </div>
                                                     </div>

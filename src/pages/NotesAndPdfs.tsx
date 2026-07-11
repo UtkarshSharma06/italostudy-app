@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import Layout from '@/components/Layout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/lib/auth';
 import { 
     BookOpen, ChevronDown, ChevronRight, FileText, Lock, Unlock, Download, Loader2, 
@@ -127,16 +128,6 @@ export default function NotesAndPdfs() {
         return matchesSubject || matchesChapters || matchesMaterials;
     });
 
-    if (authLoading || isLoading) {
-        return (
-            <Layout>
-                <div className="flex h-[60vh] items-center justify-center">
-                    <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-                </div>
-            </Layout>
-        );
-    }
-
     return (
         <Layout>
             <Helmet>
@@ -223,7 +214,24 @@ export default function NotesAndPdfs() {
 
                 {/* Subjects List */}
                 <div className="space-y-4">
-                    {filteredSubjects.length === 0 ? (
+                    {authLoading || isLoading ? (
+                        Array.from({ length: 4 }).map((_, i) => (
+                            <div key={i} className="bg-white dark:bg-slate-900 rounded-[32px] border border-slate-100 dark:border-slate-800/60 p-4 sm:p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                <div className="flex items-center gap-5">
+                                    <Skeleton className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl sm:rounded-[24px]" />
+                                    <div className="space-y-2">
+                                        <Skeleton className="h-6 w-48" />
+                                        <Skeleton className="h-4 w-32" />
+                                        <Skeleton className="h-3 w-64 hidden sm:block mt-2" />
+                                    </div>
+                                </div>
+                                <div className="flex items-center justify-between sm:justify-end gap-4 w-full sm:w-auto mt-2 sm:mt-0 border-t sm:border-t-0 border-slate-100 dark:border-slate-800 pt-4 sm:pt-0">
+                                    <Skeleton className="h-9 w-32 rounded-full" />
+                                    <Skeleton className="w-10 h-10 rounded-full" />
+                                </div>
+                            </div>
+                        ))
+                    ) : filteredSubjects.length === 0 ? (
                         <div className="text-center py-12 bg-slate-50 dark:bg-slate-900/50 rounded-3xl border border-slate-100 dark:border-slate-800">
                             <p className="text-slate-500">No subjects or materials found matching your search.</p>
                         </div>

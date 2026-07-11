@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import MobileLayout from '@/mobile/components/MobileLayout';
 import { Input } from '@/components/ui/input';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useAuth } from '@/lib/auth';
 import { 
     BookOpen, ChevronDown, ChevronRight, FileText, Lock, Unlock, Download, Loader2, 
@@ -11,11 +12,13 @@ import {
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { usePricing } from '@/context/PricingContext';
+import { useExam } from '@/context/ExamContext';
 import { Helmet } from 'react-helmet-async';
 
 interface Subject {
     id: string;
     title: string;
+    exam_model_id?: string | null;
     position: number;
 }
 
@@ -47,6 +50,7 @@ const getSubjectConfig = (title: string) => {
 export default function MobileNotesAndPdfs() {
     const { profile, loading: authLoading } = useAuth();
     const { openPricingModal } = usePricing();
+    const { activeExam } = useExam();
     const navigate = useNavigate();
     const [subjects, setSubjects] = useState<Subject[]>([]);
     const [chapters, setChapters] = useState<Chapter[]>([]);
@@ -58,7 +62,7 @@ export default function MobileNotesAndPdfs() {
 
     useEffect(() => {
         fetchData();
-    }, []);
+    }, [activeExam?.id]);
 
     const fetchData = async () => {
         setIsLoading(true);
@@ -79,10 +83,39 @@ export default function MobileNotesAndPdfs() {
             openPricingModal();
             return;
         }
-        window.open(material.pdf_url, '_blank');
+        
+        let downloadUrl = material.pdf_url;
+        let isDriveLink = false;
+        
+        if (downloadUrl.includes('drive.google.com/file/d/')) {
+            const match = downloadUrl.match(/\/d\/([a-zA-Z0-9_-]+)/);
+            if (match && match[1]) {
+                downloadUrl = `https://drive.google.com/uc?export=download&id=${match[1]}`;
+                isDriveLink = true;
+            }
+        } else if (downloadUrl.includes('drive.google.com/open?id=')) {
+             const match = downloadUrl.match(/id=([a-zA-Z0-9_-]+)/);
+             if (match && match[1]) {
+                 downloadUrl = `https://drive.google.com/uc?export=download&id=${match[1]}`;
+                 isDriveLink = true;
+             }
+        }
+        
+        if (isDriveLink) {
+            const link = document.createElement('a');
+            link.href = downloadUrl;
+            link.setAttribute('download', `${material.title}.pdf`);
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+        } else {
+            window.open(downloadUrl, '_blank');
+        }
     };
 
     const filteredSubjects = subjects.filter(sub => {
+        if (activeExam && activeExam.dbId && sub.exam_model_id !== activeExam.dbId) return false;
+
         if (!searchQuery) return true;
         const matchesSubject = sub.title.toLowerCase().includes(searchQuery.toLowerCase());
         const subjectChapters = chapters.filter(c => c.subject_id === sub.id);
@@ -91,16 +124,6 @@ export default function MobileNotesAndPdfs() {
         const matchesMaterials = materials.some(m => chapterIds.includes(m.chapter_id) && m.title.toLowerCase().includes(searchQuery.toLowerCase()));
         return matchesSubject || matchesChapters || matchesMaterials;
     });
-
-    if (authLoading || isLoading) {
-        return (
-            <MobileLayout>
-                <div className="flex h-[80vh] items-center justify-center">
-                    <Loader2 className="w-8 h-8 animate-spin text-indigo-600" />
-                </div>
-            </MobileLayout>
-        );
-    }
 
     return (
         <MobileLayout>
@@ -132,45 +155,45 @@ export default function MobileNotesAndPdfs() {
                     </div>
                 </div>
 
-                {/* Features Grid */}
-                <div className="grid grid-cols-2 gap-3">
-                    <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800/60 shadow-sm flex flex-col gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center shrink-0">
-                            <BookOpen className="w-5 h-5 text-purple-500" />
+                {/* Features Row */}
+                <div className="flex overflow-x-auto pb-2 -mx-4 px-4 gap-3 scrollbar-hide snap-x">
+                    <div className="bg-white dark:bg-slate-900 px-3 py-2 rounded-[20px] border border-slate-100 dark:border-slate-800/60 shadow-sm flex items-center gap-3 shrink-0 snap-start w-[160px]">
+                        <div className="w-9 h-9 rounded-[14px] bg-purple-50 dark:bg-purple-900/20 flex items-center justify-center shrink-0">
+                            <BookOpen className="w-4 h-4 text-purple-500" />
                         </div>
                         <div>
-                            <h4 className="font-bold text-slate-900 dark:text-white text-[11px] mb-0.5">High Quality</h4>
-                            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Curated by experts.</p>
+                            <h4 className="font-bold text-slate-900 dark:text-white text-[11px] leading-tight mb-0.5">High Quality</h4>
+                            <p className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">Curated by experts.</p>
                         </div>
                     </div>
                     
-                    <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800/60 shadow-sm flex flex-col gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center shrink-0">
-                            <CheckCircle2 className="w-5 h-5 text-emerald-500" />
+                    <div className="bg-white dark:bg-slate-900 px-3 py-2 rounded-[20px] border border-slate-100 dark:border-slate-800/60 shadow-sm flex items-center gap-3 shrink-0 snap-start w-[160px]">
+                        <div className="w-9 h-9 rounded-[14px] bg-emerald-50 dark:bg-emerald-900/20 flex items-center justify-center shrink-0">
+                            <CheckCircle2 className="w-4 h-4 text-emerald-500" />
                         </div>
                         <div>
-                            <h4 className="font-bold text-slate-900 dark:text-white text-[11px] mb-0.5">Well Structured</h4>
-                            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Topics & chapters.</p>
+                            <h4 className="font-bold text-slate-900 dark:text-white text-[11px] leading-tight mb-0.5">Well Structured</h4>
+                            <p className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">Topics & chapters.</p>
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800/60 shadow-sm flex flex-col gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center shrink-0">
-                            <CloudDownload className="w-5 h-5 text-blue-500" />
+                    <div className="bg-white dark:bg-slate-900 px-3 py-2 rounded-[20px] border border-slate-100 dark:border-slate-800/60 shadow-sm flex items-center gap-3 shrink-0 snap-start w-[160px]">
+                        <div className="w-9 h-9 rounded-[14px] bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center shrink-0">
+                            <CloudDownload className="w-4 h-4 text-blue-500" />
                         </div>
                         <div>
-                            <h4 className="font-bold text-slate-900 dark:text-white text-[11px] mb-0.5">Downloadable</h4>
-                            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">Study anytime.</p>
+                            <h4 className="font-bold text-slate-900 dark:text-white text-[11px] leading-tight mb-0.5">Downloadable</h4>
+                            <p className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">Study anytime.</p>
                         </div>
                     </div>
 
-                    <div className="bg-white dark:bg-slate-900 p-4 rounded-3xl border border-slate-100 dark:border-slate-800/60 shadow-sm flex flex-col gap-3">
-                        <div className="w-10 h-10 rounded-2xl bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center shrink-0">
-                            <Star className="w-5 h-5 text-amber-500" />
+                    <div className="bg-white dark:bg-slate-900 px-3 py-2 rounded-[20px] border border-slate-100 dark:border-slate-800/60 shadow-sm flex items-center gap-3 shrink-0 snap-start w-[160px]">
+                        <div className="w-9 h-9 rounded-[14px] bg-amber-50 dark:bg-amber-900/20 flex items-center justify-center shrink-0">
+                            <Star className="w-4 h-4 text-amber-500" />
                         </div>
                         <div>
-                            <h4 className="font-bold text-slate-900 dark:text-white text-[11px] mb-0.5">Regular Updates</h4>
-                            <p className="text-[10px] text-slate-500 dark:text-slate-400 font-medium">New PDFs added.</p>
+                            <h4 className="font-bold text-slate-900 dark:text-white text-[11px] leading-tight mb-0.5">Regular Updates</h4>
+                            <p className="text-[9px] text-slate-500 dark:text-slate-400 font-medium">New PDFs added.</p>
                         </div>
                     </div>
                 </div>
@@ -179,7 +202,23 @@ export default function MobileNotesAndPdfs() {
                     <h2 className="text-lg font-bold text-slate-900 dark:text-white mb-4">Browse by Subject</h2>
                     
                     <div className="space-y-3">
-                        {filteredSubjects.length === 0 ? (
+                        {authLoading || isLoading ? (
+                            Array.from({ length: 4 }).map((_, i) => (
+                                <div key={i} className="bg-white dark:bg-slate-900 rounded-[28px] border border-slate-100 dark:border-slate-800/60 p-4 flex flex-col gap-3">
+                                    <div className="flex items-center gap-4">
+                                        <Skeleton className="w-14 h-14 rounded-2xl shrink-0" />
+                                        <div className="flex-1 space-y-2">
+                                            <Skeleton className="h-5 w-3/4" />
+                                            <Skeleton className="h-3 w-1/2" />
+                                        </div>
+                                    </div>
+                                    <div className="flex items-center justify-between border-t border-slate-100 dark:border-slate-800 pt-3">
+                                        <Skeleton className="h-7 w-28 rounded-full" />
+                                        <Skeleton className="w-8 h-8 rounded-full shrink-0" />
+                                    </div>
+                                </div>
+                            ))
+                        ) : filteredSubjects.length === 0 ? (
                             <div className="text-center py-8 bg-white dark:bg-slate-900 rounded-3xl border border-slate-100 dark:border-slate-800">
                                 <p className="text-slate-500 text-sm">No subjects found.</p>
                             </div>

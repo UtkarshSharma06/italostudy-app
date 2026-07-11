@@ -1213,7 +1213,7 @@ export default function Dashboard() {
                                         { label: 'Resources', icon: FileText, path: '/resources', color: 'bg-fuchsia-100 dark:bg-fuchsia-900/30 text-fuchsia-600' },
                                         { label: 'History', icon: History, path: '/history', color: 'bg-cyan-100 dark:bg-cyan-900/30 text-cyan-600' },
                                         { label: 'Analytics', icon: BarChart3, path: '/analytics', color: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600' },
-                                        { label: 'Chat', icon: MessageCircle, path: '/community', color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600' },
+                                        { label: 'Notes & PDFs', icon: FileText, path: '/notes', color: 'bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600' },
                                         { label: 'Blogs', icon: BookOpen, path: '/blog', color: 'bg-orange-100 dark:bg-orange-900/30 text-orange-600' },
                                     ]
                                     .map((item) => {

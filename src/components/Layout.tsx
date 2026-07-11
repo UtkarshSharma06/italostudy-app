@@ -3,6 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/lib/auth';
 import { Button } from '@/components/ui/button';
 import {
+    Infinity,
     LayoutDashboard,
     BookOpen,
     Clock,
@@ -279,9 +280,10 @@ export default function Layout({
     const exploreNav = [
         { label: 'Blog', path: '/blog', icon: Newspaper },
         { label: 'Store', path: '/store', icon: ShoppingBag },
+        { label: 'Community', path: '/community', icon: MessageCircle }
     ];
 
-    const allNavItems = [...mainNav, ...trackNav, ...exploreNav, { label: 'Chats', path: '/community', icon: MessageCircle }];
+    const allNavItems = [...mainNav, ...trackNav, ...exploreNav];
 
     const displayName = profile?.display_name || profile?.full_name?.split(' ')[0] || user?.user_metadata?.full_name?.split(' ')[0] || 'Student';
 
@@ -329,7 +331,7 @@ export default function Layout({
                             initial={false}
                             animate={{ width: isSidebarCollapsed ? 72 : 280 }}
                             style={{ zoom: '0.9' }}
-                            className="fixed left-0 top-0 bottom-0 z-[120] bg-[#fdfdfd] dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 shadow-[8px_0_32px_rgba(0,0,0,0.03)] flex flex-col pt-6 pb-4 transition-colors duration-500 group"
+                            className="fixed left-0 top-0 bottom-0 z-[120] bg-[#fdfdfd] dark:bg-slate-950 border-r border-slate-200 dark:border-slate-800 shadow-[8px_0_32px_rgba(0,0,0,0.03)] flex flex-col pt-6 transition-colors duration-500 group"
                             transition={{ type: "spring", stiffness: 300, damping: 30 }}
                         >
                             {/* Header: Logo and Toggle */}
@@ -380,51 +382,51 @@ export default function Layout({
                             {isLoading ? (
                                 <SidebarSkeleton />
                             ) : (
-                                <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide flex flex-col gap-6 px-4 pb-10">
+                                <div className="flex-1 overflow-y-auto overflow-x-hidden scrollbar-hide flex flex-col gap-4 px-4 pb-8">
                                     {/* Profile Card */}
                                     {!isSidebarCollapsed ? (
-                                        <div className="p-3 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm flex flex-col gap-3 shrink-0">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-10 h-10 rounded-full bg-indigo-100 border-2 border-indigo-100 dark:border-slate-800 overflow-hidden shrink-0">
+                                        <div className="p-2 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm flex flex-col gap-2 shrink-0">
+                                            <div className="flex items-center gap-2.5">
+                                                <div className="w-8 h-8 rounded-full bg-indigo-100 border border-indigo-100 dark:border-slate-800 overflow-hidden shrink-0">
                                                     {profile?.avatar_url ? (
                                                         <img src={getOptimizedImageUrl(profile.avatar_url, 80, 80)} alt="avatar" className="w-full h-full object-cover" />
                                                     ) : (
-                                                        <div className="w-full h-full flex items-center justify-center text-indigo-500 font-bold">
+                                                        <div className="w-full h-full flex items-center justify-center text-indigo-500 font-bold text-xs">
                                                             {displayName.charAt(0).toUpperCase()}
                                                         </div>
                                                     )}
                                                 </div>
                                                 <div className="flex-1 min-w-0">
                                                     <div className="flex items-center gap-1.5 flex-wrap">
-                                                        <h4 className="text-[13px] font-bold text-slate-900 dark:text-white truncate max-w-[120px]">{displayName.split(' ')[0]}</h4>
+                                                        <h4 className="text-[12px] font-bold text-slate-900 dark:text-white truncate max-w-[120px] leading-tight">{displayName.split(' ')[0]}</h4>
                                                         {hasPremiumAccess ? (
-                                                            <span className="flex items-center gap-1 bg-gradient-to-r from-amber-200 to-yellow-400 text-yellow-900 text-[8px] font-black px-1.5 py-0.5 rounded uppercase tracking-widest shadow-sm shrink-0">
-                                                                <Crown size={10} className="shrink-0" />
+                                                            <span className="flex items-center gap-0.5 bg-gradient-to-r from-amber-200 to-yellow-400 text-yellow-900 text-[7px] font-black px-1 py-[1px] rounded uppercase tracking-widest shadow-sm shrink-0">
+                                                                <Crown size={8} className="shrink-0" />
                                                                 GLOBAL
                                                             </span>
                                                         ) : (
-                                                            <ShieldCheck size={14} className="text-indigo-500 shrink-0" />
+                                                            <ShieldCheck size={12} className="text-indigo-500 shrink-0" />
                                                         )}
                                                     </div>
-                                                    <p className="text-[11px] text-slate-500">Level {gamification.level} Student</p>
+                                                    <p className="text-[10px] text-slate-500 leading-tight">Level {gamification.level} Student</p>
                                                 </div>
                                             </div>
-                                            <div className="flex justify-between items-center px-1">
+                                            <div className="flex justify-between items-center px-0.5">
                                                 <div className="flex items-center gap-1">
-                                                    <Flame size={12} className="text-amber-500" />
-                                                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">{gamification.xp} XP</span>
+                                                    <Flame size={10} className="text-amber-500" />
+                                                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">{gamification.xp} XP</span>
                                                 </div>
                                                 <div className="flex items-center gap-1">
-                                                    <Trophy size={12} className="text-yellow-500" />
-                                                    <span className="text-[11px] font-bold text-slate-700 dark:text-slate-300">{gamification.stars} Stars</span>
+                                                    <Trophy size={10} className="text-yellow-500" />
+                                                    <span className="text-[10px] font-bold text-slate-700 dark:text-slate-300">{gamification.stars} Stars</span>
                                                 </div>
                                             </div>
-                                            <div className="w-full bg-slate-100 dark:bg-slate-800 h-1.5 rounded-full overflow-hidden">
+                                            <div className="w-full bg-slate-100 dark:bg-slate-800 h-1 rounded-full overflow-hidden">
                                                 <div className="bg-indigo-500 h-full transition-all duration-1000 ease-out" style={{ width: `${gamification.progressPercent}%` }} />
                                             </div>
-                                            <div className="flex justify-between items-center px-1">
-                                                <p className="text-[9px] text-slate-400 font-medium">{gamification.streak} Day Streak</p>
-                                                <p className="text-[9px] text-slate-400 font-medium">Next: {gamification.nextLevelTotalXp} XP</p>
+                                            <div className="flex justify-between items-center px-0.5">
+                                                <p className="text-[8px] text-slate-400 font-medium">{gamification.streak} Day Streak</p>
+                                                <p className="text-[8px] text-slate-400 font-medium">Next: {gamification.nextLevelTotalXp}</p>
                                             </div>
                                         </div>
                                     ) : (
@@ -507,28 +509,41 @@ export default function Layout({
                             )}
 
                             {/* Bottom Actions Container */}
-                            <div className="shrink-0 p-2 flex flex-col gap-1 mt-auto border-t border-indigo-200/50 dark:border-indigo-800/30 bg-indigo-100/60 dark:bg-indigo-950/40 z-10">
-                                {/* Premium Banner */}
+                            <div className="shrink-0 p-2 pb-3 flex flex-col gap-1 mt-auto border-t border-indigo-200/50 dark:border-indigo-800/30 bg-indigo-100/60 dark:bg-indigo-950/40 z-10">
+                                {/* Premium Banner (Pinned) */}
                                 {isExplorer && !isSidebarCollapsed && (
-                                    <div className="bg-gradient-to-br from-[#1a0b38] to-[#2b1654] rounded-[12px] p-2.5 flex flex-col shadow-xl relative overflow-hidden group cursor-pointer" onClick={openPricingModal}>
-                                        <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent group-hover:translate-x-[200%] transition-transform duration-1000" />
-                                        <div className="flex items-center gap-2.5 relative z-10">
-                                            <div className="w-8 h-8 rounded-lg bg-[#5b36f5] shadow-inner flex items-center justify-center shrink-0">
-                                                <Crown size={16} className="text-white" />
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <div className="flex items-center gap-1 mb-0.5">
-                                                    <span className="text-white font-bold text-[12px]">Italo Premium</span>
-                                                    <span className="bg-[#5b36f5] text-[7px] text-white font-black px-1 py-0.5 rounded uppercase tracking-widest shadow-sm">GLOBAL</span>
+                                    <div className="relative group cursor-pointer mb-1 w-[92%] mx-auto" onClick={openPricingModal}>
+                                        {/* Massive outer glow */}
+                                        <div className="absolute inset-0 bg-[#6b42f5] blur-[24px] opacity-20 group-hover:opacity-30 transition-opacity duration-500 rounded-full" />
+                                        
+                                        <div className="bg-gradient-to-b from-[#28194a] to-[#160d2b] rounded-[16px] p-2 flex flex-col shadow-[inset_0_1px_1px_rgba(255,255,255,0.15)] relative overflow-hidden border border-[#4a2e85]/70">
+                                            {/* Glossy overlay effect */}
+                                            <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-white/[0.03] to-transparent pointer-events-none" />
+                                            <div className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/10 to-transparent group-hover:translate-x-[200%] transition-transform duration-1000" />
+                                            
+                                            {/* Top Section */}
+                                            <div className="flex items-center gap-2.5 relative z-10">
+                                                {/* Glossy Icon Box */}
+                                                <div className="w-[34px] h-[34px] rounded-[10px] bg-gradient-to-br from-[#8a5ef8] to-[#5727e3] shadow-[inset_0_1px_1px_rgba(255,255,255,0.4),0_4px_12px_rgba(91,54,245,0.3)] border border-[#a37efa]/30 flex items-center justify-center shrink-0">
+                                                    <Crown size={18} strokeWidth={2.5} className="text-[#fed754] drop-shadow-sm" />
                                                 </div>
-                                                <span className="text-[9px] text-slate-300 leading-tight">Unlock all features</span>
+                                                
+                                                <div className="flex flex-col flex-1 min-w-0 justify-center">
+                                                    <div className="flex items-center gap-1.5 mb-0.5">
+                                                        <span className="text-white font-bold text-[12px] leading-none tracking-tight truncate">Italo Premium</span>
+                                                        <span className="bg-[#2d2111] text-[#f2b938] text-[7px] font-black px-1.5 py-0.5 rounded-[4px] uppercase tracking-widest border border-[#5c441b] shrink-0">GLOBAL</span>
+                                                    </div>
+                                                    <span className="text-[9px] text-[#b4a4d6] leading-tight truncate">Unlock all premium features</span>
+                                                </div>
+                                                <div className="w-[20px] h-[20px] rounded-full bg-[#3f2673] border border-[#5c3c9c]/50 flex items-center justify-center shrink-0 shadow-sm">
+                                                    <ChevronRight size={12} className="text-[#bba1f2]" />
+                                                </div>
                                             </div>
-                                            <ChevronRight size={12} className="text-white/50 absolute right-0 top-1/2 -translate-y-1/2" />
                                         </div>
                                     </div>
                                 )}
                                 {isExplorer && isSidebarCollapsed && (
-                                    <button onClick={openPricingModal} className="w-10 h-10 mx-auto bg-gradient-to-br from-[#1a0b38] to-[#2b1654] rounded-xl flex items-center justify-center shadow-lg group">
+                                    <button onClick={openPricingModal} className="w-10 h-10 mx-auto bg-gradient-to-br from-[#1a0b38] to-[#2b1654] rounded-xl flex items-center justify-center shadow-lg group mb-1">
                                         <Crown size={18} className="text-amber-400 group-hover:scale-110 transition-transform" />
                                     </button>
                                 )}

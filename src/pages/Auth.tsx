@@ -39,6 +39,10 @@ export default function Auth() {
     const [isVerifying, setIsVerifying] = useState(false);
     const [verifyingEmail, setVerifyingEmail] = useState('');
     const [otpCode, setOtpCode] = useState("");
+    const [isVerifyingReset, setIsVerifyingReset] = useState(false);
+    const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+    const [resetCode, setResetCode] = useState("");
+    const [newPassword, setNewPassword] = useState("");
 
     const { user, signIn, signUp, signOut, signInWithGoogle, resetPassword, mfa, aal, hasMFA } = useAuth();
     const navigate = useNavigate();
@@ -121,8 +125,8 @@ export default function Auth() {
 
     useEffect(() => {
         const handleInitialRedirect = async () => {
-            // Don't do anything while loading or if MFA dialog is already shown
-            if (!user || isLoading || requiresMFA) return;
+            // Don't do anything while loading or if MFA dialog is already shown or updating password
+            if (!user || isLoading || requiresMFA || isUpdatingPassword) return;
 
             // Check if user has MFA enabled and needs to verify
             if (hasMFA && aal !== 'aal2') {
@@ -165,7 +169,7 @@ export default function Auth() {
         };
 
         handleInitialRedirect();
-    }, [user, navigate, isLoading, requiresMFA, aal, hasMFA, location.state, searchParams]);
+    }, [user, navigate, isLoading, requiresMFA, isUpdatingPassword, aal, hasMFA, location.state, searchParams]);
 
     const validateForm = () => {
         const newErrors: { email?: string; password?: string } = {};
@@ -201,8 +205,11 @@ export default function Auth() {
         try {
             const { error } = await resetPassword(email);
             if (!error) {
-                toast.success('Email sent!', { description: "Check your inbox, we've sent you a link to reset your password." });
+                toast.success('Code sent!', { description: "Check your inbox, we've sent you a 6-digit code to reset your password." });
                 setIsForgotPassword(false);
+                setIsVerifyingReset(true);
+            } else {
+                toast.error(error.message);
             }
         } finally {
             setIsLoading(false);
@@ -300,6 +307,56 @@ export default function Auth() {
             } else {
                 toast.success('Success!', { description: "All set! Your email is verified. Welcome aboard!" });
                 navigate('/onboarding');
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleVerifyResetOtp = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (resetCode.length !== 6) return;
+        setIsLoading(true);
+
+        try {
+            const { error } = await supabase.auth.verifyOtp({
+                email,
+                token: resetCode,
+                type: 'recovery'
+            });
+
+            if (error) {
+                toast.error('Verification failed', { description: error.message });
+            } else {
+                toast.success('Code verified!', { description: 'Please enter your new password.' });
+                setIsVerifyingReset(false);
+                setIsUpdatingPassword(true);
+            }
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const handleUpdatePassword = async (e: React.FormEvent) => {
+        e.preventDefault();
+        try {
+            passwordSchema.parse(newPassword);
+        } catch (e) {
+            if (e instanceof z.ZodError) {
+                setErrors({ password: e.errors[0].message });
+                return;
+            }
+        }
+        setIsLoading(true);
+
+        try {
+            const { error } = await supabase.auth.updateUser({ password: newPassword });
+
+            if (error) {
+                toast.error('Update failed', { description: error.message });
+            } else {
+                toast.success('Password updated!', { description: 'Your password has been changed successfully.' });
+                navigate('/dashboard', { replace: true });
             }
         } finally {
             setIsLoading(false);
@@ -453,15 +510,19 @@ export default function Auth() {
 
                     <div className="mb-6 animate-in fade-in slide-in-from-top-4 duration-500">
                         <h2 className="text-2xl font-bold text-[#0f1841] mb-1 tracking-tight">
-                            {requiresMFA ? 'Security check' : (isVerifying ? 'Check your inbox' : (isForgotPassword ? 'Recover password' : (isLogin ? 'Welcome back' : 'Start your journey')))}
+                            {requiresMFA ? 'Security check' : isUpdatingPassword ? 'New password' : isVerifyingReset ? 'Verify reset code' : (isVerifying ? 'Check your inbox' : (isForgotPassword ? 'Recover password' : (isLogin ? 'Welcome back' : 'Start your journey')))}
                         </h2>
                         <p className="text-sm text-slate-500">
                             {requiresMFA 
                                 ? 'Just one last step to keep your account safe. Enter the code from your app below.' 
+                                : isUpdatingPassword
+                                ? 'Set a strong new password for your account.'
+                                : isVerifyingReset
+                                ? 'Enter the 6-digit code we sent to your email to reset your password.'
                                 : isVerifying 
                                 ? `We’ve sent a 6-digit code to ${verifyingEmail || email}. Enter it here to verify your account.` 
                                 : isForgotPassword 
-                                ? 'No worries! Just enter your email and we\'ll send you a link to get back in.' 
+                                ? 'No worries! Just enter your email and we\'ll send you a code to get back in.' 
                                 : (isLogin ? 'Good to see you again! Sign in to keep going with your prep.' : 'Join a community of students who are making their med school dreams a reality.')}
                         </p>
                     </div>
@@ -524,7 +585,7 @@ export default function Auth() {
                         </div>
                     )}
 
-                    {!requiresMFA && !isVerifying && !isForgotPassword && (
+                    {!requiresMFA && !isVerifying && !isForgotPassword && !isVerifyingReset && !isUpdatingPassword && (
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <button
                                 onClick={handleGoogleSignIn}
@@ -629,7 +690,7 @@ export default function Auth() {
                         </div>
                     )}
 
-                    {isForgotPassword && (
+                    {isForgotPassword && !isVerifyingReset && !isUpdatingPassword && (
                         <div className="animate-in fade-in slide-in-from-bottom-4 duration-500">
                             <form onSubmit={handleResetPassword} className="space-y-6">
                                 <div className="space-y-2">
@@ -659,6 +720,76 @@ export default function Auth() {
                                 >
                                     Go back to sign in
                                 </button>
+                            </form>
+                        </div>
+                    )}
+
+                    {isVerifyingReset && (
+                        <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500">
+                            <form onSubmit={handleVerifyResetOtp} className="space-y-6">
+                                <div className="flex justify-center mb-2">
+                                    <InputOTP maxLength={6} value={resetCode} onChange={setResetCode}>
+                                        <InputOTPGroup className="gap-2">
+                                            {[0, 1, 2, 3, 4, 5].map((index) => (
+                                                <InputOTPSlot
+                                                    key={index}
+                                                    index={index}
+                                                    className="w-10 h-12 bg-slate-50 border-slate-200 rounded-xl text-xl font-bold text-primary"
+                                                />
+                                            ))}
+                                        </InputOTPGroup>
+                                    </InputOTP>
+                                </div>
+                                <Button
+                                    type="submit"
+                                    disabled={isLoading || resetCode.length !== 6}
+                                    className="w-full h-12 editorial-gradient text-white rounded-xl font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.01] active:scale-95"
+                                >
+                                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                                    Verify Code
+                                </Button>
+                                <button
+                                    type="button"
+                                    onClick={() => { setIsVerifyingReset(false); setIsForgotPassword(true); }}
+                                    className="w-full text-center text-sm text-slate-500 hover:text-primary transition-colors mt-4"
+                                >
+                                    Go back
+                                </button>
+                            </form>
+                        </div>
+                    )}
+
+                    {isUpdatingPassword && (
+                        <div className="space-y-4 animate-in fade-in zoom-in-95 duration-500">
+                            <form onSubmit={handleUpdatePassword} className="space-y-6">
+                                <div className="space-y-2">
+                                    <label className="block text-sm font-medium text-slate-700">New Password</label>
+                                    <div className="relative">
+                                        <Input
+                                            type={showPassword ? "text" : "password"}
+                                            placeholder="••••••••"
+                                            value={newPassword}
+                                            onChange={(e) => { setNewPassword(e.target.value); setErrors(p => ({ ...p, password: undefined })); }}
+                                            className={`w-full h-12 px-4 rounded-xl bg-slate-50 border-none ring-1 ${errors.password ? 'ring-error' : 'ring-slate-200'} focus:ring-2 focus:ring-primary focus:bg-white transition-all duration-200 pr-12`}
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={() => setShowPassword(!showPassword)}
+                                            className="absolute right-4 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 transition-colors"
+                                        >
+                                            {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                                        </button>
+                                    </div>
+                                    {errors.password && <p className="text-xs text-error mt-1">{errors.password}</p>}
+                                </div>
+                                <Button
+                                    type="submit"
+                                    disabled={isLoading || newPassword.length < 6}
+                                    className="w-full h-12 editorial-gradient text-white rounded-xl font-bold shadow-lg shadow-primary/20 transition-all hover:scale-[1.01] active:scale-95"
+                                >
+                                    {isLoading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+                                    Update Password
+                                </Button>
                             </form>
                         </div>
                     )}

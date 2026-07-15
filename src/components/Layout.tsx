@@ -713,7 +713,7 @@ export default function Layout({
                                                         </Button>
                                                     )}
 
-                                                    <DropdownMenu>
+                                                    <DropdownMenu modal={false}>
                                                         <DropdownMenuTrigger asChild>
                                                             <Button variant="outline" className="h-9 px-4 rounded-xl bg-white border border-slate-200 hover:bg-slate-50 transition-all shadow-sm flex items-center gap-2">
                                                                 <Globe className="w-4 h-4 text-indigo-600" />
@@ -769,7 +769,7 @@ export default function Layout({
                                             </Suspense>
 
                                             <div className="md:hidden">
-                                                <DropdownMenu>
+                                                <DropdownMenu modal={false}>
                                                     <DropdownMenuTrigger asChild>
                                                         <button className="flex items-center gap-2.5 p-1 pr-4 rounded-full border border-slate-200/60 dark:border-slate-700/60 hover:bg-slate-50 dark:hover:bg-slate-800 transition-all group overflow-hidden bg-white dark:bg-slate-900 shadow-sm ring-1 ring-transparent hover:ring-indigo-100 dark:hover:ring-indigo-900 relative">
                                                             <div className={cn(

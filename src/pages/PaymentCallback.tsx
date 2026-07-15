@@ -41,6 +41,8 @@ export default function PaymentCallback() {
     ];
 
     useEffect(() => {
+        let verifyAttempted = false; // Track if we already tried active verification
+
         const verify = async () => {
             if (!orderId) {
                 setPollStatus('failed');
@@ -94,6 +96,20 @@ export default function PaymentCallback() {
                         setPollStatus('cancelled');
                         setErrorMsg('Payment was cancelled. You have not been charged.');
                         return;
+                    }
+
+                    // Still pending — try active verification once for Dodo payments
+                    if (!verifyAttempted && txn.payment_method === 'dodo') {
+                        verifyAttempted = true;
+                        console.log('🔐 Actively verifying Dodo payment for', orderId);
+                        try {
+                            await supabase.functions.invoke('verify-dodo-payment', {
+                                body: { transaction_id: orderId }
+                            });
+                        } catch (verifyErr) {
+                            // Non-fatal — webhook might still complete the transaction
+                            console.warn('Active Dodo verification failed, relying on webhook:', verifyErr);
+                        }
                     }
 
                     // Still pending — retry

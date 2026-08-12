@@ -9,7 +9,8 @@ import {
     Sparkles, 
     AlertTriangle, 
     Clock, 
-    CheckCircle2 
+    CheckCircle2,
+    Loader2
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -85,9 +86,11 @@ export default function SecurityEnforcer() {
 
     useEffect(() => {
         // WHITELIST CHECK (Routes that NEVER get blocked or security enforced)
+        // NOTE: /store-admin is only whitelisted for actual admins — not by path alone.
+        const isAdmin = profile?.role === 'admin' || profile?.role === 'sub_admin';
         const isWhitelisted =
             location.pathname.startsWith('/admin') ||
-            location.pathname.startsWith('/store-admin') ||
+            (location.pathname.startsWith('/store-admin') && isAdmin) ||
             location.pathname.startsWith('/consultant') ||
             isPublicRoute(location.pathname);
 
@@ -131,7 +134,18 @@ export default function SecurityEnforcer() {
         };
     }, [location.pathname, profile?.role]);
 
-    if (!isInitialized || authLoading) return null;
+    if (!isInitialized || authLoading) {
+        // Show a neutral blocking screen instead of null.
+        // This prevents the app from flashing visible content during the brief
+        // window before maintenance_mode is confirmed from the DB.
+        // We only block if the DB says maintenance is active; once loading is
+        // done, this is replaced by either the overlay or nothing.
+        return (
+            <div className="fixed inset-0 z-[9999] bg-white flex items-center justify-center">
+                <Loader2 className="w-5 h-5 animate-spin text-slate-200" />
+            </div>
+        );
+    }
 
     return (
         <>

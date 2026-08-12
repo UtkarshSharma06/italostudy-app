@@ -49,28 +49,49 @@ const SystemSettingsContext = createContext<SystemSettingsContextType>({
 const CACHE_KEY = 'italostudy_system_settings_v1';
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
+/**
+ * Keys that must NEVER be served from cache — always fetched fresh from DB.
+ * This prevents localStorage manipulation from bypassing security-critical flags.
+ */
+const UNCACHEABLE_KEYS = new Set(['maintenance_mode']);
+
 function readCache(): SettingsMap | null {
     try {
         const raw = localStorage.getItem(CACHE_KEY);
         if (!raw) return null;
         const { data, ts } = JSON.parse(raw);
-        return Date.now() - ts < CACHE_TTL ? data : null;
+        if (Date.now() - ts >= CACHE_TTL) return null;
+        // Strip any uncacheable keys that may have been written by older versions
+        const safe: SettingsMap = {};
+        Object.entries(data).forEach(([k, v]) => {
+            if (!UNCACHEABLE_KEYS.has(k)) safe[k] = v;
+        });
+        return safe;
     } catch { return null; }
 }
 
 function writeCache(data: SettingsMap) {
     try {
-        localStorage.setItem(CACHE_KEY, JSON.stringify({ data, ts: Date.now() }));
+        // Never persist security-critical keys to localStorage
+        const cacheable: SettingsMap = {};
+        Object.entries(data).forEach(([k, v]) => {
+            if (!UNCACHEABLE_KEYS.has(k)) cacheable[k] = v;
+        });
+        localStorage.setItem(CACHE_KEY, JSON.stringify({ data: cacheable, ts: Date.now() }));
     } catch { /* silent */ }
 }
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 
 export function SystemSettingsProvider({ children }: { children: ReactNode }) {
-    // Hydrate synchronously from cache so consumers don't flash on revisit
+    // Hydrate synchronously from cache so consumers don't flash on revisit.
+    // NOTE: maintenance_mode is NOT in the cache (UNCACHEABLE_KEYS), so loading
+    // stays true until the first DB fetch resolves — this prevents any flash
+    // of the app during maintenance while still allowing fast hydration for
+    // all other settings.
     const cached = readCache();
     const [settings, setSettings] = useState<SettingsMap>(cached ?? {});
-    const [loading, setLoading] = useState(!cached);
+    const [loading, setLoading] = useState(true); // always wait for fresh DB fetch
     const isMounted = useRef(true);
 
     useEffect(() => {

@@ -128,10 +128,38 @@ export default function Courses({ isMobileLayout }: { isMobileLayout?: boolean }
 
     const filtered = courses.filter(c => !search || c.title.toLowerCase().includes(search.toLowerCase()));
     
+    // Categorise each course for ordering:
+    //   0 = launched (no launch_date, or launch_date is in the past)
+    //   1 = coming soon with a specific date (future date string parseable by Date)
+    //   2 = coming soon without a date (launch_date === 'coming soon')
+    function getCourseOrder(c: Course): number {
+        if (!c.launch_date) return 0;
+        const lower = c.launch_date.toLowerCase();
+        if (lower === 'coming soon') return 2;
+        const parsed = Date.parse(c.launch_date);
+        if (!isNaN(parsed)) {
+            return new Date(c.launch_date) > new Date() ? 1 : 0;
+        }
+        return 0;
+    }
+
     // Sort logic
     const sortedFiltered = [...filtered].sort((a, b) => {
+        const orderA = getCourseOrder(a);
+        const orderB = getCourseOrder(b);
+
+        // Primary: launched → coming soon with date → coming soon without date
+        if (orderA !== orderB) return orderA - orderB;
+
+        // Secondary sort within the same group
         if (sortBy === 'price_low') return a.price_eur - b.price_eur;
         if (sortBy === 'price_high') return b.price_eur - a.price_eur;
+
+        // For coming-soon-with-date group, sort by launch date ascending
+        if (orderA === 1 && orderB === 1) {
+            return Date.parse(a.launch_date!) - Date.parse(b.launch_date!);
+        }
+
         return 0; // Newest is default (already sorted by created_at desc from DB)
     });
 

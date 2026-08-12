@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { BadgeCheck, Loader2, Info, ChevronRight, Brain, X, Sparkles, Check, Zap, Target, Gem, Globe, Shield, Disc, Award, FileText, PlaySquare, BarChart2, MessageSquare, ArrowRight, ShieldCheck, RotateCcw } from 'lucide-react';
+import { BadgeCheck, Loader2, Info, ChevronRight, Brain, X, Sparkles, Check, Zap, Target, Gem, Globe, Shield, Disc, Award, FileText, PlaySquare, BarChart2, MessageSquare, ArrowRight, ShieldCheck, RotateCcw, GraduationCap } from 'lucide-react';
 import { add } from 'date-fns';
 import CheckoutModal from '@/components/CheckoutModal';
 import { Button } from '@/components/ui/button';
@@ -486,7 +486,28 @@ export default function PricingModal() {
                                                 </div>
                                             </div>
 
+
+                                            {/* ── Courses CTA (Mobile) ── */}
+                                            <button
+                                                onClick={() => { closePricingModal(); navigate('/courses'); }}
+                                                className="w-full flex items-center justify-between gap-3 bg-emerald-50 dark:bg-emerald-900/20 border-2 border-emerald-200 dark:border-emerald-700/50 rounded-2xl px-4 py-3.5 mb-6 group hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all"
+                                            >
+                                                <div className="flex items-center gap-3">
+                                                    <div className="w-9 h-9 rounded-xl bg-emerald-500 flex items-center justify-center shrink-0 shadow-sm">
+                                                        <GraduationCap className="w-4.5 h-4.5 text-white" />
+                                                    </div>
+                                                    <div className="text-left">
+                                                        <p className="text-[12px] font-black text-slate-900 dark:text-white leading-tight">Prefer individual courses?</p>
+                                                        <p className="text-[10px] font-medium text-slate-500 dark:text-slate-400 leading-tight mt-0.5">Browse our full course catalog</p>
+                                                    </div>
+                                                </div>
+                                                <div className="w-7 h-7 rounded-full bg-emerald-100 dark:bg-emerald-800/50 flex items-center justify-center shrink-0 group-hover:bg-emerald-200 dark:group-hover:bg-emerald-700/50 transition-colors">
+                                                    <ChevronRight className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
+                                                </div>
+                                            </button>
+
                                             {/* Footer / Trust Badges */}
+
                                             <div className="grid grid-cols-4 gap-1 mb-10 mt-6">
                                                 <div className="flex flex-col items-center text-center">
                                                     <div className="w-8 h-8 rounded-full bg-slate-50 dark:bg-slate-800 flex items-center justify-center mb-2 shadow-sm">
@@ -634,6 +655,25 @@ export default function PricingModal() {
                                                         </div>
                                                     ))}
                                                 </div>
+
+                                                {/* ── Courses CTA (Desktop) ── */}
+                                                <button
+                                                    onClick={() => { closePricingModal(); navigate('/courses'); }}
+                                                    className="mt-4 w-full flex items-center justify-between gap-3 bg-emerald-50 dark:bg-emerald-900/20 border border-emerald-200 dark:border-emerald-700/50 rounded-xl px-3.5 py-3 group hover:bg-emerald-100 dark:hover:bg-emerald-900/30 transition-all shrink-0"
+                                                >
+                                                    <div className="flex items-center gap-2.5">
+                                                        <div className="w-8 h-8 rounded-lg bg-emerald-500 flex items-center justify-center shrink-0 shadow-sm">
+                                                            <GraduationCap className="w-4 h-4 text-white" />
+                                                        </div>
+                                                        <div className="text-left">
+                                                            <p className="text-[11px] font-black text-slate-900 dark:text-white leading-tight">Prefer individual courses?</p>
+                                                            <p className="text-[9px] font-medium text-slate-500 dark:text-slate-400 leading-tight mt-0.5">Browse our full course catalog</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="w-6 h-6 rounded-full bg-emerald-100 dark:bg-emerald-800/50 flex items-center justify-center shrink-0 group-hover:bg-emerald-200 transition-colors">
+                                                        <ChevronRight className="w-3 h-3 text-emerald-600 dark:text-emerald-400" />
+                                                    </div>
+                                                </button>
                                             </div>
 
                                             {/* Right Column (Cards) */}

@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth';
 import { supabase } from '@/integrations/supabase/client';
 import Layout from '@/components/Layout';
 import { DynamicStoreAd } from '@/components/store/DynamicStoreAd';
+import { DynamicCourseAd } from '@/components/store/DynamicCourseAd';
 import { UpgradeModal } from '@/components/UpgradeModal';
 import { SubjectIcon, getSubjectColorClass } from '@/components/ui/SubjectIcon';
 import { Button } from '@/components/ui/button';
@@ -1201,6 +1202,8 @@ export default function Dashboard() {
                             </div>
 
                             <DynamicStoreAd placementId="dashboard-bottom" onStatusChange={setIsDashboardAdActive} />
+
+                            <DynamicCourseAd placementId="dashboard-courses" />
 
                             {/* Quick Navigation Icons */}
                             <div className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 p-5 shadow-sm">

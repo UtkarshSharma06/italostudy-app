@@ -215,7 +215,25 @@ export default function Results({ hideLayout = false }: { hideLayout?: boolean }
     if (!testData) { setLoading(false); return; }
     setTest(testData as TestResult);
 
-    const examConfig = allExams[testData.exam_type] || activeExam || Object.values(allExams)[0];
+    // ── Strict exam config resolution for Section Wise Performance ──
+    // CRITICAL: Never fall back to the user's activeExam (different exam = wrong section names).
+    // Try exact slug match first, then partial match, then section-count heuristic.
+    let examConfig: any = null;
+    if (testData.exam_type) {
+      // 1. Exact slug match (e.g., 'imat', 'cent-s-prep')
+      examConfig = allExams[testData.exam_type];
+      // 2. Partial slug match (e.g., test has 'imat' but exam slug is 'imat-2025')
+      if (!examConfig) {
+        const typeKey = testData.exam_type.toLowerCase();
+        examConfig = Object.values(allExams).find((e: any) =>
+          e.id?.toLowerCase() === typeKey ||
+          e.id?.toLowerCase().startsWith(typeKey) ||
+          typeKey.startsWith(e.id?.toLowerCase())
+        ) || null;
+      }
+    }
+    // 3. If still null (unknown exam_type), fall back to first exam only as last resort
+    if (!examConfig) examConfig = Object.values(allExams)[0] || null;
     setTestConfig(examConfig);
 
     // Fetch rankings for mock/ranked tests
@@ -569,22 +587,171 @@ export default function Results({ hideLayout = false }: { hideLayout?: boolean }
     });
   };
 
-  // Section-wise performance
+  // ── Section-wise performance ──────────────────────────────────────────────────
+  // Strategy:
+  //   1. Group questions by section_name/subject/topic using keyword matching
+  //   2. For any unmapped questions, assign to the section whose mapped questions
+  //      are NEAREST by question_number (prevents questions "disappearing")
+  //   3. Last resort: positional fallback if NO questions could be mapped at all
   const sectionPerf = (() => {
-    if (!testConfig?.sections) return [];
-    let start = 0;
+    if (!testConfig?.sections || questions.length === 0) return [];
+
+    // Helper: map a raw string to a canonical section name via keyword matching.
+    // RULE: Only use UNAMBIGUOUS keywords — terms that appear in multiple sections
+    //       (energy, thermo, nuclear, electron, mass, pressure, heat, current) are
+    //       deliberately omitted. Ambiguous questions fall to nearest-neighbor below.
+    const resolveToSection = (raw: string): string | null => {
+      const lower = (raw || '').toLowerCase().trim();
+      if (!lower) return null;
+
+      // 1. Exact match (fastest path for correctly-stored section_names)
+      const exact = testConfig.sections.find((s: any) => s.name.toLowerCase() === lower);
+      if (exact) return exact.name;
+
+      // 2. Prefix/suffix: handles "Physics & Math" ↔ "Physics and Mathematics" variants
+      for (const sec of testConfig.sections) {
+        const sn = sec.name.toLowerCase();
+        if (sn.startsWith(lower) || lower.startsWith(sn)) return sec.name;
+      }
+
+      // 3. Unambiguous subject-level keyword — score each section independently
+      //    and return the one with the highest score. Ties → unmapped → nearest-neighbor.
+      const scores: Record<string, number> = {};
+      testConfig.sections.forEach((s: any) => { scores[s.name] = 0; });
+
+      for (const sec of testConfig.sections) {
+        const sn = sec.name.toLowerCase();
+
+        // ── BIOLOGY (unambiguous biology-only topics) ─────────────────────────
+        if (sn.includes('bio')) {
+          if (/\bbio(logy)?\b/.test(lower)) scores[sec.name] += 100;
+          const bioTopics = /\b(cell\b|organelle|tissue|plant\b|algae|fungi|bacteri|virus\b|animal\b|mammal|physiology|anatomy|genetics\b|dna\b|rna\b|protein\b|enzyme\b|atp\b|respiration|photosynthesis|evolution\b|ecology\b|ecosystem|taxonomy|heredity|mendelian|chromosome|mutation\b|mitosis|meiosis|neuron\b|nerve\b|muscle\b|blood\b|heart\b|lung\b|kidney\b|digestion|hormone\b|immune|reproduction|embryo|biodiversity|biotechnology|cloning\b|species\b|organism|population\b|osmosis|diffusion\b|prokaryot|eukaryot|cell membrane|cell wall|ribosome|mitochondria|chloroplast)\b/;
+          if (bioTopics.test(lower)) scores[sec.name] += 60;
+        }
+
+        // ── CHEMISTRY (unambiguous chemistry-only topics) ─────────────────────
+        // NOTE: 'thermo','nuclear','electron','energy','mass','pressure','heat',
+        //       'current','radiation','carbon','nitrogen','oxygen' are EXCLUDED
+        //       because they're ambiguous with Physics topics.
+        if (sn.includes('chem')) {
+          if (/\bchem(istry)?\b/.test(lower)) scores[sec.name] += 100;
+          const chemTopics = /\b(stoichiometry|stoich|ionic\b|covalent|redox\b|oxidation|oxidat|acid\b|acids\b|alkalin|ph\b|buffer\b|equilibrium|equilibr|molarit|molarity|precipit|enthalpy|enthalp|entropy|enthropy|gibbs\b|catalyst|isomer|nomenclature|nomencl|hydrocarbon|alkane|alkene|alkyne|alcohol\b|ester\b|amine\b|amide\b|carbonyl|polymer\b|solubility|solubil|periodic table|valence\b|halide|titrat|electrochemistry|electrolyte|galvanic|electrolysis|oxidation state|oxidation number|chemical bond|chemical reaction|chemical equilibrium|reaction rate|le chatelier|hess|avogadro|molec|mole\b|mol\b|limiting reagent|yield\b|empirical formula|molecular formula)\b/;
+          if (chemTopics.test(lower)) scores[sec.name] += 60;
+        }
+
+        // ── PHYSICS & MATHEMATICS (unambiguous physics/math-only topics) ──────
+        // NOTE: 'energy','thermo','heat','temperature','pressure','nuclear',
+        //       'radiation','mass','electron','current','fluid','electr' are
+        //       EXCLUDED — use specific physics terms only.
+        if (sn.includes('phys') || sn.includes('math')) {
+          if (/\b(physic|physics|math|mathemat)\b/.test(lower)) scores[sec.name] += 100;
+          const physTopics = /\b(kinematics|kinema|dynamics\b|dynamic\b|newton|torque|momentum\b|wave\b|waves\b|sound\b|optics\b|optic\b|lens\b|mirror\b|magnetism|magnetic field|electric circuit|circuit\b|voltage\b|resistance\b|capacitance|capacit|gravitation|gravitational|satellite|orbit\b|quantum\b|algebra\b|arithmetic|arithmet|polynomial|logarithm|trigonometry|trigon|sine\b|cosine\b|tangent\b|geometry\b|geometric|vector\b|vectors\b|matrix\b|matrices|determinant|probability\b|statistics\b|combination\b|permutation\b|sequence\b|series\b|calculus\b|derivative\b|integral\b|differentiation|integration|electrostatic|electromagnetism|electromagnetic|magnetic force|lorentz|faraday|coulomb|ohm\b|ampere\b|snell|doppler|hooke|projectile|inclined plane|centripetal|angular velocity|angular momentum)\b/;
+          if (physTopics.test(lower)) scores[sec.name] += 60;
+        }
+
+        // ── LOGICAL REASONING & GENERAL KNOWLEDGE ─────────────────────────────
+        if (sn.includes('logic') || sn.includes('reason') || sn.includes('general') || sn.includes('knowledge')) {
+          if (/\b(logic|logical|reasoning|reason\b|argument|syllogism|deduction|induction|inference|assumption|conclusion|critical thinking|analogy|general knowledge|gk\b|history\b|geography\b|culture\b|philosophy|politics|european union|eu\b|civics|comprehension|reading)\b/.test(lower)) scores[sec.name] += 80;
+        }
+      }
+
+      // Return the section with the highest score (must be > 0)
+      let bestSection: string | null = null;
+      let bestScore = 0;
+      for (const [secName, score] of Object.entries(scores)) {
+        if (score > bestScore) { bestScore = score; bestSection = secName; }
+      }
+      if (bestSection) return bestSection;
+
+      // 4. Last keyword pass: any 4+ char word from the section name in raw
+      for (const sec of testConfig.sections) {
+        const words = sec.name.toLowerCase().split(/[\s&,\/]+/);
+        if (words.some((w: string) => w.length >= 4 && lower.includes(w))) return sec.name;
+      }
+
+      return null; // → goes to nearest-neighbor fallback
+    };
+
+    // Build buckets
+    const buckets: Record<string, Question[]> = {};
+    testConfig.sections.forEach((sec: any) => { buckets[sec.name] = []; });
+
+    const unmapped: Question[] = [];
+    questions.forEach(q => {
+      const raw = q.section_name || q.subject || q.topic || '';
+      const resolved = resolveToSection(raw);
+      if (resolved && buckets[resolved] !== undefined) {
+        buckets[resolved].push(q);
+      } else {
+        unmapped.push(q);
+      }
+    });
+
+    // ── Nearest-neighbor fallback for unmapped questions ──────────────────────
+    // Questions are ordered by question_number. Since StartTest groups by section
+    // then by order_index, adjacent question numbers belong to the same section.
+    // So assign each unmapped question to the section of its nearest mapped neighbor.
+    if (unmapped.length > 0) {
+      const totalMapped = Object.values(buckets).reduce((sum, arr) => sum + arr.length, 0);
+
+      if (totalMapped > 0) {
+        // Build a sorted array of { qNum, sectionName } for mapped questions
+        const mappedIndex: Array<{ qNum: number; section: string }> = [];
+        Object.entries(buckets).forEach(([secName, qs]) => {
+          qs.forEach(q => {
+            if (q.question_number != null) {
+              mappedIndex.push({ qNum: q.question_number, section: secName });
+            }
+          });
+        });
+        mappedIndex.sort((a, b) => a.qNum - b.qNum);
+
+        unmapped.forEach(q => {
+          if (mappedIndex.length === 0) return;
+          const qNum = q.question_number ?? 0;
+
+          // Binary-search-style: find closest question_number in mappedIndex
+          let best = mappedIndex[0];
+          let lo = 0; let hi = mappedIndex.length - 1;
+          while (lo <= hi) {
+            const mid = (lo + hi) >> 1;
+            if (Math.abs(mappedIndex[mid].qNum - qNum) < Math.abs(best.qNum - qNum)) best = mappedIndex[mid];
+            if (mappedIndex[mid].qNum < qNum) lo = mid + 1;
+            else hi = mid - 1;
+          }
+          buckets[best.section].push(q);
+        });
+      } else {
+        // Truly no matches — full positional fallback
+        let start = 0;
+        return testConfig.sections.map((sec: any) => {
+          const sqs = questions.slice(start, start + sec.questionCount);
+          start += sec.questionCount;
+          const correct = sqs.filter(q => q.user_answer === q.correct_index).length;
+          const incorrect = sqs.filter(q => q.user_answer !== null && q.user_answer !== q.correct_index).length;
+          const skipped = sqs.filter(q => q.user_answer === null).length;
+          const acc = sqs.length > 0 ? Math.round((correct / sqs.length) * 100) : 0;
+          const totalTime = sqs.reduce((s, q) => s + (q.time_spent_seconds || 0), 0);
+          const rawSec = testConfig ? Number((correct * testConfig.scoring.correct + incorrect * testConfig.scoring.incorrect).toFixed(1)) : correct;
+          return { name: sec.name, score: rawSec, correct, incorrect, skipped, accuracy: acc, timeSecs: totalTime, questionCount: sqs.length };
+        });
+      }
+    }
+
+    // Final stats per section
     return testConfig.sections.map((sec: any) => {
-      const sqs = questions.slice(start, start + sec.questionCount);
-      start += sec.questionCount;
+      const sqs = buckets[sec.name] || [];
       const correct = sqs.filter(q => q.user_answer === q.correct_index).length;
       const incorrect = sqs.filter(q => q.user_answer !== null && q.user_answer !== q.correct_index).length;
       const skipped = sqs.filter(q => q.user_answer === null).length;
       const acc = sqs.length > 0 ? Math.round((correct / sqs.length) * 100) : 0;
       const totalTime = sqs.reduce((s, q) => s + (q.time_spent_seconds || 0), 0);
       const rawSec = testConfig ? Number((correct * testConfig.scoring.correct + incorrect * testConfig.scoring.incorrect).toFixed(1)) : correct;
-      return { name: sec.name, score: rawSec, correct, incorrect, skipped, accuracy: acc, timeSecs: totalTime };
+      return { name: sec.name, score: rawSec, correct, incorrect, skipped, accuracy: acc, timeSecs: totalTime, questionCount: sqs.length };
     });
   })();
+
+
 
   return (
     <>

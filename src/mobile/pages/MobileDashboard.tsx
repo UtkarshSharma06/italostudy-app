@@ -22,6 +22,7 @@ import { useTranslation } from 'react-i18next';
 import MobileLayout from '../components/MobileLayout';
 import { useActiveTest } from '@/hooks/useActiveTest';
 import { DynamicStoreAd } from '@/components/store/DynamicStoreAd';
+import { DynamicCourseAd } from '@/components/store/DynamicCourseAd';
 import { usePlanAccess } from '@/hooks/usePlanAccess';
 import { lazy, Suspense } from 'react';
 import { Capacitor } from '@capacitor/core';
@@ -1146,6 +1147,11 @@ const MobileDashboard: React.FC = () => {
                         </button>
                     </div>
                     <DynamicStoreAd placementId="dashboard-bottom" />
+                </section>
+
+                {/* ─── RECOMMENDED COURSES ─── */}
+                <section className="mt-5 px-4">
+                    <DynamicCourseAd placementId="dashboard-courses" />
                 </section>
 
 

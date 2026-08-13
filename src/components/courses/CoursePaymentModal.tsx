@@ -12,6 +12,28 @@ import { cn } from '@/lib/utils';
 import { useCurrency } from '@/hooks/useCurrency';
 import { getCountryCode } from '@/utils/countryDetection';
 
+/**
+ * Detect if the user is in India.
+ * Priority order:
+ *  1. Device timezone (always IST for Indian users, even on VPN)
+ *  2. IP geolocation (fallback, can be fooled by VPN)
+ *
+ * This ensures Indian users on a US/EU VPN still see Razorpay.
+ */
+async function detectIsIndia(): Promise<boolean> {
+    // 1. Timezone check — highest priority, VPN-proof
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    if (tz.includes('Kolkata') || tz.includes('Calcutta')) return true;
+
+    // 2. IP check — secondary fallback
+    try {
+        const code = await getCountryCode();
+        return code === 'IN';
+    } catch {
+        return false;
+    }
+}
+
 declare global {
     interface Window { Razorpay: any; paypal: any; }
 }
@@ -52,11 +74,9 @@ export default function CoursePaymentModal({ course, onClose }: CoursePaymentMod
     const paypalContainerRef = useRef<HTMLDivElement>(null);
     const paypalRendered = useRef(false);
 
-    // ── Detect country via IP (accurate, not just timezone) ──────────────────
+    // ── Detect India: timezone-first (VPN-proof) then IP fallback ─────────────
     useEffect(() => {
-        getCountryCode().then(code => {
-            setIsIndia(code === 'IN');
-        });
+        detectIsIndia().then(setIsIndia);
     }, []);
 
     // ── Load payment gateways from system_settings ────────────────────────────

@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { useCurrency } from '@/hooks/useCurrency';
+import { getCountryCode } from '@/utils/countryDetection';
 
 declare global {
     interface Window { Razorpay: any; paypal: any; }
@@ -39,17 +40,6 @@ function formatExpiry(days: number) {
     return `${days} days`;
 }
 
-// ── Step 1: Create course_transaction record ────────────────────────────────
-async function createCourseTxn(courseId: string): Promise<{ txn_id: string } | { error: string }> {
-    const res = await supabase.functions.invoke('create-course-order', {
-        body: { course_id: courseId, gateway: 'init' },
-    });
-    const data = res.data as any;
-    if (res.error || data?.error) return { error: data?.error || res.error?.message || 'Failed to create order' };
-    if (!data?.transaction_id) return { error: 'No transaction ID returned' };
-    return { txn_id: data.transaction_id };
-}
-
 export default function CoursePaymentModal({ course, onClose }: CoursePaymentModalProps) {
     const { user } = useAuth() as any;
     const { formatPrice, getRegionalPrice } = useCurrency();
@@ -58,25 +48,32 @@ export default function CoursePaymentModal({ course, onClose }: CoursePaymentMod
     const [selectedGateway, setSelectedGateway] = useState<string | null>(null);
     const [gateways, setGateways] = useState<any>({});
     const [isProcessing, setIsProcessing] = useState(false);
+    const [isIndia, setIsIndia] = useState(false);
     const paypalContainerRef = useRef<HTMLDivElement>(null);
     const paypalRendered = useRef(false);
 
-    // Load payment gateways from system_settings (same source as main CheckoutModal)
+    // ── Detect country via IP (accurate, not just timezone) ──────────────────
+    useEffect(() => {
+        getCountryCode().then(code => {
+            setIsIndia(code === 'IN');
+        });
+    }, []);
+
+    // ── Load payment gateways from system_settings ────────────────────────────
     useEffect(() => {
         (supabase as any).rpc('get_payment_config').then(({ data }: any) => {
             if (data) {
                 setGateways(data);
-                // Preload Razorpay script
+                // Preload Razorpay script (always, in case needed)
                 if (!document.querySelector('script[src*="razorpay"]')) {
                     const s = document.createElement('script');
                     s.src = 'https://checkout.razorpay.com/v1/checkout.js';
                     s.async = true;
                     document.body.appendChild(s);
                 }
-                // Preload PayPal script
+                // Preload PayPal script if enabled
                 if (data.paypal?.enabled && data.paypal?.client_id && !document.querySelector('script[src*="paypal.com/sdk/js"]')) {
                     const s = document.createElement('script');
-                    // Use intent=capture for one-time course payments (not subscription)
                     s.src = `https://www.paypal.com/sdk/js?client-id=${data.paypal.client_id}&currency=EUR&intent=capture`;
                     s.async = true;
                     document.body.appendChild(s);
@@ -85,13 +82,31 @@ export default function CoursePaymentModal({ course, onClose }: CoursePaymentMod
         });
     }, []);
 
+    // ── Auto-select the only available gateway ────────────────────────────────
+    // If there's only one option visible, pre-select it so user doesn't need an extra tap
+    useEffect(() => {
+        if (!gateways || selectedGateway) return;
+
+        const showRazorpay = isIndia && gateways.razorpay?.enabled;
+        const showDodo = !isIndia && gateways.dodo?.enabled;
+        const showPaypal = !isIndia && gateways.paypal?.enabled;
+
+        // Count available options for non-India
+        if (showRazorpay && !showDodo && !showPaypal) {
+            setSelectedGateway('razorpay');
+        } else if (showDodo && !showPaypal) {
+            setSelectedGateway('dodo');
+        }
+        // If multiple options, let the user pick
+    }, [gateways, isIndia]);
+
     const showError = (msg: string) => {
         setErrorMsg(msg);
         setState('error');
         setIsProcessing(false);
     };
 
-    // ── Dodo ────────────────────────────────────────────────────────────────────
+    // ── Dodo ──────────────────────────────────────────────────────────────────
     const handleDodo = async () => {
         setIsProcessing(true);
         try {
@@ -147,11 +162,10 @@ export default function CoursePaymentModal({ course, onClose }: CoursePaymentMod
         }
     };
 
-    // ── Razorpay ────────────────────────────────────────────────────────────────
+    // ── Razorpay ──────────────────────────────────────────────────────────────
     const handleRazorpay = async () => {
         setIsProcessing(true);
         try {
-            // 1. Create course_transaction (init only)
             const initRes = await supabase.functions.invoke('create-course-order', {
                 body: { course_id: course.id, gateway: 'razorpay' },
             });
@@ -159,7 +173,6 @@ export default function CoursePaymentModal({ course, onClose }: CoursePaymentMod
             if (initRes.error || initData?.error) throw new Error(initData?.error || initRes.error?.message);
             const txnId = initData.transaction_id;
 
-            // 2. Get Razorpay order from Edge Function
             const rzpRes = await supabase.functions.invoke('create-course-razorpay', {
                 body: { course_transaction_id: txnId },
             });
@@ -168,7 +181,6 @@ export default function CoursePaymentModal({ course, onClose }: CoursePaymentMod
 
             if (!window.Razorpay) throw new Error('Razorpay not loaded. Please refresh and try again.');
 
-            // 3. Open Razorpay checkout
             const rzp = new window.Razorpay({
                 key: rzpData.key_id,
                 order_id: rzpData.order_id,
@@ -178,7 +190,6 @@ export default function CoursePaymentModal({ course, onClose }: CoursePaymentMod
                 description: rzpData.description,
                 prefill: { email: user?.email || '' },
                 handler: async (response: any) => {
-                    // Payment succeeded — redirect to our callback with gateway=razorpay
                     onClose();
                     window.location.href = `/course-payment/callback?order_id=${txnId}&payment_id=${response.razorpay_payment_id}&dodo_status=succeeded&gateway=razorpay`;
                 },
@@ -197,13 +208,12 @@ export default function CoursePaymentModal({ course, onClose }: CoursePaymentMod
         }
     };
 
-    // ── PayPal ──────────────────────────────────────────────────────────────────
+    // ── PayPal ────────────────────────────────────────────────────────────────
     const handlePayPal = async () => {
         setIsProcessing(true);
         paypalRendered.current = false;
 
         try {
-            // 1. Create course_transaction
             const initRes = await supabase.functions.invoke('create-course-order', {
                 body: { course_id: course.id, gateway: 'paypal' },
             });
@@ -216,7 +226,6 @@ export default function CoursePaymentModal({ course, onClose }: CoursePaymentMod
             toast.info('Click the PayPal button below to complete your payment');
             setIsProcessing(false);
 
-            // Clear old buttons
             if (paypalContainerRef.current) paypalContainerRef.current.innerHTML = '';
             paypalRendered.current = true;
 
@@ -226,6 +235,7 @@ export default function CoursePaymentModal({ course, onClose }: CoursePaymentMod
                     return actions.order.create({
                         intent: 'CAPTURE',
                         purchase_units: [{
+                            // ✅ Use the pre-calculated regional/discounted price
                             amount: { value: localCourse.amount.toFixed(2), currency_code: localCourse.currency === 'INR' ? 'EUR' : (localCourse.currency || 'EUR') },
                             description: `${course.title} — ItaloStudy Course`,
                             custom_id: txnId,
@@ -264,15 +274,17 @@ export default function CoursePaymentModal({ course, onClose }: CoursePaymentMod
         else if (selectedGateway === 'paypal') handlePayPal();
     };
 
-    const isINR = typeof navigator !== 'undefined' && (
-        Intl.DateTimeFormat().resolvedOptions().timeZone?.includes('Calcutta') ||
-        Intl.DateTimeFormat().resolvedOptions().timeZone?.includes('Kolkata')
-    );
-
     const hasDiscount = !!course.discount_price_eur || !!course.regional_prices?.INR_discount;
     const localCourse = hasDiscount
         ? getRegionalPrice(course.discount_price_eur || course.price_eur, course.regional_prices?.INR_discount ? { INR: course.regional_prices.INR_discount } : undefined)
         : getRegionalPrice(course.price_eur, course.regional_prices);
+
+    // ── Gateway visibility rules ──────────────────────────────────────────────
+    // India → Razorpay only  |  Rest of world → Dodo + PayPal (no Razorpay)
+    const showRazorpay = isIndia && gateways.razorpay?.enabled;
+    const showDodo     = !isIndia && gateways.dodo?.enabled;
+    const showPaypal   = !isIndia && gateways.paypal?.enabled;
+    const noGateways   = !showRazorpay && !showDodo && !showPaypal;
 
     return (
         <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
@@ -287,7 +299,7 @@ export default function CoursePaymentModal({ course, onClose }: CoursePaymentMod
                 animate={{ opacity: 1, scale: 1, y: 0 }}
                 exit={{ opacity: 0, scale: 0.95, y: 20 }}
                 transition={{ duration: 0.25, ease: [0.22, 1, 0.36, 1] }}
-                className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-[2rem] overflow-hidden shadow-2xl"
+                className="relative w-full max-w-md bg-white dark:bg-slate-900 rounded-[2rem] overflow-hidden shadow-2xl border border-slate-100 dark:border-slate-800"
             >
                 {/* Accent bar */}
                 <div className="h-1.5 w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500" />
@@ -296,7 +308,7 @@ export default function CoursePaymentModal({ course, onClose }: CoursePaymentMod
                 {!isProcessing && (
                     <button onClick={onClose}
                         className="absolute top-5 right-5 w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors z-10">
-                        <X className="w-4 h-4 text-slate-500" />
+                        <X className="w-4 h-4 text-slate-500 dark:text-slate-400" />
                     </button>
                 )}
 
@@ -312,17 +324,17 @@ export default function CoursePaymentModal({ course, onClose }: CoursePaymentMod
                                     <div className="w-12 h-12 rounded-xl bg-indigo-100 dark:bg-indigo-900/40 flex items-center justify-center flex-shrink-0 overflow-hidden">
                                         {course.thumbnail_url
                                             ? <img src={course.thumbnail_url} alt="" className="w-full h-full object-cover" />
-                                            : <GraduationCap className="w-6 h-6 text-indigo-600" />}
+                                            : <GraduationCap className="w-6 h-6 text-indigo-600 dark:text-indigo-400" />}
                                     </div>
                                     <div>
                                         <p className="text-[9px] font-black uppercase tracking-widest text-indigo-500">Course Enrollment</p>
                                         <h2 className="font-black text-slate-900 dark:text-white text-base leading-tight">{course.title}</h2>
-                                        <p className="text-xs text-slate-400 font-medium mt-0.5">{formatExpiry(course.expiry_days)} access · One-time payment</p>
+                                        <p className="text-xs text-slate-400 dark:text-slate-500 font-medium mt-0.5">{formatExpiry(course.expiry_days)} access · One-time payment</p>
                                     </div>
                                 </div>
 
-                                {/* Price */}
-                                <div className="bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl p-4 flex items-center justify-between">
+                                {/* Price box */}
+                                <div className="bg-indigo-50 dark:bg-indigo-950/40 rounded-2xl p-4 flex items-center justify-between border border-indigo-100 dark:border-indigo-900/40">
                                     <div className="space-y-0.5">
                                         {[
                                             { icon: Clock, text: `${formatExpiry(course.expiry_days)} access` },
@@ -335,25 +347,27 @@ export default function CoursePaymentModal({ course, onClose }: CoursePaymentMod
                                     </div>
                                     <div className="text-right">
                                         <p className="text-[9px] font-black uppercase tracking-widest text-indigo-400 mb-1">Total</p>
-                                        <div className="flex items-baseline gap-0.5">
-                                            <span className="text-2xl font-black text-indigo-700 dark:text-indigo-300">{formatPrice(localCourse.amount, localCourse.currency)}</span>
-                                        </div>
+                                        <span className="text-2xl font-black text-indigo-700 dark:text-indigo-300">
+                                            {formatPrice(localCourse.amount, localCourse.currency)}
+                                        </span>
                                     </div>
                                 </div>
 
                                 {/* Payment method selection */}
                                 <div className="space-y-3">
-                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                                    <p className="text-[9px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 flex items-center gap-2">
                                         <CreditCard className="w-3 h-3" /> Select Payment Method
                                     </p>
 
-                                    {/* Razorpay — India */}
-                                    {isINR && gateways.razorpay?.enabled && (
+                                    {/* ── Razorpay — India only ── */}
+                                    {showRazorpay && (
                                         <div className="space-y-1.5">
-                                            <p className="text-[8px] font-black uppercase tracking-widest text-slate-300 px-1">India</p>
+                                            <p className="text-[8px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 px-1">India</p>
                                             <button onClick={() => setSelectedGateway('razorpay')}
-                                                className={cn('w-full p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2',
-                                                    selectedGateway === 'razorpay' ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/20' : 'border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700')}>
+                                                className={cn('w-full p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 bg-white dark:bg-slate-800',
+                                                    selectedGateway === 'razorpay'
+                                                        ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/20'
+                                                        : 'border-slate-100 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-slate-600')}>
                                                 <img src="/payments/razorpay.webp" alt="Razorpay" className="h-6 w-auto object-contain" />
                                                 <div className="flex items-center gap-2 opacity-60">
                                                     <img src="/payments/upi.webp" alt="UPI" className="h-3 w-auto" />
@@ -364,13 +378,15 @@ export default function CoursePaymentModal({ course, onClose }: CoursePaymentMod
                                         </div>
                                     )}
 
-                                    {/* Dodo — International */}
-                                    {gateways.dodo?.enabled && (
+                                    {/* ── Dodo — International (non-India) ── */}
+                                    {showDodo && (
                                         <div className="space-y-1.5">
-                                            <p className="text-[8px] font-black uppercase tracking-widest text-slate-300 px-1">Cards &amp; Digital Wallets</p>
+                                            <p className="text-[8px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 px-1">Cards &amp; Digital Wallets</p>
                                             <button onClick={() => setSelectedGateway('dodo')}
-                                                className={cn('w-full p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2',
-                                                    selectedGateway === 'dodo' ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/20' : 'border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700')}>
+                                                className={cn('w-full p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2 bg-white dark:bg-slate-800',
+                                                    selectedGateway === 'dodo'
+                                                        ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/20'
+                                                        : 'border-slate-100 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-slate-600')}>
                                                 <img src="/payments/dodopayments.webp" alt="Dodo Payments" className="h-6 w-auto object-contain" />
                                                 <div className="flex flex-wrap items-center justify-center gap-1.5 opacity-60">
                                                     <img src="/payments/googlepay.webp" alt="Google Pay" className="h-3 w-auto" />
@@ -382,30 +398,32 @@ export default function CoursePaymentModal({ course, onClose }: CoursePaymentMod
                                         </div>
                                     )}
 
-                                    {/* PayPal */}
-                                    {gateways.paypal?.enabled && (
+                                    {/* ── PayPal — International (non-India) ── */}
+                                    {showPaypal && (
                                         <div className="space-y-1.5">
-                                            <p className="text-[8px] font-black uppercase tracking-widest text-slate-300 px-1">PayPal</p>
+                                            <p className="text-[8px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 px-1">PayPal</p>
                                             <button onClick={() => setSelectedGateway('paypal')}
-                                                className={cn('w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-center',
-                                                    selectedGateway === 'paypal' ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/20' : 'border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700')}>
+                                                className={cn('w-full p-4 rounded-2xl border-2 transition-all flex items-center justify-center bg-white dark:bg-slate-800',
+                                                    selectedGateway === 'paypal'
+                                                        ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/20'
+                                                        : 'border-slate-100 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-slate-600')}>
                                                 <img src="/payments/paypal.webp" alt="PayPal" className="h-6 w-auto object-contain" />
                                             </button>
                                         </div>
                                     )}
 
-                                    {/* No gateways configured */}
-                                    {!gateways.dodo?.enabled && !gateways.razorpay?.enabled && !gateways.paypal?.enabled && (
-                                        <div className="text-center py-6 text-slate-400 text-sm">
+                                    {/* No gateways configured yet (loading or misconfigured) */}
+                                    {noGateways && (
+                                        <div className="text-center py-6 text-slate-400 dark:text-slate-500 text-sm">
                                             <CreditCard className="w-8 h-8 mx-auto mb-2 opacity-30" />
                                             <p>Payment methods loading…</p>
                                         </div>
                                     )}
 
-                                    {/* PayPal buttons render here */}
+                                    {/* PayPal buttons render target */}
                                     <div id="course-paypal-btn-container" ref={paypalContainerRef} className="empty:hidden mt-2" />
 
-                                    {/* Pay Now */}
+                                    {/* Pay Now button — non-PayPal gateways */}
                                     {selectedGateway && selectedGateway !== 'paypal' && (
                                         <motion.button
                                             initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
@@ -418,7 +436,7 @@ export default function CoursePaymentModal({ course, onClose }: CoursePaymentMod
                                         </motion.button>
                                     )}
 
-                                    {/* PayPal shows buttons inline, trigger render */}
+                                    {/* PayPal render trigger */}
                                     {selectedGateway === 'paypal' && !paypalRendered.current && (
                                         <motion.button
                                             initial={{ opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }}
@@ -434,11 +452,11 @@ export default function CoursePaymentModal({ course, onClose }: CoursePaymentMod
 
                                 {/* Security footer */}
                                 <div className="flex items-center justify-center gap-4 pt-1">
-                                    <div className="flex items-center gap-1.5 text-slate-300 dark:text-slate-600">
+                                    <div className="flex items-center gap-1.5 text-slate-400 dark:text-slate-500">
                                         <Lock className="w-3 h-3" />
                                         <span className="text-[9px] font-black uppercase tracking-widest">256-bit SSL</span>
                                     </div>
-                                    <div className="flex items-center gap-1.5 text-slate-300 dark:text-slate-600">
+                                    <div className="flex items-center gap-1.5 text-slate-400 dark:text-slate-500">
                                         <ShieldCheck className="w-3 h-3" />
                                         <span className="text-[9px] font-black uppercase tracking-widest">Secure Checkout</span>
                                     </div>
@@ -459,7 +477,7 @@ export default function CoursePaymentModal({ course, onClose }: CoursePaymentMod
                                 </div>
                                 <div>
                                     <h3 className="font-black text-slate-900 dark:text-white text-lg">Opening Checkout…</h3>
-                                    <p className="text-sm text-slate-400 mt-1">Loading secure payment window…</p>
+                                    <p className="text-sm text-slate-400 dark:text-slate-500 mt-1">Loading secure payment window…</p>
                                 </div>
                             </motion.div>
                         )}
@@ -468,19 +486,20 @@ export default function CoursePaymentModal({ course, onClose }: CoursePaymentMod
                         {state === 'error' && (
                             <motion.div key="err" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
                                 className="text-center py-6 space-y-5">
-                                <div className="w-16 h-16 rounded-full bg-rose-50 dark:bg-rose-900/30 border-2 border-rose-200 flex items-center justify-center mx-auto">
+                                <div className="w-16 h-16 rounded-full bg-rose-50 dark:bg-rose-900/30 border-2 border-rose-200 dark:border-rose-800 flex items-center justify-center mx-auto">
                                     <AlertCircle className="w-7 h-7 text-rose-500" />
                                 </div>
                                 <div>
                                     <h3 className="font-black text-rose-700 dark:text-rose-400 text-lg">Payment Failed</h3>
-                                    <p className="text-sm text-slate-400 mt-2 leading-relaxed">{errorMsg}</p>
+                                    <p className="text-sm text-slate-400 dark:text-slate-500 mt-2 leading-relaxed">{errorMsg}</p>
                                 </div>
                                 <div className="space-y-2">
                                     <button onClick={() => { setState('select'); setSelectedGateway(null); }}
-                                        className="w-full h-12 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black uppercase tracking-widest text-sm">
+                                        className="w-full h-12 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black uppercase tracking-widest text-sm transition-colors">
                                         Try Again
                                     </button>
-                                    <button onClick={onClose} className="w-full text-xs font-bold text-slate-400 hover:text-slate-600 py-1 transition-colors">
+                                    <button onClick={onClose}
+                                        className="w-full text-xs font-bold text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 py-1 transition-colors">
                                         Cancel
                                     </button>
                                 </div>

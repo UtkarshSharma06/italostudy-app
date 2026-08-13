@@ -9,6 +9,22 @@ import {
     ArrowLeft, Loader2, CheckCircle, AlertCircle, Tag, Heart, ShieldCheck, Lock, CreditCard, X
 } from 'lucide-react';
 import { toast } from 'sonner';
+import { getCountryCode } from '@/utils/countryDetection';
+
+/**
+ * India detection — timezone first (VPN-proof), IP as fallback.
+ * Same logic as CoursePaymentModal.
+ */
+async function detectIsIndia(): Promise<boolean> {
+    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+    if (tz.includes('Kolkata') || tz.includes('Calcutta')) return true;
+    try {
+        const code = await getCountryCode();
+        return code === 'IN';
+    } catch {
+        return false;
+    }
+}
 
 declare global {
     interface Window { Razorpay: any; paypal: any; }
@@ -39,7 +55,6 @@ export default function CourseCheckout() {
     const paypalContainerRef = useRef<HTMLDivElement>(null);
     const paypalRendered = useRef(false);
 
-    // Coupon states
     const [couponInput, setCouponInput] = useState('');
     const [appliedCoupon, setAppliedCoupon] = useState<any>(null);
     const [isApplyingCoupon, setIsApplyingCoupon] = useState(false);
@@ -47,10 +62,16 @@ export default function CourseCheckout() {
     // Pre-Registration state
     const [isPreRegistered, setIsPreRegistered] = useState(false);
 
-    const isINR = typeof navigator !== 'undefined' && (
-        Intl.DateTimeFormat().resolvedOptions().timeZone?.includes('Calcutta') ||
-        Intl.DateTimeFormat().resolvedOptions().timeZone?.includes('Kolkata')
-    );
+    // India detection — async, VPN-proof (timezone-first)
+    const [isIndia, setIsIndia] = useState(() => {
+        // Synchronous fast-path: check timezone immediately to avoid flicker
+        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
+        return tz.includes('Kolkata') || tz.includes('Calcutta');
+    });
+
+    useEffect(() => {
+        detectIsIndia().then(setIsIndia);
+    }, []);
 
     useEffect(() => {
         if (!courseId) { navigate('/courses'); return; }
@@ -79,11 +100,8 @@ export default function CourseCheckout() {
         const { data: gatewayData } = await (supabase as any).rpc('get_payment_config');
         if (gatewayData) {
             setGateways(gatewayData);
-            
-            // Auto-select gateway logic
-            if (isINR && gatewayData.razorpay?.enabled) setSelectedGateway('razorpay');
-            else if (gatewayData.dodo?.enabled) setSelectedGateway('dodo');
-            else if (gatewayData.paypal?.enabled) setSelectedGateway('paypal');
+            // Note: gateway auto-selection now happens in a separate useEffect
+            // that watches both `gateways` and `isIndia` so it fires after async detection.
 
             if (!document.querySelector('script[src*="razorpay"]')) {
                 const s = document.createElement('script');
@@ -100,6 +118,14 @@ export default function CourseCheckout() {
         }
         setIsLoading(false);
     };
+
+    // ── Auto-select gateway after both gateways + India detection are ready ────
+    useEffect(() => {
+        if (!gateways || selectedGateway) return; // don't override user's choice
+        if (isIndia && gateways.razorpay?.enabled) setSelectedGateway('razorpay');
+        else if (!isIndia && gateways.dodo?.enabled) setSelectedGateway('dodo');
+        else if (!isIndia && gateways.paypal?.enabled) setSelectedGateway('paypal');
+    }, [gateways, isIndia]);
 
     // ── Payment Handlers ───────────────────────────────────────────────────────
     const handleDodo = async () => {
@@ -245,6 +271,13 @@ export default function CourseCheckout() {
 
             if (error || !coupon) {
                 toast.error('Invalid or expired coupon code');
+                setIsApplyingCoupon(false);
+                return;
+            }
+
+            // Reject subscription-only coupons on course checkout
+            if (coupon.applies_to === 'subscription') {
+                toast.error('This coupon is only valid for subscription plans, not course purchases');
                 setIsApplyingCoupon(false);
                 return;
             }
@@ -396,7 +429,7 @@ export default function CourseCheckout() {
                                     <h2 className="text-lg font-black text-slate-800">Select Payment Method</h2>
                                 </div>
                                 <div className="p-5 space-y-3">
-                                    {isINR && gateways.razorpay?.enabled && (
+                                    {isIndia && gateways.razorpay?.enabled && (
                                         <button onClick={() => setSelectedGateway('razorpay')}
                                             className={`w-full p-3 sm:p-4 rounded-xl border-2 transition-all group ${selectedGateway === 'razorpay' ? 'border-indigo-600 bg-indigo-50/50 shadow-[0_0_0_4px_rgba(79,70,229,0.1)]' : 'border-slate-100 hover:border-slate-300 bg-white'}`}>
                                             <div className="flex items-center justify-between">
@@ -420,7 +453,7 @@ export default function CourseCheckout() {
                                         </button>
                                     )}
 
-                                    {!isINR && gateways.dodo?.enabled && (
+                                    {!isIndia && gateways.dodo?.enabled && (
                                         <button onClick={() => setSelectedGateway('dodo')}
                                             className={`w-full p-3 sm:p-4 rounded-xl border-2 transition-all group ${selectedGateway === 'dodo' ? 'border-indigo-600 bg-indigo-50/50 shadow-[0_0_0_4px_rgba(79,70,229,0.1)]' : 'border-slate-100 hover:border-slate-300 bg-white'}`}>
                                             <div className="flex items-center justify-between">

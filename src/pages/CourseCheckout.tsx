@@ -9,22 +9,6 @@ import {
     ArrowLeft, Loader2, CheckCircle, AlertCircle, Tag, Heart, ShieldCheck, Lock, CreditCard, X
 } from 'lucide-react';
 import { toast } from 'sonner';
-import { getCountryCode } from '@/utils/countryDetection';
-
-/**
- * India detection — timezone first (VPN-proof), IP as fallback.
- * Same logic as CoursePaymentModal.
- */
-async function detectIsIndia(): Promise<boolean> {
-    const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
-    if (tz.includes('Kolkata') || tz.includes('Calcutta')) return true;
-    try {
-        const code = await getCountryCode();
-        return code === 'IN';
-    } catch {
-        return false;
-    }
-}
 
 declare global {
     interface Window { Razorpay: any; paypal: any; }
@@ -42,7 +26,7 @@ export default function CourseCheckout() {
     const { courseId } = useParams<{ courseId: string }>();
     const navigate = useNavigate();
     const { user } = useAuth() as any;
-    const { formatPrice, getRegionalPrice } = useCurrency();
+    const { formatPrice, getRegionalPrice, currency: currentCurrency } = useCurrency();
 
     const [course, setCourse] = useState<Course | null>(null);
     const [isLoading, setIsLoading] = useState(true);
@@ -62,16 +46,10 @@ export default function CourseCheckout() {
     // Pre-Registration state
     const [isPreRegistered, setIsPreRegistered] = useState(false);
 
-    // India detection — async, VPN-proof (timezone-first)
-    const [isIndia, setIsIndia] = useState(() => {
-        // Synchronous fast-path: check timezone immediately to avoid flicker
-        const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || '';
-        return tz.includes('Kolkata') || tz.includes('Calcutta');
-    });
-
-    useEffect(() => {
-        detectIsIndia().then(setIsIndia);
-    }, []);
+    // Use currency from useCurrency() — same as subscription CheckoutModal.
+    // INR = Indian user → Razorpay. Everything else → Dodo.
+    // Works correctly on VPN because useCurrency() uses IP detection.
+    const isIndia = currentCurrency.code === 'INR';
 
     useEffect(() => {
         if (!courseId) { navigate('/courses'); return; }
@@ -119,7 +97,7 @@ export default function CourseCheckout() {
         setIsLoading(false);
     };
 
-    // ── Auto-select gateway after both gateways + India detection are ready ────
+    // ── Auto-select gateway after both gateways + currency are ready ───────────
     useEffect(() => {
         if (!gateways || selectedGateway) return; // don't override user's choice
         if (isIndia && gateways.razorpay?.enabled) setSelectedGateway('razorpay');

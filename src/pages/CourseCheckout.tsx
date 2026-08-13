@@ -65,7 +65,7 @@ export default function CourseCheckout() {
 
         // Check if pre-registered
         if (user && courseData.pre_register_discount_percent > 0) {
-            const { data: preReg } = await supabase
+            const { data: preReg } = await (supabase as any)
                 .from('course_pre_registrations')
                 .select('id')
                 .eq('user_id', user.id)
@@ -254,13 +254,14 @@ export default function CourseCheckout() {
             }
 
             // Reject subscription-only coupons on course checkout
-            if (coupon.applies_to === 'subscription') {
+            const c = coupon as any;
+            if (c.applies_to === 'subscription') {
                 toast.error('This coupon is only valid for subscription plans, not course purchases');
                 setIsApplyingCoupon(false);
                 return;
             }
 
-            if (coupon.course_id && coupon.course_id !== course?.id) {
+            if (c.course_id && c.course_id !== course?.id) {
                 toast.error('This coupon is not valid for this course');
                 setIsApplyingCoupon(false);
                 return;

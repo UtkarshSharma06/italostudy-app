@@ -226,7 +226,7 @@ export default function CoursePaymentModal({ course, onClose }: CoursePaymentMod
                     return actions.order.create({
                         intent: 'CAPTURE',
                         purchase_units: [{
-                            amount: { value: course.price_eur.toString(), currency_code: 'EUR' },
+                            amount: { value: localCourse.amount.toFixed(2), currency_code: localCourse.currency === 'INR' ? 'EUR' : (localCourse.currency || 'EUR') },
                             description: `${course.title} — ItaloStudy Course`,
                             custom_id: txnId,
                         }],

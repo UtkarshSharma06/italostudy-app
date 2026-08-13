@@ -1201,7 +1201,7 @@ export default function CheckoutModal({
                                                             </div>
                                                             <div className="flex flex-col items-start gap-0.5 md:gap-1.5 mt-0.5 md:mt-0">
                                                                 <div className="flex items-center gap-2">
-                                                                    <img src="/payments/dodopayments.webp" alt="Dodo Payments" className="h-3.5 md:h-6 w-auto object-contain" />
+                                                                    <img src="/payments/dodopayments.webp" alt="Dodo Payments" className="h-6 md:h-9 w-auto object-contain" />
                                                                 </div>
                                                                 <div className="hidden md:flex items-center gap-1.5 opacity-60">
                                                                     <img src="/payments/stripe.webp" alt="Stripe" className="h-3 w-auto" />

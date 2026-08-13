@@ -477,7 +477,7 @@ export default function BundleCheckoutModal({ course, plan, onClose }: BundleChe
                                             <button onClick={() => setSelectedGateway('dodo')}
                                                 className={cn('w-full p-4 rounded-2xl border-2 transition-all flex flex-col items-center gap-2',
                                                     selectedGateway === 'dodo' ? 'border-violet-600 bg-violet-50/50 dark:bg-violet-900/20' : 'border-slate-100 dark:border-slate-800 hover:border-slate-200 dark:hover:border-slate-700')}>
-                                                <img src="/payments/dodopayments.webp" alt="Dodo Payments" className="h-6 w-auto object-contain" />
+                                                <img src="/payments/dodopayments.webp" alt="Dodo Payments" className="h-9 w-auto object-contain" />
                                                 <div className="flex flex-wrap items-center justify-center gap-1.5 opacity-60">
                                                     <img src="/payments/googlepay.webp" alt="Google Pay" className="h-3 w-auto" />
                                                     <img src="/payments/applepay.webp" alt="Apple Pay" className="h-3 w-auto" />

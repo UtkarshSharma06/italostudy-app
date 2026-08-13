@@ -446,7 +446,7 @@ export default function CourseCheckout() {
                                                     </div>
                                                 </div>
                                                 <div className="flex items-center gap-1.5 sm:gap-2">
-                                                    <img src="/payments/dodopayments.webp" alt="Dodo" className="h-4 sm:h-5 w-auto object-contain opacity-80 group-hover:opacity-100 transition-opacity hidden sm:block" />
+                                                    <img src="/payments/dodopayments.webp" alt="Dodo" className="h-7 sm:h-9 w-auto object-contain opacity-80 group-hover:opacity-100 transition-opacity" />
                                                 </div>
                                             </div>
                                             <div className="mt-3 pl-7 sm:pl-9 flex flex-wrap gap-1.5 sm:gap-2 opacity-50 group-hover:opacity-70 transition-opacity items-center">

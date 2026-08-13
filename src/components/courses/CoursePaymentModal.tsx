@@ -380,7 +380,7 @@ export default function CoursePaymentModal({ course, onClose }: CoursePaymentMod
                                                     selectedGateway === 'dodo'
                                                         ? 'border-indigo-600 bg-indigo-50/50 dark:bg-indigo-900/20'
                                                         : 'border-slate-100 dark:border-slate-700 hover:border-indigo-300 dark:hover:border-slate-600')}>
-                                                <img src="/payments/dodopayments.webp" alt="Dodo Payments" className="h-6 w-auto object-contain" />
+                                                <img src="/payments/dodopayments.webp" alt="Dodo Payments" className="h-9 w-auto object-contain" />
                                                 <div className="flex flex-wrap items-center justify-center gap-1.5 opacity-60">
                                                     <img src="/payments/googlepay.webp" alt="Google Pay" className="h-3 w-auto" />
                                                     <img src="/payments/applepay.webp" alt="Apple Pay" className="h-3 w-auto" />

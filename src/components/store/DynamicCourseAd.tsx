@@ -154,9 +154,13 @@ export const DynamicCourseAd = ({
                         const alreadyPreRegistered = preRegistered[course.id];
                         const isRegistering = preRegistering[course.id];
 
-                        const displayPrice = course.price_eur;
-                        const originalPrice = course.discount_price_eur;
-                        const hasDiscount = originalPrice && originalPrice > displayPrice;
+                        // base price = price_eur (shown struck-through)
+                        // discounted price = discount_price_eur (shown prominent)
+                        const basePrice = course.price_eur;
+                        const discountedPrice = course.discount_price_eur;
+                        const hasDiscount = discountedPrice && discountedPrice < basePrice && discountedPrice > 0;
+                        const displayPrice = hasDiscount ? discountedPrice : basePrice; // prominent price
+                        const discountPct = hasDiscount ? Math.round(((basePrice - discountedPrice) / basePrice) * 100) : 0;
 
                         return (
                             <button
@@ -217,22 +221,26 @@ export const DynamicCourseAd = ({
                                             </button>
                                         )
                                     ) : (
-                                        /* Normal price display */
-                                        <div className="flex flex-wrap items-baseline gap-1.5">
+                                        /* Normal price display — discounted price prominent, base price struck through */
+                                        <div className="flex flex-col gap-0.5">
                                             {displayPrice != null ? (
                                                 <>
-                                                    <span className="text-base font-black text-emerald-600 dark:text-emerald-400">
-                                                        {formatPrice(displayPrice)}
-                                                    </span>
+                                                    {/* Main (prominent) price */}
+                                                    <div className="flex items-baseline gap-1.5 flex-wrap">
+                                                        <span className="text-base font-black text-emerald-600 dark:text-emerald-400">
+                                                            {formatPrice(displayPrice)}
+                                                        </span>
+                                                        {hasDiscount && (
+                                                            <span className="text-[11px] font-bold text-slate-400 line-through">
+                                                                {formatPrice(basePrice)}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    {/* Discount badge */}
                                                     {hasDiscount && (
-                                                        <>
-                                                            <span className="text-xs font-bold text-slate-400 line-through">
-                                                                {formatPrice(originalPrice)}
-                                                            </span>
-                                                            <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 px-1.5 py-0.5 rounded-md ml-auto">
-                                                                -{Math.round(((originalPrice - displayPrice) / originalPrice) * 100)}%
-                                                            </span>
-                                                        </>
+                                                        <span className="text-[10px] font-black bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400 px-1.5 py-0.5 rounded-md self-start">
+                                                            -{discountPct}% OFF
+                                                        </span>
                                                     )}
                                                 </>
                                             ) : (

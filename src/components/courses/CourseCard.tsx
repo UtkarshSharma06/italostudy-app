@@ -384,12 +384,34 @@ export default function CourseCard({ course, index = 0, variant = 'default' }: C
                     )}
 
                     <div className="flex items-center">
-                        <button className="bg-[#2d2d2d] dark:bg-slate-800 hover:bg-[#1a1a1a] dark:hover:bg-slate-700 text-white font-bold text-[13px] px-5 py-2 rounded-l-[8px] transition-colors h-[38px] flex items-center justify-center">
-                            {isEnrolled ? 'View Details' : (isComingSoon ? 'Pre-Register' : 'Buy Now')}
-                        </button>
-                        <div className="bg-[#1a1a1a] dark:bg-slate-700 text-white border-l border-white/20 dark:border-white/10 h-[38px] w-[34px] rounded-r-[8px] flex items-center justify-center">
-                            <ChevronRight className="w-4 h-4" />
-                        </div>
+                        {isEnrolled ? (
+                            <>
+                                <button className="bg-[#2d2d2d] dark:bg-slate-800 hover:bg-[#1a1a1a] dark:hover:bg-slate-700 text-white font-bold text-[13px] px-5 py-2 rounded-l-[8px] transition-colors h-[38px] flex items-center justify-center">
+                                    View Details
+                                </button>
+                                <div className="bg-[#1a1a1a] dark:bg-slate-700 text-white border-l border-white/20 dark:border-white/10 h-[38px] w-[34px] rounded-r-[8px] flex items-center justify-center">
+                                    <ChevronRight className="w-4 h-4" />
+                                </div>
+                            </>
+                        ) : isComingSoon ? (
+                            <>
+                                <button className="bg-slate-600 dark:bg-slate-700 hover:bg-slate-700 dark:hover:bg-slate-600 text-white font-bold text-[13px] px-5 py-2 rounded-l-[8px] transition-colors h-[38px] flex items-center justify-center">
+                                    Pre-Register
+                                </button>
+                                <div className="bg-slate-700 dark:bg-slate-600 text-white border-l border-white/20 h-[38px] w-[34px] rounded-r-[8px] flex items-center justify-center">
+                                    <ChevronRight className="w-4 h-4" />
+                                </div>
+                            </>
+                        ) : (
+                            <>
+                                <button className="bg-emerald-600 hover:bg-emerald-700 active:bg-emerald-800 text-white font-bold text-[13px] px-5 py-2 rounded-l-[8px] transition-colors h-[38px] flex items-center justify-center">
+                                    Buy Now
+                                </button>
+                                <div className="bg-emerald-700 hover:bg-emerald-800 text-white border-l border-white/20 h-[38px] w-[34px] rounded-r-[8px] flex items-center justify-center cursor-pointer transition-colors">
+                                    <ChevronRight className="w-4 h-4" />
+                                </div>
+                            </>
+                        )}
                     </div>
                 </div>
             </div>

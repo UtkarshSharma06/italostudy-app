@@ -1389,7 +1389,7 @@ const MobileDashboard: React.FC = () => {
 
                     {/* WhatsApp Half */}
                     <div
-                        onClick={() => openExternalUrl('https://chat.whatsapp.com/CfVh7u9L6vT7ZFpZwwVa4A')}
+                        onClick={() => openExternalUrl('https://chat.whatsapp.com/JZxQCS4A4ZO8k7bOEMYtTz')}
                         className="bg-[#25D366] text-white rounded-3xl p-4 shadow-sm flex flex-col justify-between cursor-pointer active:scale-[0.98] transition-all relative overflow-hidden"
                     >
                         <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 blur-xl rounded-full -mr-10 -mt-10" />

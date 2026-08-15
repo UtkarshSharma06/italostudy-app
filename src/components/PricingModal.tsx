@@ -1,5 +1,5 @@
 import { useNavigate } from 'react-router-dom';
-import { BadgeCheck, Loader2, Info, ChevronRight, Brain, X, Sparkles, Check, Zap, Target, Gem, Globe, Shield, Disc, Award, FileText, PlaySquare, BarChart2, MessageSquare, ArrowRight, ShieldCheck, RotateCcw, GraduationCap } from 'lucide-react';
+import { BadgeCheck, Loader2, Info, ChevronRight, Brain, X, Sparkles, Check, Zap, Target, Gem, Globe, Shield, Disc, Award, FileText, PlaySquare, BarChart2, MessageSquare, ArrowRight, ShieldCheck, RotateCcw, GraduationCap, BookOpen } from 'lucide-react';
 import { add } from 'date-fns';
 import CheckoutModal from '@/components/CheckoutModal';
 import { Button } from '@/components/ui/button';
@@ -66,6 +66,25 @@ export default function PricingModal() {
     const [isRendering, setIsRendering] = useState(true);
     const [selectedPlan, setSelectedPlan] = useState<string>('');
     const [selectedCycleId, setSelectedCycleId] = useState<string>('');
+    const [courses, setCourses] = useState<any[]>([]);
+
+    useEffect(() => {
+        async function fetchCourses() {
+            try {
+                const { data } = await supabase
+                    .from('courses')
+                    .select('*')
+                    .eq('is_active', true)
+                    .order('created_at', { ascending: false });
+                if (data) {
+                    setCourses(data);
+                }
+            } catch (err) {
+                console.error("Failed to fetch courses for pricing modal", err);
+            }
+        }
+        fetchCourses();
+    }, []);
 
     useEffect(() => {
         if (isPricingModalOpen) {
@@ -568,7 +587,7 @@ export default function PricingModal() {
                             exit={{ y: 20, opacity: 0 }}
                             transition={{ duration: 0.18, ease: [0.22, 1, 0.36, 1] }}
                             style={{ willChange: 'transform, opacity' }}
-                            className="hidden md:flex flex-col w-[1000px] max-w-full h-[100dvh] max-h-[100dvh] rounded-none bg-white dark:bg-slate-900 overflow-hidden relative shadow-[0_20px_60px_-15px_rgba(0,0,0,0.3)] font-sans"
+                            className="hidden md:flex flex-col w-screen max-w-full h-[100dvh] max-h-[100dvh] rounded-none bg-white dark:bg-slate-900 overflow-hidden relative font-sans"
                             onClick={(e) => e.stopPropagation()}
                         >
                             {(() => {
@@ -677,7 +696,7 @@ export default function PricingModal() {
                                             </div>
 
                                             {/* Right Column (Cards) */}
-                                            <div className="flex-1 flex flex-col pl-6">
+                                            <div className="flex-1 flex flex-col pl-6 max-w-[600px]">
                                                 
                                                 {/* Top Toggle Area for Global Cycles */}
                                                 <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-xl mb-4 shrink-0">
@@ -830,6 +849,56 @@ export default function PricingModal() {
                                                             {profile?.selected_plan !== 'global' && isUpdating === null && <ArrowRight className="w-3 h-3" />}
                                                         </button>
                                                     </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Third Column: Courses */}
+                                            <div className="w-[400px] xl:w-[500px] pl-6 ml-6 border-l border-slate-100 dark:border-slate-800 flex flex-col shrink-0">
+                                                <h3 className="text-[13px] font-black uppercase tracking-widest text-slate-800 dark:text-slate-200 mb-4 flex items-center gap-2 mt-1">
+                                                    <BookOpen className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                                                    Available Courses
+                                                </h3>
+                                                <div className="overflow-y-auto pr-2 flex-1 space-y-3 pb-4">
+                                                    {courses.length === 0 ? (
+                                                        <div className="flex items-center justify-center h-full text-slate-400 text-xs font-bold uppercase">Loading courses...</div>
+                                                    ) : courses.map(c => {
+                                                        const isComingSoon = c.launch_date && (c.launch_date.toLowerCase() === 'coming soon' || (!isNaN(Date.parse(c.launch_date)) && new Date(c.launch_date) > new Date()));
+                                                        
+                                                        return (
+                                                        <div key={c.id} onClick={() => { closePricingModal(); navigate(`/courses/${c.id}`); }} className="flex items-center gap-3 p-3 rounded-xl border border-slate-100 dark:border-slate-800 hover:border-indigo-500/30 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer group transition-all bg-white dark:bg-slate-900 shadow-sm hover:shadow-md">
+                                                            <div className="relative shrink-0">
+                                                                <img src={c.thumbnail_url} alt={c.title} className="w-[100px] h-[64px] rounded-lg object-cover bg-slate-100 dark:bg-slate-800" />
+                                                                {c.discount_price_eur && !isComingSoon && (
+                                                                    <div className="absolute -top-2 -right-2 bg-gradient-to-r from-red-500 to-orange-500 text-white text-[9px] font-black uppercase px-1.5 py-0.5 rounded shadow-sm scale-90">SALE</div>
+                                                                )}
+                                                            </div>
+                                                            <div className="flex-1 min-w-0 flex flex-col justify-center">
+                                                                <h4 className="text-[12px] font-bold text-slate-900 dark:text-white truncate group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors mb-0.5">{c.title}</h4>
+                                                                <p className="text-[10px] text-slate-500 dark:text-slate-400 truncate font-medium">{c.exam_model_name || c.title.split(' ')[0] + ' Preparation'}</p>
+                                                                <div className="flex items-center gap-2 mt-1.5">
+                                                                    {isComingSoon ? (
+                                                                        <span className="text-[9px] font-black uppercase tracking-widest text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-500/10 px-2 py-0.5 rounded-md border border-indigo-100 dark:border-indigo-500/20">
+                                                                            Registration Open
+                                                                        </span>
+                                                                    ) : (
+                                                                        <>
+                                                                            <span className="text-[11px] font-black text-slate-900 dark:text-white">
+                                                                                {c.discount_price_eur ? `€${c.discount_price_eur}` : (c.price_eur ? `€${c.price_eur}` : 'FREE')}
+                                                                            </span>
+                                                                            {c.discount_price_eur && c.price_eur && (
+                                                                                <span className="text-[9px] font-bold text-slate-400 line-through">€{c.price_eur}</span>
+                                                                            )}
+                                                                            <span className="text-[8px] font-bold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-900/30 px-1.5 py-0.5 rounded uppercase tracking-wider ml-1 border border-emerald-200 dark:border-emerald-800">Buy Now</span>
+                                                                        </>
+                                                                    )}
+                                                                </div>
+                                                            </div>
+                                                            <div className="flex items-center justify-center w-8 h-8 rounded-full bg-indigo-50 dark:bg-indigo-500/10 opacity-0 group-hover:opacity-100 transition-all shrink-0">
+                                                                <ChevronRight className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                                                            </div>
+                                                        </div>
+                                                    )}
+                                                    )}
                                                 </div>
                                             </div>
 

@@ -12,6 +12,7 @@ import { UpgradeModal } from '@/components/UpgradeModal';
 import { SubjectIcon, getSubjectColorClass } from '@/components/ui/SubjectIcon';
 import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
+import { usePricing } from '@/context/PricingContext';
 import {
     Zap,
     Clock,
@@ -74,7 +75,8 @@ import StudyPlannerWidget from '@/components/StudyPlannerWidget';
 import { DesktopDashboardSkeleton } from '@/components/DesktopDashboardSkeleton';
 import { readDashboardCache, invalidateDashboardCache, writeDashboardCache } from '@/hooks/useDashboardPrefetch';
 import { PWAPrompt } from '@/components/PWAPrompt';
-
+import CrossSellBanner from '@/components/CrossSellBanner';
+import ExitIntentPopup from '@/components/ExitIntentPopup';
 
 interface SubjectMastery {
     subject: string;
@@ -283,6 +285,7 @@ export default function Dashboard() {
     const navigate = useNavigate();
     const location = useLocation();
     const { toast } = useToast();
+    const { openPricingModal } = usePricing();
     const { activeExam, allExams } = useExam();
     const { activeTest, refreshActiveTest } = useActiveTest();
     const [isTestNotificationDismissed, setIsTestNotificationDismissed] = useState(false);
@@ -1032,10 +1035,16 @@ export default function Dashboard() {
 
     // The Dashboard now returns a stable Layout that stays mounted throughout the loading process.
     // This prevents the Sidebar/Header from flickering between Auth Loading and Data Loading.
+    // The Dashboard now returns a stable Layout that stays mounted throughout the loading process.
+    // This prevents the Sidebar/Header from flickering between Auth Loading and Data Loading.
     return (
         <Layout isLoading={loading || isDashboardLoading}>
+            <ExitIntentPopup delaySeconds={15} onClaim={openPricingModal} />
             {/* Notifications outside the main colored wrapper so they sit at the very top under the header */}
             <LatestNotificationPopup />
+
+            {/* 🎯 Cross-sell: personalized course/subscription offer */}
+            {!loading && !isDashboardLoading && <CrossSellBanner variant="banner" />}
 
             {/* Active Test Resume Strip */}
             {!loading && !isDashboardLoading && activeTest && !isTestNotificationDismissed && (
@@ -1677,7 +1686,7 @@ export default function Dashboard() {
 
                             {/* WhatsApp Community (Always visible) */}
                             <div
-                                onClick={() => window.open('https://chat.whatsapp.com/CfVh7u9L6vT7ZFpZwwVa4A', '_blank')}
+                                onClick={() => window.open('https://chat.whatsapp.com/JZxQCS4A4ZO8k7bOEMYtTz', '_blank')}
                                 className="group relative p-5 rounded-2xl bg-[#25D366] text-white cursor-pointer shadow-lg hover:-translate-y-0.5 transition-all border border-white/10 overflow-hidden"
                             >
                                 <div className="absolute top-0 right-0 w-28 h-28 bg-emerald-400/10 blur-2xl rounded-full -mr-10 -mt-10 group-hover:bg-emerald-400/20 transition-colors" />

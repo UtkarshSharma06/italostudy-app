@@ -4,9 +4,10 @@ import { useAuth } from '@/lib/auth';
 import { useExam } from '@/context/ExamContext';
 import CourseCard from '@/components/courses/CourseCard';
 import { Search, Loader2, Filter, Zap, ArrowRight, BookOpen, LayoutGrid, X } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import Layout from '@/components/Layout';
+import ExitIntentPopup from '@/components/ExitIntentPopup';
 
 interface AdBanner {
     image_url: string;
@@ -399,6 +400,14 @@ export default function Courses({ isMobileLayout }: { isMobileLayout?: boolean }
         </div>
     );
 
-    if (isMobileLayout) return content;
-    return <Layout showFooter={false}>{content}</Layout>;
+    if (isMobileLayout) return (
+        <>
+            {content}
+        </>
+    );
+    return (
+        <Layout showFooter={false}>
+            {content}
+        </Layout>
+    );
 }

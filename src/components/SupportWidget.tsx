@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
+import { useLocation } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import ReactMarkdown from 'react-markdown';
 import remarkMath from 'remark-math';
@@ -40,6 +41,8 @@ interface Message {
 export default function SupportWidget() {
     const { user } = useAuth();
     const { toast } = useToast();
+    const location = useLocation();
+    const isPlayerPage = location.pathname.includes('/courses/');
     const [isOpen, setIsOpen] = useState(false);
     
     const [view, setView] = useState<'main' | 'new-ticket' | 'topic-list' | 'topic-detail' | 'ticket-list' | 'ticket-detail'>('main');
@@ -519,7 +522,7 @@ export default function SupportWidget() {
                 </AnimatePresence>
             
             {/* Floating Button */}
-            <div className="fixed bottom-[100px] right-4 md:bottom-6 md:right-6 z-[9999]">
+            <div className={`fixed bottom-[100px] right-4 md:bottom-6 md:right-6 z-[9999] ${isPlayerPage ? 'hidden md:block' : ''}`}>
                 <div className="relative">
                     <Button 
                         onClick={() => setIsOpen(!isOpen)}

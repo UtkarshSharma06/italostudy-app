@@ -352,7 +352,7 @@ export default function Onboarding() {
                                         <Mail className="w-4 h-4 text-[#5A32FA]" />
                                         Email Us
                                     </button>
-            <a href="https://chat.whatsapp.com/CfVh7u9L6vT7ZFpZwwVa4A" target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 hover:bg-[#25D366]/10 rounded-lg transition-colors text-slate-700 font-medium text-sm">
+            <a href="https://chat.whatsapp.com/JZxQCS4A4ZO8k7bOEMYtTz" target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 hover:bg-[#25D366]/10 rounded-lg transition-colors text-slate-700 font-medium text-sm">
                 <Phone className="w-4 h-4 text-[#25D366]" />
                 WhatsApp
             </a>
@@ -396,6 +396,17 @@ export default function Onboarding() {
             {/* Main Content Area */}
             <div className="flex-1 w-full flex flex-col items-center justify-start pt-4 z-20">
                 <div className="w-full flex flex-col items-center scale-[0.80] sm:scale-[0.85] md:scale-90 xl:scale-100 origin-top px-4 pb-12">
+                {/* Social proof pulse bar */}
+                <div className="flex items-center gap-2 bg-emerald-50 border border-emerald-100 rounded-full px-4 py-1.5 mb-4 shadow-sm">
+                    <span className="relative flex h-2 w-2">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                    <p className="text-[11px] font-bold text-emerald-700">
+                        <span className="text-emerald-900">38 students</span> joined in the last 24 hours
+                    </p>
+                </div>
+
                 {/* Welcome Text */}
                 <h1 className="text-3xl md:text-[2.75rem] font-black text-slate-900 tracking-tight text-center mb-2">
                     Welcome to ItaloStudy! 👋
@@ -620,11 +631,33 @@ export default function Onboarding() {
                             </Button>
                         </div>
 
+                        {/* Urgency micro-copy */}
+                        {step === 1 && (
+                            <p className="text-center text-[11px] text-slate-400 font-medium mt-3 animate-pulse">
+                                🔥 <span className="text-amber-500 font-bold">12 students</span> are setting up their account right now
+                            </p>
+                        )}
+                        {step === 4 && (
+                            <p className="text-center text-[11px] text-slate-400 font-medium mt-3">
+                                ✅ Almost done! Your study plan will be ready instantly.
+                            </p>
+                        )}
+
                     </motion.div>
                 </AnimatePresence>
                 
-                <div className="flex items-center justify-center gap-2 mt-4 text-slate-500 text-xs font-medium w-fit mx-auto px-4 py-2 relative z-30">
-                    <ShieldCheck className="w-4 h-4 text-[#5A32FA]" /> Trusted by 12,000+ students worldwide
+                <div className="flex items-center justify-center gap-3 mt-4 text-slate-500 text-xs font-medium w-fit mx-auto px-4 py-2 relative z-30 flex-wrap">
+                    <div className="flex items-center gap-1.5">
+                        <ShieldCheck className="w-4 h-4 text-[#5A32FA]" />
+                        <span>Trusted by <strong className="text-slate-700">12,000+</strong> students</span>
+                    </div>
+                    <span className="text-slate-300">·</span>
+                    <div className="flex items-center gap-1.5">
+                        <Star className="w-3.5 h-3.5 text-amber-400 fill-amber-400" />
+                        <span><strong className="text-slate-700">4.9/5</strong> rating</span>
+                    </div>
+                    <span className="text-slate-300">·</span>
+                    <span>🔒 100% secure & private</span>
                 </div>
             </div>
         </div>

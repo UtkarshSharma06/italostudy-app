@@ -19,6 +19,9 @@ import Footer from '@/components/Footer';
 import CheckoutModal from '@/components/CheckoutModal';
 import { cn } from '@/lib/utils';
 import SEO from '@/components/SEO';
+import SocialProofToast from '@/components/SocialProofToast';
+import LaunchCountdownBanner from '@/components/LaunchCountdownBanner';
+import ExitIntentPopup from '@/components/ExitIntentPopup';
 
 const FAQItem = ({ question, answer }: { question: string; answer: string }) => {
     const [isOpen, setIsOpen] = useState(false);
@@ -256,6 +259,13 @@ export default function Pricing() {
 
     return (
         <div className="min-h-screen bg-[#Fdfdfd] dark:bg-slate-950 font-sans text-slate-900 dark:text-white selection:bg-indigo-100 selection:text-indigo-900 relative overflow-x-hidden">
+            <SocialProofToast />
+            <LaunchCountdownBanner
+                endDate="2026-08-22T00:00:00+05:30"
+                message="🚀 Limited time — Early bird subscription pricing ends August 22!"
+                ctaText="Get Access"
+                onCtaClick={() => document.getElementById('pricing-plans')?.scrollIntoView({ behavior: 'smooth' })}
+            />
             <SEO
                 title="Pricing & Membership Plans | ItaloStudy"
                 description="Join ItaloStudy and unlock premium exam prep tools. Choose from our flexible plans for IMAT, CEnT-S, SAT, and IELTS."

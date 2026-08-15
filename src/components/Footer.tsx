@@ -66,7 +66,7 @@ export default function Footer() {
                             <motion.a
                                 whileHover={{ scale: 1.05, y: -2 }}
                                 whileTap={{ scale: 0.95 }}
-                                href="https://chat.whatsapp.com/CfVh7u9L6vT7ZFpZwwVa4A"
+                                href="https://chat.whatsapp.com/JZxQCS4A4ZO8k7bOEMYtTz"
                                 className="w-8 h-8 rounded-lg bg-white flex items-center justify-center text-slate-400 hover:text-green-600 transition-all border border-slate-200 shadow-sm"
                             >
                                 <MessageCircle className="w-4 h-4" />

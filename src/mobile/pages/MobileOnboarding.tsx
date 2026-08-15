@@ -358,7 +358,7 @@ export default function MobileOnboarding() {
                             <PopoverContent className="w-56 p-2 rounded-xl border-slate-200 shadow-xl" align="end">
                                 <div className="flex flex-col gap-1">
                                     <button onClick={() => { navigator.clipboard.writeText('contact@italostudy.com'); toast({ title: "Email copied", description: "contact@italostudy.com has been copied to your clipboard." }); }} className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 rounded-lg transition-colors text-slate-700 font-medium text-sm text-left"><Mail className="w-4 h-4 text-[#5A32FA]" />Email Us</button>
-                                    <a href="https://chat.whatsapp.com/CfVh7u9L6vT7ZFpZwwVa4A" target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 hover:bg-[#25D366]/10 rounded-lg transition-colors text-slate-700 font-medium text-sm">
+                                    <a href="https://chat.whatsapp.com/JZxQCS4A4ZO8k7bOEMYtTz" target="_blank" rel="noreferrer" className="flex items-center gap-3 p-3 hover:bg-[#25D366]/10 rounded-lg transition-colors text-slate-700 font-medium text-sm">
                                         <Phone className="w-4 h-4 text-[#25D366]" />
                                         WhatsApp
                                     </a>

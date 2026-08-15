@@ -8,12 +8,17 @@ import { useCourseAccess } from '@/hooks/useCourseAccess';
 import { usePricing } from '@/context/PricingContext';
 import { useCurrency } from '@/hooks/useCurrency';
 import CoursePaymentModal from '@/components/courses/CoursePaymentModal';
+import CrossSellBanner from '@/components/CrossSellBanner';
+import SecureYouTubePlayer from '@/components/courses/SecureYouTubePlayer';
 import {
-    ArrowLeft, Loader2, CheckCircle, Lock, Play, Sparkles, GraduationCap, ChevronRight, Share2, Bell
+    ArrowLeft, Loader2, CheckCircle, Lock, Play, Sparkles, GraduationCap, ChevronRight, Share2, Bell, XCircle
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { motion, AnimatePresence } from 'framer-motion';
 import { toast } from 'sonner';
+import SocialProofToast from '@/components/SocialProofToast';
+import LaunchCountdownBanner from '@/components/LaunchCountdownBanner';
+
 
 import { SubjectIcon, getSubjectColorClass } from '@/components/ui/SubjectIcon';
 interface Course {
@@ -26,6 +31,7 @@ interface Course {
     lecture_type?: string;
     features?: string[];
     slug?: string;
+    demo_video_url?: string | null;
 }
 interface Subject { id: string; title: string; position: number; }
 
@@ -35,6 +41,18 @@ function formatExpiry(days: number) {
     if (days >= 365) return `${Math.floor(days / 365)} year`;
     if (days >= 30) return `${Math.floor(days / 30)} months`;
     return `${days} days`;
+}
+
+function extractYouTubeId(url: string) {
+    if (!url) return '';
+    if (url.includes('youtube.com/watch')) {
+        const urlParams = new URL(url).searchParams;
+        return urlParams.get('v') || '';
+    }
+    if (url.includes('youtu.be/')) {
+        return url.split('youtu.be/')[1].split('?')[0];
+    }
+    return '';
 }
 
 export default function CourseDetail({ isMobileLayout }: { isMobileLayout?: boolean }) {
@@ -54,6 +72,7 @@ export default function CourseDetail({ isMobileLayout }: { isMobileLayout?: bool
     const [isPreRegistered, setIsPreRegistered] = useState(false);
     const [isPreRegistering, setIsPreRegistering] = useState(false);
     const [preRegistrationCount, setPreRegistrationCount] = useState(0);
+    const [showDemoVideo, setShowDemoVideo] = useState(false);
 
     const { config, openPricingModal } = usePricing();
     const { formatPrice, getRegionalPrice } = useCurrency();
@@ -248,12 +267,36 @@ export default function CourseDetail({ isMobileLayout }: { isMobileLayout?: bool
         'Progress Tracking'
     ];
 
+    const ytId = course?.demo_video_url ? extractYouTubeId(course.demo_video_url) : '';
+
+    const DemoVideoModal = showDemoVideo && course.demo_video_url ? (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={() => setShowDemoVideo(false)}>
+            <div className="relative w-full max-w-4xl aspect-video bg-black rounded-xl overflow-hidden shadow-2xl" onClick={e => e.stopPropagation()}>
+                <button onClick={() => setShowDemoVideo(false)} className="absolute top-4 right-4 z-10 w-10 h-10 flex items-center justify-center bg-black/50 text-white rounded-full hover:bg-black/70 transition-colors">
+                    <XCircle className="w-6 h-6" />
+                </button>
+                {course.demo_video_url.endsWith('.mp4') ? (
+                    <video src={course.demo_video_url} controls autoPlay className="w-full h-full" />
+                ) : ytId ? (
+                    <div className="w-full h-full">
+                        <SecureYouTubePlayer videoId={ytId} title={course.title} />
+                    </div>
+                ) : (
+                    <div className="w-full h-full flex items-center justify-center text-white">Invalid video URL</div>
+                )}
+            </div>
+        </div>
+    ) : null;
+
     // ── Mobile layout ────────────────────────────────────────────────────────
     if (isMobileLayout) {
         return (
             <div className="min-h-screen bg-[#f3f4f6] dark:bg-slate-950 pb-[100px]">
+                {DemoVideoModal}
+                <SocialProofToast />
+                <LaunchCountdownBanner endDate="2026-08-22T00:00:00+05:30" message="🚀 Early bird price — ends soon!" />
                     {/* Top Poster Image */}
-                    <div className="relative w-full aspect-video bg-slate-900 overflow-hidden">
+                    <div className="relative w-full aspect-video bg-slate-900 overflow-hidden group">
                         <button onClick={() => navigate('/courses')} className="absolute top-4 left-4 z-10 w-8 h-8 flex items-center justify-center bg-black/40 backdrop-blur-md rounded-full text-white active:scale-95 transition-transform">
                             <ArrowLeft className="w-5 h-5" />
                         </button>
@@ -262,6 +305,14 @@ export default function CourseDetail({ isMobileLayout }: { isMobileLayout?: bool
                         ) : (
                             <div className="w-full h-full flex items-center justify-center bg-[#6b46c1]">
                                 <GraduationCap className="w-16 h-16 text-white/50" />
+                            </div>
+                        )}
+                        {course.demo_video_url && (
+                            <div className="absolute inset-0 bg-black/10 flex items-center justify-center pointer-events-none">
+                                <button onClick={() => setShowDemoVideo(true)} className="pointer-events-auto flex items-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-full font-bold shadow-[0_0_15px_rgba(220,38,38,0.5)] transform hover:scale-105 transition-all ring-2 ring-white/20">
+                                    <Play className="w-5 h-5 fill-white" />
+                                    Play Demo
+                                </button>
                             </div>
                         )}
                     </div>
@@ -458,7 +509,11 @@ export default function CourseDetail({ isMobileLayout }: { isMobileLayout?: bool
     // ── Desktop layout ───────────────────────────────────────────────────────
     return (
         <Layout showFooter={false}>
+            {DemoVideoModal}
+            <SocialProofToast />
+            <CrossSellBanner variant="banner" />
             <div className="bg-[#f3f4f6] dark:bg-slate-950 min-h-screen">
+                <LaunchCountdownBanner endDate="2026-08-22T00:00:00+05:30" message="🚀 Early bird price — ends soon!" />
                     
                     {/* Top Purple Banner */}
                     <div className="bg-gradient-to-r from-[#6b46c1] to-[#805ad5] px-6 py-10 md:py-14 relative overflow-hidden">
@@ -585,12 +640,20 @@ export default function CourseDetail({ isMobileLayout }: { isMobileLayout?: bool
                             <div className="lg:w-[350px] flex-shrink-0">
                                 <div className="bg-white dark:bg-slate-900 rounded-xl shadow-[0_2px_10px_rgba(0,0,0,0.06)] border border-slate-200 dark:border-slate-800 sticky top-24 overflow-hidden">
                                     <div className="p-3">
-                                        <div className="rounded-lg overflow-hidden relative mb-4">
+                                        <div className="rounded-lg overflow-hidden relative mb-4 group">
                                             {course.thumbnail_url ? (
                                                 <img src={course.thumbnail_url} alt={course.title} className="w-full aspect-video object-cover" />
                                             ) : (
                                                 <div className="w-full aspect-video bg-[#6b46c1] flex items-center justify-center">
                                                     <GraduationCap className="w-16 h-16 text-white/50" />
+                                                </div>
+                                            )}
+                                            {course.demo_video_url && (
+                                                <div className="absolute inset-0 bg-black/10 flex items-center justify-center pointer-events-none">
+                                                    <button onClick={() => setShowDemoVideo(true)} className="pointer-events-auto flex items-center gap-2 px-5 py-2.5 bg-red-600 hover:bg-red-700 text-white rounded-full font-bold shadow-[0_0_15px_rgba(220,38,38,0.5)] transform hover:scale-105 transition-all ring-2 ring-white/20">
+                                                        <Play className="w-5 h-5 fill-white" />
+                                                        Play Demo
+                                                    </button>
                                                 </div>
                                             )}
                                         </div>

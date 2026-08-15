@@ -12,6 +12,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/lib/auth';
 import { useCourseAccess } from '@/hooks/useCourseAccess';
 import SecureYouTubePlayer from '@/components/courses/SecureYouTubePlayer';
+import CrossSellBanner from '@/components/CrossSellBanner';
 import {
     ArrowLeft, FileText, Video, Loader2, Lock,
     CheckCircle, Download, ExternalLink, Clock, Play, BookOpen, X
@@ -356,6 +357,12 @@ export default function CourseChapterView({ isMobileLayout }: { isMobileLayout?:
                             )}
 
                         </AnimatePresence>
+
+                        {/* 🎯 Cross-sell below content — nudges to subscription or course */}
+                        <div className="mt-8">
+                            <CrossSellBanner variant="card" />
+                        </div>
+
                     </div>
                 </div>
             </Wrapper>

@@ -12,7 +12,7 @@ export const getEducationalOrganizationSchema = () => ({
   "description": "Italy's most advanced study simulator for CEnT-S, IMAT, SAT and IELTS entrance exam preparation. Join 5,000+ students with a 98% pass rate.",
   "sameAs": [
     "https://www.instagram.com/italostudycom",
-    "https://chat.whatsapp.com/CfVh7u9L6vT7ZFpZwwVa4A",
+    "https://chat.whatsapp.com/JZxQCS4A4ZO8k7bOEMYtTz",
     "https://www.facebook.com/italostudy",
     "https://www.linkedin.com/company/italostudy",
     "https://www.youtube.com/@italostudy",

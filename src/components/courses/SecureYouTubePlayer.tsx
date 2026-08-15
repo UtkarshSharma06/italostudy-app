@@ -11,7 +11,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import {
     Play, Pause, Volume2, VolumeX, Maximize, Minimize,
-    RotateCcw, RotateCw, Loader2, Settings, ChevronDown
+    RotateCcw, RotateCw, Loader2, Settings, ChevronDown, Subtitles
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -89,6 +89,7 @@ export default function SecureYouTubePlayer({ videoId, title, thumbnail, startSe
     const [showSpeedMenu, setShowSpeedMenu] = useState(false);
     const [showQualityMenu, setShowQualityMenu] = useState(false);
     const [isDragging, setIsDragging] = useState(false);
+    const [ccEnabled, setCcEnabled] = useState(false);
 
     const ytThumb = thumbnail || `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg`;
 
@@ -133,7 +134,7 @@ export default function SecureYouTubePlayer({ videoId, title, thumbnail, startSe
                     fs: 0,                // disable native fullscreen button
                     playsinline: 1,
                     showinfo: 0,          // hide video title/share bar
-                    cc_load_policy: 0,    // no auto captions
+                    cc_load_policy: 1,    // default to captions loaded so module is available
                     start: startSeconds ? Math.floor(startSeconds) : undefined,
                     origin: window.location.origin,
                     enablejsapi: 1,
@@ -146,11 +147,14 @@ export default function SecureYouTubePlayer({ videoId, title, thumbnail, startSe
                         setDuration(d);
                         setVolume(e.target.getVolume?.() || 100);
                         e.target.setPlaybackRate?.(speed);
-                        // Fetch available quality levels after a short delay
                         setTimeout(() => {
-                            const qs: string[] = e.target.getAvailableQualityLevels?.() || [];
-                            if (qs.length > 0) setAvailableQualities(['auto', ...qs.filter(q => q !== 'auto')]);
-                        }, 2000);
+                            if (!playerRef.current) return;
+                            const q = playerRef.current.getAvailableQualityLevels?.() || [];
+                            setAvailableQualities(q);
+                            setQuality(playerRef.current.getPlaybackQuality?.() || 'auto');
+                            // Turn off default captions initially to respect ccEnabled=false state
+                            playerRef.current.unloadModule?.('captions');
+                        }, 500);
                     },
                     onStateChange: (e: any) => {
                         const s = e.data;
@@ -229,37 +233,124 @@ export default function SecureYouTubePlayer({ videoId, title, thumbnail, startSe
         setShowQualityMenu(false);
     };
 
-    const toggleFullscreen = () => {
-        const el = containerRef.current;
-        if (!el) return;
-        if (!document.fullscreenElement) {
-            el.requestFullscreen?.();
-        } else {
-            document.exitFullscreen?.();
-        }
-    };
+    const [cssFullscreen, setCssFullscreen] = useState(false);
+    const [isPortrait, setIsPortrait] = useState(false);
 
     useEffect(() => {
-        const h = () => setFullscreen(!!document.fullscreenElement);
-        document.addEventListener('fullscreenchange', h);
-        return () => document.removeEventListener('fullscreenchange', h);
+        const handleResize = () => setIsPortrait(window.innerHeight > window.innerWidth);
+        handleResize();
+        window.addEventListener('resize', handleResize);
+        return () => window.removeEventListener('resize', handleResize);
     }, []);
 
-    // ── Seek bar drag ─────────────────────────────────────────────────────────
-    const calcSeekPct = (e: MouseEvent | React.MouseEvent) => {
-        const rect = seekBarRef.current?.getBoundingClientRect();
-        if (!rect) return 0;
-        return Math.min(100, Math.max(0, ((e.clientX - rect.left) / rect.width) * 100));
-    };
+    const toggleFullscreen = useCallback(async () => {
+        const el = containerRef.current as any;
+        const doc = document as any;
 
-    const handleSeekMouseDown = (e: React.MouseEvent) => {
+        const isNativeFullscreen = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
+
+        if (!isNativeFullscreen && !cssFullscreen) {
+            try {
+                if (el?.requestFullscreen) {
+                    await el.requestFullscreen();
+                } else if (el?.webkitRequestFullscreen) {
+                    await el.webkitRequestFullscreen();
+                } else if (el?.mozRequestFullScreen) {
+                    await el.mozRequestFullScreen();
+                } else if (el?.msRequestFullscreen) {
+                    await el.msRequestFullscreen();
+                } else {
+                    setCssFullscreen(true);
+                }
+                
+                if (window.screen && (window.screen.orientation as any)?.lock) {
+                    try { await (window.screen.orientation as any).lock('landscape'); } catch (e) { /* ignore */ }
+                }
+            } catch (error) {
+                setCssFullscreen(true);
+            }
+            setFullscreen(true);
+        } else {
+            if (isNativeFullscreen) {
+                if (doc.exitFullscreen) {
+                    doc.exitFullscreen();
+                } else if (doc.webkitExitFullscreen) {
+                    doc.webkitExitFullscreen();
+                } else if (doc.mozCancelFullScreen) {
+                    doc.mozCancelFullScreen();
+                } else if (doc.msExitFullscreen) {
+                    doc.msExitFullscreen();
+                }
+            }
+            if (cssFullscreen) {
+                setCssFullscreen(false);
+            }
+            if (window.screen && window.screen.orientation?.unlock) {
+                try { window.screen.orientation.unlock(); } catch (e) { /* ignore */ }
+            }
+            setFullscreen(false);
+        }
+    }, [cssFullscreen]);
+
+    const toggleCC = useCallback(() => {
+        if (!playerRef.current) return;
+        if (ccEnabled) {
+            playerRef.current.unloadModule?.('captions');
+            setCcEnabled(false);
+        } else {
+            playerRef.current.loadModule?.('captions');
+            playerRef.current.setOption?.('captions', 'track', { languageCode: 'en' });
+            setCcEnabled(true);
+        }
+    }, [ccEnabled]);
+
+    useEffect(() => {
+        const h = () => {
+            const doc = document as any;
+            const isNativeFs = !!(doc.fullscreenElement || doc.webkitFullscreenElement || doc.mozFullScreenElement || doc.msFullscreenElement);
+            if (!isNativeFs && !cssFullscreen) {
+                setFullscreen(false);
+            }
+        };
+        document.addEventListener('fullscreenchange', h);
+        document.addEventListener('webkitfullscreenchange', h);
+        document.addEventListener('mozfullscreenchange', h);
+        document.addEventListener('MSFullscreenChange', h);
+        return () => {
+            document.removeEventListener('fullscreenchange', h);
+            document.removeEventListener('webkitfullscreenchange', h);
+            document.removeEventListener('mozfullscreenchange', h);
+            document.removeEventListener('MSFullscreenChange', h);
+        };
+    }, [cssFullscreen]);
+
+    // ── Seek bar drag (Mouse + Touch) ─────────────────────────────────────────
+    const handleSeekStart = (e: React.MouseEvent | React.TouchEvent) => {
         e.preventDefault();
         setIsDragging(true);
-        seek(calcSeekPct(e));
-        const onMove = (ev: MouseEvent) => seek(calcSeekPct(ev));
-        const onUp = () => { setIsDragging(false); document.removeEventListener('mousemove', onMove); document.removeEventListener('mouseup', onUp); };
+        
+        const getPct = (ev: MouseEvent | TouchEvent | React.MouseEvent | React.TouchEvent) => {
+            const clientX = 'touches' in ev ? ev.touches[0].clientX : (ev as any).clientX;
+            const rect = seekBarRef.current?.getBoundingClientRect();
+            if (!rect) return 0;
+            return Math.min(100, Math.max(0, ((clientX - rect.left) / rect.width) * 100));
+        };
+        
+        seek(getPct(e));
+
+        const onMove = (ev: MouseEvent | TouchEvent) => seek(getPct(ev));
+        const onUp = () => { 
+            setIsDragging(false); 
+            document.removeEventListener('mousemove', onMove); 
+            document.removeEventListener('mouseup', onUp); 
+            document.removeEventListener('touchmove', onMove);
+            document.removeEventListener('touchend', onUp);
+        };
+        
         document.addEventListener('mousemove', onMove);
         document.addEventListener('mouseup', onUp);
+        document.addEventListener('touchmove', onMove, { passive: false });
+        document.addEventListener('touchend', onUp);
     };
 
     // ── Auto-hide controls ────────────────────────────────────────────────────
@@ -269,7 +360,16 @@ export default function SecureYouTubePlayer({ videoId, title, thumbnail, startSe
         if (state === 'playing') hideTimer.current = setTimeout(() => setShowControls(false), 3000);
     };
 
-    useEffect(() => { if (state !== 'playing') { setShowControls(true); clearTimeout(hideTimer.current); } }, [state]);
+    useEffect(() => { 
+        if (state !== 'playing') { 
+            setShowControls(true); 
+            clearTimeout(hideTimer.current); 
+        } else {
+            // When transitioning to playing, auto-hide after 3 seconds
+            clearTimeout(hideTimer.current);
+            hideTimer.current = setTimeout(() => setShowControls(false), 3000);
+        }
+    }, [state]);
 
     // Close menus on outside click
     useEffect(() => {
@@ -296,14 +396,77 @@ export default function SecureYouTubePlayer({ videoId, title, thumbnail, startSe
         return () => el.removeEventListener('keydown', blockKeys, true);
     }, []);
 
+    // ── Overlay Click / Double Tap ────────────────────────────────────────────
+    const lastTapRef = useRef<{ time: number; x: number }>({ time: 0, x: 0 });
+    const tapTimerRef = useRef<any>(null);
+
+    const handleOverlayClick = (e: React.MouseEvent) => {
+        const now = Date.now();
+        const rect = e.currentTarget.getBoundingClientRect();
+        const x = e.clientX - rect.left;
+        
+        if (now - lastTapRef.current.time < 300) {
+            // Double tap detected
+            clearTimeout(tapTimerRef.current);
+            if (x < rect.width / 3) {
+                skip(-10);
+                bumpControls();
+            } else if (x > (rect.width * 2) / 3) {
+                skip(10);
+                bumpControls();
+            } else {
+                toggleFullscreen();
+            }
+            lastTapRef.current = { time: 0, x: 0 };
+            return;
+        }
+        
+        lastTapRef.current = { time: now, x };
+
+        // Schedule single tap action
+        tapTimerRef.current = setTimeout(() => {
+            if (!showControls) {
+                bumpControls();
+            } else {
+                togglePlay();
+            }
+        }, 300);
+    };
+
     const isPlaying = state === 'playing';
     const showOverlayPlay = state === 'ready' || state === 'paused' || state === 'ended';
+
+    const getFullscreenStyle = (): React.CSSProperties => {
+        if (!cssFullscreen) return { aspectRatio: '16/9' };
+        if (isPortrait) {
+            return {
+                position: 'fixed',
+                top: '50%',
+                left: '50%',
+                width: `${window.innerHeight}px`,
+                height: `${window.innerWidth}px`,
+                transform: 'translate(-50%, -50%) rotate(90deg)',
+                transformOrigin: 'center center',
+                zIndex: 999999,
+            };
+        }
+        return {
+            position: 'fixed',
+            inset: 0,
+            width: '100dvw',
+            height: '100dvh',
+            zIndex: 999999,
+        };
+    };
 
     return (
         <div
             ref={containerRef}
-            className="relative w-full bg-black select-none group"
-            style={{ aspectRatio: '16/9' }}
+            className={cn(
+                "bg-black select-none group",
+                cssFullscreen ? "" : "relative w-full"
+            )}
+            style={getFullscreenStyle()}
             onMouseMove={bumpControls}
             onMouseLeave={() => isPlaying && setShowControls(false)}
             onContextMenu={blockContext}
@@ -371,8 +534,7 @@ export default function SecureYouTubePlayer({ videoId, title, thumbnail, startSe
                     }}
                     onContextMenu={blockContext}
                     onDragStart={blockDrag}
-                    onClick={togglePlay}
-                    onDoubleClick={toggleFullscreen}
+                    onClick={handleOverlayClick}
                 />
             )}
 
@@ -390,16 +552,20 @@ export default function SecureYouTubePlayer({ videoId, title, thumbnail, startSe
             {/* ── Title overlay (top) ── */}
             {title && (
                 <div className={cn(
-                    'absolute top-0 inset-x-0 z-50 bg-gradient-to-b from-black/80 via-black/40 to-transparent px-5 pt-4 pb-10 transition-opacity duration-300 pointer-events-none',
+                    'absolute top-0 inset-x-0 z-50 bg-gradient-to-b from-black/80 via-black/40 to-transparent px-5 pt-4 pb-10 transition-opacity duration-300 pointer-events-none flex justify-between items-start',
                     showControls || !isPlaying ? 'opacity-100' : 'opacity-0'
                 )}>
-                    <p className="text-white text-sm font-bold drop-shadow max-w-2xl line-clamp-1">{title}</p>
+                    <p className="text-white text-sm font-bold drop-shadow max-w-xl line-clamp-1 flex-1">{title}</p>
+                    <div className="flex-shrink-0 flex items-center gap-2">
+                        <img src="/logo-dark-full.webp" alt="Italostudy" className="h-5 object-contain opacity-90 drop-shadow-md" onError={(e) => e.currentTarget.src = '/logo.png'} />
+                        <div className="bg-red-600 w-2 h-2 rounded-full shadow-[0_0_8px_rgba(220,38,38,0.8)]" />
+                    </div>
                 </div>
             )}
 
             {/* ── Controls bar ── */}
             <div className={cn(
-                'absolute bottom-0 inset-x-0 z-50 bg-gradient-to-t from-black/95 via-black/60 to-transparent px-4 pt-10 pb-3 transition-opacity duration-300',
+                'absolute bottom-0 inset-x-0 z-50 bg-gradient-to-t from-black/95 via-black/60 to-transparent px-3 md:px-4 pt-10 pb-4 md:pb-3 transition-opacity duration-300',
                 showControls || !isPlaying ? 'opacity-100' : 'opacity-0 pointer-events-none'
             )}>
                 {/* ── Seek bar ── */}
@@ -408,7 +574,8 @@ export default function SecureYouTubePlayer({ videoId, title, thumbnail, startSe
                         ref={seekBarRef}
                         className="relative w-full h-1 rounded-full cursor-pointer group/seek hover:h-2.5 transition-all duration-150"
                         style={{ background: 'rgba(255,255,255,0.2)' }}
-                        onMouseDown={handleSeekMouseDown}
+                        onMouseDown={handleSeekStart}
+                        onTouchStart={handleSeekStart}
                     >
                         {/* Buffered */}
                         <div className="absolute inset-y-0 left-0 rounded-full bg-white/20" style={{ width: `${buffered}%` }} />
@@ -420,60 +587,72 @@ export default function SecureYouTubePlayer({ videoId, title, thumbnail, startSe
                 </div>
 
                 {/* ── Button row ── */}
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1 md:gap-1.5">
                     {/* Skip back 10s */}
                     <button
                         onClick={e => { e.stopPropagation(); skip(-10); }}
-                        className="w-8 h-8 flex items-center justify-center text-white/80 hover:text-white transition-colors rounded-lg hover:bg-white/10"
+                        className="w-10 h-10 md:w-8 md:h-8 flex items-center justify-center text-white/80 hover:text-white transition-colors rounded-lg hover:bg-white/10 shrink-0"
                     >
-                        <RotateCcw className="w-4 h-4" />
+                        <RotateCcw className="w-4 h-4 md:w-4 md:h-4" />
                     </button>
 
                     {/* Play / Pause */}
                     <button
                         onClick={e => { e.stopPropagation(); togglePlay(); }}
-                        className="w-9 h-9 flex items-center justify-center text-white hover:text-white/80 transition-colors rounded-lg hover:bg-white/10"
+                        className="w-11 h-11 md:w-9 md:h-9 flex items-center justify-center text-white hover:text-white/80 transition-colors rounded-lg hover:bg-white/10 shrink-0"
                     >
                         {isPlaying
-                            ? <Pause className="w-5 h-5" fill="white" />
-                            : <Play className="w-5 h-5 ml-0.5" fill="white" />}
+                            ? <Pause className="w-5 h-5 md:w-5 md:h-5" fill="white" />
+                            : <Play className="w-5 h-5 md:w-5 md:h-5 ml-0.5" fill="white" />}
                     </button>
 
                     {/* Skip forward 10s */}
                     <button
                         onClick={e => { e.stopPropagation(); skip(10); }}
-                        className="w-8 h-8 flex items-center justify-center text-white/80 hover:text-white transition-colors rounded-lg hover:bg-white/10"
+                        className="w-10 h-10 md:w-8 md:h-8 flex items-center justify-center text-white/80 hover:text-white transition-colors rounded-lg hover:bg-white/10 shrink-0"
                     >
-                        <RotateCw className="w-4 h-4" />
+                        <RotateCw className="w-4 h-4 md:w-4 md:h-4" />
                     </button>
 
                     {/* Mute */}
                     <button
                         onClick={e => { e.stopPropagation(); toggleMute(); }}
-                        className="w-8 h-8 flex items-center justify-center text-white/80 hover:text-white transition-colors rounded-lg hover:bg-white/10"
+                        className="w-10 h-10 md:w-8 md:h-8 hidden sm:flex items-center justify-center text-white/80 hover:text-white transition-colors rounded-lg hover:bg-white/10 shrink-0"
                     >
                         {muted ? <VolumeX className="w-4 h-4" /> : <Volume2 className="w-4 h-4" />}
                     </button>
 
                     {/* Time */}
-                    <span className="text-white/70 text-xs font-mono ml-1 flex-1 whitespace-nowrap">
+                    <span className="text-white/70 text-[10px] md:text-xs font-mono ml-1 flex-1 whitespace-nowrap overflow-hidden text-ellipsis">
                         {fmtTime(current)} / {fmtTime(duration)}
                     </span>
 
+                    {/* CC Toggle */}
+                    <button
+                        onClick={e => { e.stopPropagation(); toggleCC(); }}
+                        className={cn(
+                            "w-10 h-10 md:w-8 md:h-8 flex items-center justify-center transition-colors rounded-lg hover:bg-white/10 shrink-0",
+                            ccEnabled ? "text-red-400" : "text-white/80 hover:text-white"
+                        )}
+                        title="Closed Captions"
+                    >
+                        <Subtitles className="w-4 h-4" />
+                    </button>
+
                     {/* ── Speed picker ── */}
-                    <div className="relative" onClick={e => e.stopPropagation()}>
+                    <div className="relative shrink-0" onClick={e => e.stopPropagation()}>
                         <button
                             onClick={() => { setShowSpeedMenu(s => !s); setShowQualityMenu(false); }}
-                            className="flex items-center gap-1 text-white/80 hover:text-white text-xs font-bold px-2 h-8 rounded-lg hover:bg-white/10 transition-colors whitespace-nowrap"
+                            className="flex items-center gap-1 text-white/80 hover:text-white text-[11px] md:text-xs font-bold px-2 h-10 md:h-8 rounded-lg hover:bg-white/10 transition-colors whitespace-nowrap"
                         >
                             {speed === 1 ? '1×' : `${speed}×`}
                         </button>
                         {showSpeedMenu && (
-                            <div className="absolute bottom-full mb-2 right-0 bg-black/95 border border-white/10 rounded-xl py-1 min-w-[90px] shadow-2xl z-[60]">
+                            <div className="absolute bottom-full mb-2 right-0 bg-black/95 border border-white/10 rounded-xl py-1 min-w-[100px] md:min-w-[90px] shadow-2xl z-[60]">
                                 <p className="text-[9px] font-black uppercase tracking-widest text-white/40 px-3 py-1">Speed</p>
                                 {SPEEDS.map(s => (
                                     <button key={s} onClick={() => setSpeedVal(s)}
-                                        className={cn('w-full text-left px-3 py-1.5 text-xs font-bold hover:bg-white/10 transition-colors',
+                                        className={cn('w-full text-left px-4 py-2.5 md:px-3 md:py-1.5 text-xs font-bold hover:bg-white/10 transition-colors',
                                             speed === s ? 'text-red-400' : 'text-white/80')}>
                                         {s === 1 ? '1× (Normal)' : `${s}×`}
                                     </button>
@@ -484,20 +663,20 @@ export default function SecureYouTubePlayer({ videoId, title, thumbnail, startSe
 
                     {/* ── Quality picker ── */}
                     {availableQualities.length > 1 && (
-                        <div className="relative" onClick={e => e.stopPropagation()}>
+                        <div className="relative shrink-0" onClick={e => e.stopPropagation()}>
                             <button
                                 onClick={() => { setShowQualityMenu(s => !s); setShowSpeedMenu(false); }}
-                                className="flex items-center gap-1 text-white/80 hover:text-white text-xs font-bold px-2 h-8 rounded-lg hover:bg-white/10 transition-colors whitespace-nowrap"
+                                className="flex items-center gap-1 text-white/80 hover:text-white text-[11px] md:text-xs font-bold px-2 h-10 md:h-8 rounded-lg hover:bg-white/10 transition-colors whitespace-nowrap"
                             >
-                                <Settings className="w-3.5 h-3.5" />
+                                <Settings className="w-3.5 h-3.5 md:w-3.5 md:h-3.5" />
                                 {QUALITY_LABELS[quality] || quality}
                             </button>
                             {showQualityMenu && (
-                                <div className="absolute bottom-full mb-2 right-0 bg-black/95 border border-white/10 rounded-xl py-1 min-w-[110px] shadow-2xl z-[60]">
+                                <div className="absolute bottom-full mb-2 right-0 bg-black/95 border border-white/10 rounded-xl py-1 min-w-[120px] md:min-w-[110px] shadow-2xl z-[60]">
                                     <p className="text-[9px] font-black uppercase tracking-widest text-white/40 px-3 py-1">Quality</p>
                                     {availableQualities.map(q => (
                                         <button key={q} onClick={() => setQualityVal(q)}
-                                            className={cn('w-full text-left px-3 py-1.5 text-xs font-bold hover:bg-white/10 transition-colors',
+                                            className={cn('w-full text-left px-4 py-2.5 md:px-3 md:py-1.5 text-xs font-bold hover:bg-white/10 transition-colors',
                                                 quality === q ? 'text-red-400' : 'text-white/80')}>
                                             {QUALITY_LABELS[q] || q}
                                         </button>
@@ -510,7 +689,7 @@ export default function SecureYouTubePlayer({ videoId, title, thumbnail, startSe
                     {/* Fullscreen */}
                     <button
                         onClick={e => { e.stopPropagation(); toggleFullscreen(); }}
-                        className="w-8 h-8 flex items-center justify-center text-white/80 hover:text-white transition-colors rounded-lg hover:bg-white/10"
+                        className="w-10 h-10 md:w-8 md:h-8 flex items-center justify-center text-white/80 hover:text-white transition-colors rounded-lg hover:bg-white/10 shrink-0"
                     >
                         {fullscreen ? <Minimize className="w-4 h-4" /> : <Maximize className="w-4 h-4" />}
                     </button>

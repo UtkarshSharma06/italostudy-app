@@ -8,6 +8,7 @@ import {
     Lock, ShieldCheck, ArrowRight, Clock, Copy, Check
 } from 'lucide-react';
 import { toast } from 'sonner';
+import CrossSellBanner from '@/components/CrossSellBanner';
 
 type PollStatus = 'waiting' | 'found' | 'completed' | 'failed' | 'cancelled' | 'timeout';
 
@@ -334,6 +335,13 @@ export default function CoursePaymentCallback() {
                                     <GraduationCap className="w-8 h-8 text-indigo-500 mx-auto" />
                                     <p className="text-sm font-bold text-indigo-700">Your course is ready!</p>
                                     <p className="text-xs text-indigo-500 font-medium">Access all lectures, PDFs, and materials from the Courses page.</p>
+                                </motion.div>
+                            )}
+
+                            {/* 🎯 Cross-sell: upgrade to subscription */}
+                            {uiStatus === 'success' && (
+                                <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.5 }}>
+                                    <CrossSellBanner variant="card" onUpgradeClick={() => navigate('/pricing')} />
                                 </motion.div>
                             )}
 

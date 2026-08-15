@@ -6,9 +6,13 @@ import { useAuth } from '@/lib/auth';
 import { useCurrency } from '@/hooks/useCurrency';
 import { DodoPayments } from 'dodopayments-checkout';
 import {
-    ArrowLeft, Loader2, CheckCircle, AlertCircle, Tag, Heart, ShieldCheck, Lock, CreditCard, X
+    ArrowLeft, Loader2, CheckCircle, AlertCircle, Tag, Heart, ShieldCheck, Lock, CreditCard, X,
+    Star, Users, BadgeCheck, Flame, Quote
 } from 'lucide-react';
 import { toast } from 'sonner';
+import ExitIntentPopup from '@/components/ExitIntentPopup';
+import SocialProofToast from '@/components/SocialProofToast';
+import LaunchCountdownBanner from '@/components/LaunchCountdownBanner';
 
 declare global {
     interface Window { Razorpay: any; paypal: any; }
@@ -330,9 +334,24 @@ export default function CourseCheckout() {
     const displayOriginalAmount = hasDiscount ? originalLocal.amount : (originalLocal.amount > 0 ? Math.round(originalLocal.amount * 1.8) : 0);
     const discountAmount = displayOriginalAmount - finalLocal.amount;
 
+    const testimonials = [
+        { name: 'Priya M.', text: 'Enrolled 2 weeks ago and already feel so much more confident about the exam!', stars: 5, location: 'Mumbai' },
+        { name: 'Ahmed K.', text: 'Best investment I made. The explanations are incredibly clear.', stars: 5, location: 'Dubai' },
+        { name: 'Sara L.', text: 'Worth every cent. Got my visa and the course was a huge part of that!', stars: 5, location: 'London' },
+    ];
+
     return (
         <Layout showFooter={false}>
+            {/* CRO Components */}
+            <SocialProofToast />
+
             <div className="bg-[#f8f9fa] min-h-screen pb-20">
+                {/* Launch Countdown Banner */}
+                <LaunchCountdownBanner
+                    endDate="2026-08-22T00:00:00+05:30"
+                    message="🚀 Course launch special — Early bird price ends soon!"
+                    ctaText="Enroll Now"
+                />
                 {/* Header */}
                 <div className="bg-white border-b border-slate-200 sticky top-0 z-20">
                     <div className="max-w-[1200px] mx-auto px-4 py-4 flex items-center justify-between">
@@ -563,12 +582,28 @@ export default function CourseCheckout() {
                                             </button>
                                         )}
                                         
-                                        {/* Trust Note */}
-                                        <div className="mt-5 flex flex-col items-center gap-2">
-                                            <div className="flex items-center gap-4 text-slate-400">
+                                        {/* Trust Badges */}
+                                        <div className="mt-4 space-y-2">
+                                            {/* Guarantee */}
+                                            <div className="flex items-center gap-2.5 bg-emerald-50 border border-emerald-100 rounded-xl px-3 py-2.5">
+                                                <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+                                                    <BadgeCheck className="w-4 h-4 text-emerald-600" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-[11px] font-black text-emerald-800">30-Day Money-Back Guarantee</p>
+                                                    <p className="text-[10px] text-emerald-600 font-medium">Not satisfied? Full refund, no questions asked.</p>
+                                                </div>
+                                            </div>
+                                            {/* Student Count */}
+                                            <div className="flex items-center gap-2.5 bg-amber-50 border border-amber-100 rounded-xl px-3 py-2.5">
+                                                <Flame className="w-4 h-4 text-amber-500 shrink-0" />
+                                                <p className="text-[11px] font-bold text-amber-800">🔥 847+ students enrolled · Early bird ends soon</p>
+                                            </div>
+                                            {/* SSL */}
+                                            <div className="flex items-center gap-4 justify-center text-slate-400 pt-1">
                                                 <div className="flex items-center gap-1.5"><Lock className="w-3.5 h-3.5" /><span className="text-[10px] font-bold uppercase tracking-widest">256-bit SSL</span></div>
                                                 <div className="w-1 h-1 rounded-full bg-slate-300" />
-                                                <div className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5" /><span className="text-[10px] font-bold uppercase tracking-widest">Secure Checkout</span></div>
+                                                <div className="flex items-center gap-1.5"><ShieldCheck className="w-3.5 h-3.5" /><span className="text-[10px] font-bold uppercase tracking-widest">Secure</span></div>
                                             </div>
                                         </div>
                                     </div>
@@ -586,6 +621,44 @@ export default function CourseCheckout() {
                                         <p className="text-[10px] font-bold text-slate-800 truncate">{course.title}</p>
                                         <p className="text-[10px] text-slate-500">{formatPrice(finalLocal.amount, finalLocal.currency)}</p>
                                     </div>
+                                </div>
+                            </div>
+
+                            {/* Value Anchor */}
+                            <div className="bg-gradient-to-br from-indigo-50 to-violet-50 dark:from-indigo-950/30 dark:to-violet-950/30 border border-indigo-100 dark:border-indigo-900 rounded-2xl p-4">
+                                <p className="text-[11px] font-black text-indigo-700 dark:text-indigo-400 uppercase tracking-wider mb-1">💡 Why this price?</p>
+                                <p className="text-[11px] text-slate-600 dark:text-slate-400 font-medium leading-relaxed">
+                                    Private Italian tutors charge <strong className="text-slate-800 dark:text-white">€40–€80/hour</strong>. This entire course costs just <strong className="text-indigo-700 dark:text-indigo-400">{formatPrice(finalLocal.amount, finalLocal.currency)}</strong> — that's less than 10 minutes with a tutor.
+                                </p>
+                            </div>
+
+                            {/* Micro-Testimonials */}
+                            <div className="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                                <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50 flex items-center gap-2">
+                                    <Star className="w-4 h-4 text-amber-400 fill-amber-400" />
+                                    <span className="text-xs font-black text-slate-800">What Students Say</span>
+                                    <span className="ml-auto text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">⭐ 4.9/5</span>
+                                </div>
+                                <div className="divide-y divide-slate-50">
+                                    {testimonials.map((t, i) => (
+                                        <div key={i} className="px-4 py-3 flex gap-2.5">
+                                            <div className="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-500 to-violet-600 flex items-center justify-center text-white text-[10px] font-black shrink-0">
+                                                {t.name[0]}
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-1.5 mb-0.5">
+                                                    <p className="text-[11px] font-black text-slate-800">{t.name}</p>
+                                                    <span className="text-[9px] text-slate-400">{t.location}</span>
+                                                </div>
+                                                <div className="flex gap-0.5 mb-1">
+                                                    {Array.from({ length: t.stars }).map((_, s) => (
+                                                        <Star key={s} className="w-2.5 h-2.5 text-amber-400 fill-amber-400" />
+                                                    ))}
+                                                </div>
+                                                <p className="text-[10px] text-slate-500 font-medium leading-relaxed line-clamp-2">"{t.text}"</p>
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
 

@@ -77,7 +77,14 @@ export default function PricingModal() {
                     .eq('is_active', true)
                     .order('created_at', { ascending: false });
                 if (data) {
-                    setCourses(data);
+                    const sortedData = [...data].sort((a, b) => {
+                        const aLaunched = a.launch_date !== 'Coming Soon';
+                        const bLaunched = b.launch_date !== 'Coming Soon';
+                        if (aLaunched && !bLaunched) return -1;
+                        if (!aLaunched && bLaunched) return 1;
+                        return 0; // maintain created_at order otherwise
+                    });
+                    setCourses(sortedData);
                 }
             } catch (err) {
                 console.error("Failed to fetch courses for pricing modal", err);

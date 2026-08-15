@@ -290,14 +290,25 @@ export default function CourseChapterView({ isMobileLayout }: { isMobileLayout?:
                                                             <p className="text-slate-900 dark:text-white text-sm font-bold leading-snug line-clamp-2">
                                                                 {i + 1}. {lec.title}
                                                             </p>
-                                                            <div className="flex items-center gap-2 mt-1">
+                                                            <div className="flex items-center gap-3 mt-1.5 flex-wrap">
+                                                                {lec.duration_seconds ? (
+                                                                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1">
+                                                                        <Clock className="w-3 h-3" /> {fmtDuration(lec.duration_seconds)}
+                                                                    </span>
+                                                                ) : (
+                                                                    <span className="text-[10px] text-slate-500 dark:text-slate-400 font-medium flex items-center gap-1">
+                                                                        <Clock className="w-3 h-3" /> --m
+                                                                    </span>
+                                                                )}
                                                                 {!accessible && (
-                                                                    <span className="text-[10px] text-slate-400 font-medium flex items-center gap-0.5">
-                                                                        <Lock className="w-2.5 h-2.5" /> Enroll to watch
+                                                                    <span className="text-[10px] text-slate-400 font-medium flex items-center gap-1">
+                                                                        <Lock className="w-3 h-3" /> Enroll to watch
                                                                     </span>
                                                                 )}
                                                                 {isDone && (
-                                                                    <span className="text-[10px] text-emerald-600 font-black">✓ Completed</span>
+                                                                    <span className="text-[10px] text-emerald-600 font-black flex items-center gap-1">
+                                                                        <CheckCircle className="w-3 h-3" /> Completed
+                                                                    </span>
                                                                 )}
                                                             </div>
                                                         </div>

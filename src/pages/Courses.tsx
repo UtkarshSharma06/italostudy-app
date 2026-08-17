@@ -4,10 +4,11 @@ import { useAuth } from '@/lib/auth';
 import { useExam } from '@/context/ExamContext';
 import CourseCard from '@/components/courses/CourseCard';
 import { Search, Loader2, Filter, Zap, ArrowRight, BookOpen, LayoutGrid, X } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import Layout from '@/components/Layout';
 import ExitIntentPopup from '@/components/ExitIntentPopup';
+import { usePricing } from '@/context/PricingContext';
 
 interface AdBanner {
     image_url: string;
@@ -61,6 +62,7 @@ export default function Courses({ isMobileLayout }: { isMobileLayout?: boolean }
         return sessionStorage.getItem('hideCourseBanner') !== 'true';
     });
     const [sortBy, setSortBy] = useState<'newest' | 'price_low' | 'price_high'>('newest');
+    const { openPricingModal } = usePricing();
 
     useEffect(() => { fetchCourses(); }, [user?.id, activeExam?.id]);
 
@@ -270,27 +272,35 @@ export default function Courses({ isMobileLayout }: { isMobileLayout?: boolean }
             <div className="px-4 md:px-8 mt-4 space-y-4">
                 {/* ── Upgrade Banner ── */}
                 {profile?.selected_plan === 'explorer' && isBannerVisible && (
-                    <div className="bg-[#f4f2ff] dark:bg-[#201d36] rounded-2xl p-6 flex flex-col md:flex-row items-center justify-between gap-6 relative shadow-sm border border-[#e5dfff] dark:border-[#3b3469]">
-                        <div className="relative z-10 flex items-center gap-5">
-                            <div className="w-12 h-12 rounded-full bg-[#5a4bda] flex items-center justify-center flex-shrink-0 shadow-[0_4px_12px_rgba(90,75,218,0.3)]">
-                                <Zap className="w-6 h-6 text-white fill-white" />
+                    <div className="relative rounded-2xl p-[2px] bg-gradient-to-r from-[#5a4bda] via-[#816bf6] to-[#ec4899] shadow-lg mb-4 overflow-hidden group">
+                        {/* Shimmer effect */}
+                        <div className="absolute inset-0 bg-gradient-to-r from-white/0 via-white/20 to-white/0 translate-x-[-100%] group-hover:translate-x-[100%] transition-transform duration-1000 ease-in-out pointer-events-none" />
+                        
+                        <div className="bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl rounded-[14px] p-6 flex flex-col md:flex-row items-center justify-between gap-6 relative">
+                            <div className="relative z-10 flex items-start sm:items-center gap-5 w-full md:w-auto">
+                                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-[#5a4bda] to-[#816bf6] flex items-center justify-center flex-shrink-0 shadow-[0_4px_16px_rgba(90,75,218,0.4)]">
+                                    <Zap className="w-6 h-6 text-white fill-white" />
+                                </div>
+                                <div className="flex-1">
+                                    <h3 className="text-[18px] font-extrabold mb-1.5 tracking-tight text-transparent bg-clip-text bg-gradient-to-r from-[#5a4bda] to-[#ec4899]">
+                                        Unlock unlimited practice + mocks
+                                    </h3>
+                                    <p className="text-slate-600 dark:text-slate-300 text-[14px] font-medium leading-snug max-w-2xl">
+                                        Upgrade to Global Plan and access all courses, test series, mocks, videos and more.
+                                    </p>
+                                </div>
                             </div>
-                            <div>
-                                <h3 className="text-[17px] font-bold mb-1 tracking-tight text-[#5a4bda] dark:text-indigo-400">
-                                    Unlock unlimited practice + mocks
-                                </h3>
-                                <p className="text-slate-600 dark:text-slate-400 text-[14px] font-medium">
-                                    Upgrade to Global Plan and access all courses, test series, mocks, videos and more.
-                                </p>
+                            <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full md:w-auto shrink-0">
+                                <button 
+                                    onClick={(e) => { e.preventDefault(); openPricingModal(); }}
+                                    className="w-full sm:w-auto justify-center whitespace-nowrap bg-gradient-to-r from-[#5a4bda] to-[#816bf6] text-white hover:from-[#4b3eb8] hover:to-[#6c59d4] font-bold text-[14px] px-8 py-3.5 rounded-xl transition-all flex items-center gap-2 shadow-[0_4px_14px_rgba(90,75,218,0.3)] hover:shadow-[0_6px_20px_rgba(90,75,218,0.4)] hover:-translate-y-0.5 active:translate-y-0"
+                                >
+                                    Upgrade Now <ArrowRight className="w-4 h-4" />
+                                </button>
+                                <button onClick={() => { setIsBannerVisible(false); sessionStorage.setItem('hideCourseBanner', 'true'); }} className="absolute -top-12 sm:top-auto sm:relative right-0 sm:right-auto text-slate-400 hover:text-slate-600 dark:hover:text-white p-2 transition-colors">
+                                    <X className="w-5 h-5" />
+                                </button>
                             </div>
-                        </div>
-                        <div className="relative z-10 flex flex-col sm:flex-row items-start sm:items-center gap-4 w-full md:w-auto">
-                            <a href="/pricing" className="w-full sm:w-auto justify-center whitespace-nowrap bg-white dark:bg-slate-800 text-[#5a4bda] dark:text-indigo-400 border border-[#e5dfff] dark:border-indigo-500/30 font-bold text-[13px] px-6 py-3 rounded-full hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors flex items-center gap-2 shadow-sm">
-                                Upgrade Plan <ArrowRight className="w-4 h-4" />
-                            </a>
-                            <button onClick={() => { setIsBannerVisible(false); sessionStorage.setItem('hideCourseBanner', 'true'); }} className="absolute -top-12 sm:top-auto sm:relative right-0 sm:right-auto text-[#5a4bda]/50 hover:text-[#5a4bda] dark:text-indigo-400/50 dark:hover:text-indigo-400 p-2 transition-colors">
-                                <X className="w-5 h-5" />
-                            </button>
                         </div>
                     </div>
                 )}
@@ -400,14 +410,6 @@ export default function Courses({ isMobileLayout }: { isMobileLayout?: boolean }
         </div>
     );
 
-    if (isMobileLayout) return (
-        <>
-            {content}
-        </>
-    );
-    return (
-        <Layout showFooter={false}>
-            {content}
-        </Layout>
-    );
+    if (isMobileLayout) return content;
+    return <Layout showFooter={false}>{content}</Layout>;
 }

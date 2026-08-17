@@ -48,8 +48,7 @@ import { DashboardSkeleton } from '@/mobile/components/DashboardSkeleton';
 import { useToast } from '@/hooks/use-toast';
 import { PWAPrompt } from '@/components/PWAPrompt';
 import StudyPlannerWidget from '@/components/StudyPlannerWidget';
-
-
+import { DashboardShowcase } from '@/components/dashboard/DashboardShowcase';
 interface SubjectMastery {
     subject: string;
     solved: number;
@@ -980,6 +979,11 @@ const MobileDashboard: React.FC = () => {
                         </div>
                     </div>
                 </motion.section>
+
+                {/* ── SHOWCASE VIDEOS ── */}
+                <div className="mt-3">
+                    <DashboardShowcase examName={activeExam?.name} userId={user?.id} />
+                </div>
 
                 {/* ─── GETTING STARTED CARD ─── */}
                 <motion.div

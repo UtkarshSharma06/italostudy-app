@@ -149,7 +149,11 @@ export default function SecureYouTubePlayer({ videoId, title, thumbnail, startSe
                         e.target.setPlaybackRate?.(speed);
                         setTimeout(() => {
                             if (!playerRef.current) return;
-                            const q = playerRef.current.getAvailableQualityLevels?.() || [];
+                            let q = playerRef.current.getAvailableQualityLevels?.() || [];
+                            if (q.length <= 1) {
+                                // Provide static fallback because YouTube API often hides qualities
+                                q = ['hd1080', 'hd720', 'large', 'medium', 'small', 'auto'];
+                            }
                             setAvailableQualities(q);
                             setQuality(playerRef.current.getPlaybackQuality?.() || 'auto');
                             // Turn off default captions initially to respect ccEnabled=false state

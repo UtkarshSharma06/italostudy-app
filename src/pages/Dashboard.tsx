@@ -77,6 +77,7 @@ import { readDashboardCache, invalidateDashboardCache, writeDashboardCache } fro
 import { PWAPrompt } from '@/components/PWAPrompt';
 import CrossSellBanner from '@/components/CrossSellBanner';
 import ExitIntentPopup from '@/components/ExitIntentPopup';
+import { DashboardShowcase } from '@/components/dashboard/DashboardShowcase';
 
 interface SubjectMastery {
     subject: string;
@@ -1164,6 +1165,9 @@ export default function Dashboard() {
                         </div>
                     </div>
                 </div>
+
+                {/* ── SHOWCASE VIDEOS ── */}
+                <DashboardShowcase examName={activeExam?.name} userId={user?.id} />
 
                 {/* ── MAIN CONTENT ── */}
                 <div className="max-w-7xl mx-auto px-4 md:px-6 py-6 md:py-8">

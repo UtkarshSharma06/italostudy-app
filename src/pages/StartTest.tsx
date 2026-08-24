@@ -19,7 +19,9 @@ import {
   Shield,
   Server,
   Lock,
-  Crown
+  Crown,
+  RotateCcw,
+  AlertTriangle
 } from 'lucide-react';
 import { useExam } from '@/context/ExamContext';
 import { usePlanAccess, invalidatePlanCache } from '@/hooks/usePlanAccess';
@@ -56,6 +58,8 @@ export default function StartTest() {
   const [timeLimit, setTimeLimit] = useState(30);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [bankExhausted, setBankExhausted] = useState(false);
+  const [isRefilling, setIsRefilling] = useState(false);
 
   // Fetch unique topics for the selected subject
   useEffect(() => {
@@ -134,6 +138,11 @@ export default function StartTest() {
 
     fetchTopics();
   }, [subject, activeExam?.id]);
+
+  // Reset bank exhausted state when user changes subject/topic/difficulty
+  useEffect(() => {
+    setBankExhausted(false);
+  }, [subject, topic, difficulty]);
 
   // Auto-start for Mock Simulation or Direct "Consult" Missions
   useEffect(() => {
@@ -661,13 +670,48 @@ export default function StartTest() {
 
     } catch (error: any) {
       console.error('Error starting test:', error);
+      const isExhausted = error?.message?.includes('Insufficient questions');
+      if (isExhausted) {
+        setBankExhausted(true);
+      }
       toast({
-        title: 'Mission Interface Error',
-        description: error?.message || error?.details || 'Please verify database connection and schema.',
+        title: isExhausted ? 'Question Bank Exhausted' : 'Mission Interface Error',
+        description: isExhausted
+          ? `You've solved all available questions for this subject${topic && topic !== 'all' ? ` / ${topic}` : ''} on ${difficulty} difficulty. Refill below to practice again!`
+          : (error?.message || error?.details || 'Please verify database connection and schema.'),
         variant: 'destructive',
       });
     } finally {
       setIsGenerating(false);
+    }
+  };
+
+  const handleRefill = async (wrongOnly: boolean) => {
+    if (!user || !activeExam) return;
+    setIsRefilling(true);
+    try {
+      let query = (supabase as any)
+        .from('user_practice_responses')
+        .delete()
+        .eq('user_id', user.id)
+        .eq('exam_type', activeExam.id)
+        .eq('subject', subject);
+      if (topic && topic !== 'all') query = query.eq('topic', topic);
+      if (wrongOnly) query = query.eq('is_correct', false);
+      const { error } = await query;
+      if (error) throw error;
+      invalidatePlanCache(); // ← reset the 15-question limit counter
+      setBankExhausted(false);
+      toast({
+        title: '\u2705 Questions Refilled!',
+        description: wrongOnly
+          ? `Wrong & skipped answers for ${subject}${topic && topic !== 'all' ? ` / ${topic}` : ''} are back in your practice pool.`
+          : `All questions for ${subject}${topic && topic !== 'all' ? ` / ${topic}` : ''} have been reset. You can start practicing again!`,
+      });
+    } catch (e: any) {
+      toast({ title: 'Refill failed', description: 'Please try again.', variant: 'destructive' });
+    } finally {
+      setIsRefilling(false);
     }
   };
 
@@ -1034,11 +1078,57 @@ export default function StartTest() {
             </div>
           </div>
 
-          <div className="pt-10 border-t border-slate-50">
+          {/* ── Bank Exhausted Banner ── */}
+          {bankExhausted && (
+            <div className="mt-6 rounded-[1.5rem] border-2 border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-5">
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-500/20 flex items-center justify-center shrink-0 mt-0.5">
+                  <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <p className="font-black text-sm text-amber-800 dark:text-amber-300">Question Bank Exhausted</p>
+                  <p className="text-xs text-amber-700 dark:text-amber-400 mt-0.5 leading-relaxed">
+                    You've solved all questions for <span className="font-bold">{subject}{topic && topic !== 'all' ? ` › ${topic}` : ''}</span> on <span className="font-bold capitalize">{difficulty}</span> difficulty. Refill to practice again.
+                  </p>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => handleRefill(false)}
+                  disabled={isRefilling}
+                  className="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-black uppercase tracking-wide transition-all active:scale-[0.97] disabled:opacity-60"
+                >
+                  {isRefilling ? (
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                  ) : (
+                    <RotateCcw className="w-4 h-4" />
+                  )}
+                  Refill All
+                </button>
+                <button
+                  onClick={() => handleRefill(true)}
+                  disabled={isRefilling}
+                  className="flex items-center justify-center gap-2 py-3 px-4 rounded-2xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-black uppercase tracking-wide transition-all active:scale-[0.97] disabled:opacity-60"
+                >
+                  {isRefilling ? (
+                    <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"/><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"/></svg>
+                  ) : (
+                    <RotateCcw className="w-4 h-4" />
+                  )}
+                  Wrong & Skipped
+                </button>
+              </div>
+              <p className="text-center text-[9px] text-amber-600/70 dark:text-amber-500/60 font-bold uppercase tracking-wider mt-3">
+                "Refill All" resets everything • "Wrong & Skipped" re-adds wrong + unanswered questions
+              </p>
+            </div>
+          )}
+
+          <div className="pt-6 border-t border-slate-50 mt-6">
             <Button
               onClick={() => handleStartTest(false)}
-              disabled={isGenerating || !subject}
-              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700 font-black h-20 rounded-[2rem] text-[15px] uppercase tracking-[0.2em] shadow-2xl shadow-indigo-500/30 active:scale-[0.98] transition-all flex items-center justify-center gap-3 border-0"
+              disabled={isGenerating || !subject || bankExhausted}
+              className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:from-indigo-700 hover:to-purple-700 font-black h-20 rounded-[2rem] text-[15px] uppercase tracking-[0.2em] shadow-2xl shadow-indigo-500/30 active:scale-[0.98] transition-all flex items-center justify-center gap-3 border-0 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               Start Mission
               <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="5" y1="12" x2="19" y2="12"></line><polyline points="12 5 19 12 12 19"></polyline></svg>

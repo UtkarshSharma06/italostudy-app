@@ -53,6 +53,7 @@ export const DashboardShowcase = memo(({ examName, userId }: { examName?: string
                     .from('exam_showcase_videos')
                     .select('id, title, description, youtube_video_id, thumbnail_url, course_id, learning_exams!inner(name)')
                     .eq('is_active', true)
+                    .eq('placement', 'dashboard')
                     .order('position', { ascending: true });
 
                 console.log('SHOWCASE VIDEOS FETCHED:', vids);
@@ -74,24 +75,12 @@ export const DashboardShowcase = memo(({ examName, userId }: { examName?: string
                         .from('course_enrollments')
                         .select('course_id')
                         .eq('user_id', userId)
-                        .in('course_id', courseIds);
+                        .in('course_id', courseIds)
+                        .eq('status', 'active')
+                        .gt('expires_at', new Date().toISOString());
 
                     if (enrollmentData) {
                         enrollmentData.forEach((e: any) => enrollments.add(e.course_id));
-                    }
-                    
-                    // Also check global PRO access if we want
-                    const { data: profile } = await supabase
-                        .from('profiles')
-                        .select('selected_plan')
-                        .eq('id', userId)
-                        .single();
-                        
-                    if (profile?.selected_plan && profile.selected_plan !== 'explorer') {
-                        // If they have PRO, they might have access to all courses, but lets stick to direct enrollments 
-                        // or just unlock them if PRO gives access to courses.
-                        // Assuming PRO gives access to all courses:
-                        courseIds.forEach((id: string) => enrollments.add(id));
                     }
                 }
 
@@ -188,7 +177,7 @@ export const DashboardShowcase = memo(({ examName, userId }: { examName?: string
 
                                     {/* Hover CTA Overlay for locked courses */}
                                     {!isEnrolled && video.course_id && (
-                                        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center p-6 text-center">
+                                        <div className="absolute inset-0 bg-black/80 backdrop-blur-sm opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity duration-300 flex flex-col items-center justify-center p-6 text-center">
                                             <Lock className="w-8 h-8 text-amber-400 mb-3" />
                                             <h4 className="text-white font-bold text-lg mb-1">Unlock Full Course</h4>
                                             <p className="text-white/70 text-xs mb-4">Enroll in this course to watch the full lecture and master the subject.</p>

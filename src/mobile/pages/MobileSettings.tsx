@@ -5,7 +5,8 @@ import {
     User, Lock, Bell, CreditCard, HelpCircle,
     LogOut, ChevronRight, Moon, Globe, Zap,
     Share2, ShieldCheck, Key, MessageSquare,
-    Camera, Check, X, ArrowLeft, Smartphone, Info, Clock, Loader2, Save, Crown
+    Camera, Check, X, ArrowLeft, Smartphone, Info, Clock, Loader2, Save, Crown,
+    RotateCcw, AlertTriangle, BookOpen
 } from 'lucide-react';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Switch } from "@/components/ui/switch";
@@ -50,6 +51,8 @@ import {
     CommandList,
 } from "@/components/ui/command";
 import { countries } from '@/lib/countries';
+import { useExam } from '@/context/ExamContext';
+
 
 
 type SettingsView = 'main' | 'account' | 'security';
@@ -64,6 +67,57 @@ export default function MobileSettings() {
     const { openPricingModal } = usePricing();
     const [activeView, setActiveView] = useState<SettingsView>('main');
     const [isSharing, setIsSharing] = useState(false);
+    const [isResettingAll, setIsResettingAll] = useState(false);
+    const [isResettingWrong, setIsResettingWrong] = useState(false);
+    const [showResetConfirm, setShowResetConfirm] = useState<'all' | 'wrong' | null>(null);
+    const [resetSubject, setResetSubject] = useState<string>('all');
+    const { activeExam } = useExam();
+    const subjectOptions = activeExam?.sections?.map((s: any) => s.name) || [];
+
+    const handleResetAllQuestions = async () => {
+        if (!user) return;
+        setIsResettingAll(true);
+        try {
+            let query = (supabase as any)
+                .from('user_practice_responses')
+                .delete()
+                .eq('user_id', user.id);
+            if (resetSubject !== 'all') query = query.eq('subject', resetSubject);
+            if (activeExam?.id) query = query.eq('exam_type', activeExam.id);
+            const { error } = await query;
+            if (error) throw error;
+            const label = resetSubject === 'all' ? 'all subjects' : resetSubject;
+            toast({ title: '✅ Questions refilled!', description: `Practice bank for ${label} has been reset.` });
+        } catch (e) {
+            toast({ title: 'Reset failed', description: 'Please try again.', variant: 'destructive' });
+        } finally {
+            setIsResettingAll(false);
+            setShowResetConfirm(null);
+        }
+    };
+
+    const handleResetWrongQuestions = async () => {
+        if (!user) return;
+        setIsResettingWrong(true);
+        try {
+            let query = (supabase as any)
+                .from('user_practice_responses')
+                .delete()
+                .eq('user_id', user.id)
+                .eq('is_correct', false);
+            if (resetSubject !== 'all') query = query.eq('subject', resetSubject);
+            if (activeExam?.id) query = query.eq('exam_type', activeExam.id);
+            const { error } = await query;
+            if (error) throw error;
+            const label = resetSubject === 'all' ? 'all subjects' : resetSubject;
+            toast({ title: '✅ Wrong & Skipped refilled!', description: `Wrong & skipped questions in ${label} are available again.` });
+        } catch (e) {
+            toast({ title: 'Reset failed', description: 'Please try again.', variant: 'destructive' });
+        } finally {
+            setIsResettingWrong(false);
+            setShowResetConfirm(null);
+        }
+    };
 
     // Profile States
     const [displayName, setDisplayName] = useState("");
@@ -889,6 +943,103 @@ export default function MobileSettings() {
                         </div>
                     </div>
                 ))}
+            </div>
+
+            {/* ── Practice Question Bank ── */}
+            <div className="px-4 pt-2">
+                <div className="bg-white dark:bg-slate-950 rounded-[2rem] border border-slate-100 dark:border-white/5 shadow-sm p-5">
+                    <div className="flex items-center gap-3 mb-4">
+                        <div className="w-10 h-10 rounded-xl bg-indigo-50 dark:bg-indigo-500/10 flex items-center justify-center shrink-0">
+                            <BookOpen className="w-5 h-5 text-indigo-600 dark:text-indigo-400" />
+                        </div>
+                        <div>
+                            <h3 className="font-bold text-sm text-slate-900 dark:text-white">Practice Question Bank</h3>
+                            <p className="text-[10px] font-medium text-slate-400 uppercase tracking-widest mt-0.5">Refill by subject</p>
+                        </div>
+                    </div>
+
+                    {/* Subject Chips */}
+                    <div className="mb-4">
+                        <p className="text-[10px] font-black uppercase tracking-wider text-slate-400 mb-2">Select Subject</p>
+                        <div className="flex flex-wrap gap-2">
+                            <button
+                                onClick={() => setResetSubject('all')}
+                                className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wide border-2 transition-all ${resetSubject === 'all' ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400'}`}
+                            >
+                                All
+                            </button>
+                            {subjectOptions.map((s: string) => (
+                                <button
+                                    key={s}
+                                    onClick={() => setResetSubject(s)}
+                                    className={`px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-wide border-2 transition-all ${resetSubject === s ? 'bg-indigo-600 border-indigo-600 text-white' : 'border-slate-200 dark:border-white/10 text-slate-500 dark:text-slate-400'}`}
+                                >
+                                    {s}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    {showResetConfirm ? (
+                        <div className="bg-amber-50 dark:bg-amber-500/10 border border-amber-200 dark:border-amber-500/20 rounded-2xl p-4">
+                            <div className="flex items-center gap-2 mb-2">
+                                <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
+                                <p className="text-sm font-bold text-amber-800 dark:text-amber-400">
+                                    {showResetConfirm === 'all'
+                                        ? `Refill${resetSubject !== 'all' ? ` "${resetSubject}"` : ' all subjects'}?`
+                                        : `Re-add wrong & skipped${resetSubject !== 'all' ? ` for "${resetSubject}"` : ''}?`}
+                                </p>
+                            </div>
+                            <p className="text-xs text-amber-700 dark:text-amber-500 mb-4">
+                                {showResetConfirm === 'all'
+                                    ? `Solved history${resetSubject !== 'all' ? ` for "${resetSubject}"` : ' for all subjects'} will be cleared.`
+                                    : `Wrong & skipped questions${resetSubject !== 'all' ? ` in "${resetSubject}"` : ''} will be re-added to your pool.`}
+                            </p>
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={showResetConfirm === 'all' ? handleResetAllQuestions : handleResetWrongQuestions}
+                                    disabled={isResettingAll || isResettingWrong}
+                                    className="flex-1 py-3 rounded-xl bg-amber-600 text-white text-xs font-black uppercase tracking-widest flex items-center justify-center gap-2"
+                                >
+                                    {(isResettingAll || isResettingWrong) ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Confirm'}
+                                </button>
+                                <button
+                                    onClick={() => setShowResetConfirm(null)}
+                                    className="flex-1 py-3 rounded-xl border border-slate-200 dark:border-white/10 text-xs font-black uppercase tracking-widest text-slate-600 dark:text-slate-300"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
+                        </div>
+                    ) : (
+                        <div className="space-y-3">
+                            <button
+                                onClick={() => setShowResetConfirm('all')}
+                                className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-dashed border-rose-200 dark:border-rose-500/20 active:bg-rose-50 dark:active:bg-rose-500/5 transition-all text-left"
+                            >
+                                <div className="w-9 h-9 rounded-xl bg-rose-100 dark:bg-rose-500/10 flex items-center justify-center shrink-0">
+                                    <RotateCcw className="w-4 h-4 text-rose-600 dark:text-rose-400" />
+                                </div>
+                                <div>
+                                    <p className="font-bold text-sm text-slate-900 dark:text-white">Refill All Questions</p>
+                                    <p className="text-[10px] text-slate-400 mt-0.5">{resetSubject === 'all' ? 'Reset entire solved history' : `Reset "${resetSubject}" history`}</p>
+                                </div>
+                            </button>
+                            <button
+                                onClick={() => setShowResetConfirm('wrong')}
+                                className="w-full flex items-center gap-4 p-4 rounded-2xl border-2 border-dashed border-amber-200 dark:border-amber-500/20 active:bg-amber-50 dark:active:bg-amber-500/5 transition-all text-left"
+                            >
+                                <div className="w-9 h-9 rounded-xl bg-amber-100 dark:bg-amber-500/10 flex items-center justify-center shrink-0">
+                                    <RotateCcw className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                                </div>
+                                <div>
+                                    <p className="font-bold text-sm text-slate-900 dark:text-white">Refill Wrong & Skipped</p>
+                                    <p className="text-[10px] text-slate-400 mt-0.5">{resetSubject === 'all' ? 'Re-add wrong + unanswered questions' : `Wrong & skipped in "${resetSubject}"`}</p>
+                                </div>
+                            </button>
+                        </div>
+                    )}
+                </div>
             </div>
 
             {/* Log Out Button */}

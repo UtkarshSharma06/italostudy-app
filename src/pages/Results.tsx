@@ -37,6 +37,7 @@ import SolutionsViewer from '@/components/SolutionsViewer';
 import { generateResultReportPDF } from '@/utils/resultReportGenerator';
 import { cn } from '@/lib/utils';
 import { usePricing } from '@/context/PricingContext';
+import { ResultShowcase } from '@/components/dashboard/ResultShowcase';
 
 interface Question {
   id: string;
@@ -977,6 +978,15 @@ export default function Results({ hideLayout = false }: { hideLayout?: boolean }
                   </div>
                 </div>
               )}
+
+              {/* ── Video Showcase (course conversion) ─────────────────── */}
+              <ResultShowcase
+                placement={isMock ? 'mock_result' : 'practice_result'}
+                examName={test.exam_type || ''}
+                userId={user?.id}
+                subject={isPractice ? (test.subject || undefined) : undefined}
+                topic={isPractice ? (test.topic || undefined) : undefined}
+              />
 
               {/* ── Your Progress ─────────────────────────────────────── */}
               <div className="bg-white dark:bg-card rounded-2xl border border-slate-200 dark:border-border shadow-sm p-5">

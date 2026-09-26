@@ -27,7 +27,7 @@ export default function CoursePaymentCallback() {
     const [verifyStarted, setVerifyStarted] = useState(false);
 
     const orderId = searchParams.get('order_id');
-    const paymentId = searchParams.get('payment_id');
+    const paymentId = searchParams.get('payment_id') || searchParams.get('dodo_payment_id') || searchParams.get('id');
     const dodoStatus = searchParams.get('payment_status') || searchParams.get('status') || searchParams.get('dodo_status');
     const gateway = searchParams.get('gateway') || 'dodo';
 

@@ -105,6 +105,8 @@ export const DashboardShowcase = memo(({ examName, userId }: { examName?: string
                     is_preview: previewIds.has(v.youtube_video_id)
                 }));
 
+                console.log('FINAL VIDEOS RENDERED:', finalVids);
+
                 setVideos(finalVids);
                 setEnrolledCourseIds(enrollments);
             } catch (error) {

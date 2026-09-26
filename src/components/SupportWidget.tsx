@@ -140,7 +140,7 @@ export default function SupportWidget() {
         
         const { data: ticketData, error: ticketError } = await (supabase as any)
             .from('support_tickets')
-            .insert([{ user_id: user.id, subject: newSubject.trim() }])
+            .insert([{ user_id: user.id, subject: newSubject.trim(), has_unread_user_reply: true }])
             .select()
             .single();
             
@@ -174,6 +174,12 @@ export default function SupportWidget() {
         const { error } = await (supabase as any)
             .from('support_messages')
             .insert([{ ticket_id: selectedTicket.id, sender_id: user.id, sender_type: 'user', message: newMessage.trim() }]);
+
+        if (!error) {
+            await (supabase as any).from('support_tickets')
+                .update({ has_unread_user_reply: true, updated_at: new Date().toISOString() })
+                .eq('id', selectedTicket.id);
+        }
 
         setIsSending(false);
         if (error) {

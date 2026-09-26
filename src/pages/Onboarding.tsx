@@ -642,6 +642,22 @@ export default function Onboarding() {
                                 ✅ Almost done! Your study plan will be ready instantly.
                             </p>
                         )}
+                        {/* Free plan limitation reminder */}
+                        {step === 4 && (!selectedPlan || selectedPlan === 'explorer') && (
+                            <div className="mt-3 text-center">
+                                <p className="text-[11px] text-slate-400">
+                                    Starting with <span className="font-bold text-amber-600">5 free questions/day</span> · 1 mock exam · No AI explanations.{' '}
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPricingHover(true)}
+                                        className="text-[#5A32FA] font-bold underline underline-offset-2 hover:opacity-70 transition-opacity"
+                                    >
+                                        Upgrade for unlimited access →
+                                    </button>
+                                </p>
+                            </div>
+                        )}
+
 
                     </motion.div>
                 </AnimatePresence>

@@ -356,7 +356,7 @@ export default function Dashboard() {
     const [isTrackerModalOpen, setIsTrackerModalOpen] = useState(false);
     const [activeDates, setActiveDates] = useState<Set<string>>(new Set());
     const [upcomingSession, setUpcomingSession] = useState<any>(null);
-    const { hasPremiumAccess, isAdmin, isElite, isGlobal, isSubscriptionExpired } = usePlanAccess();
+    const { hasPremiumAccess, isAdmin, isElite, isGlobal, isSubscriptionExpired, isExplorer, totalPracticeCount, practiceLimit, openPricingModal: openPlanModal } = usePlanAccess();
     const [hasAnyCourse, setHasAnyCourse] = useState(false);
 
     useEffect(() => {
@@ -1046,6 +1046,34 @@ export default function Dashboard() {
 
             {/* 🎯 Cross-sell: personalized course/subscription offer */}
             {!loading && !isDashboardLoading && <CrossSellBanner variant="banner" />}
+
+            {/* 🔒 Free user daily limit nudge */}
+            {!loading && !isDashboardLoading && isExplorer && (
+                <div className="mx-4 md:mx-6 mt-3 mb-1 bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/50 rounded-xl px-4 py-3 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0 flex-1">
+                        <div className="flex flex-col gap-1 flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                                <span className="text-xs font-bold text-amber-800 dark:text-amber-300">
+                                    {Math.max(0, practiceLimit - totalPracticeCount)} of {practiceLimit} free questions left today
+                                </span>
+                                <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium shrink-0">Resets at midnight IST</span>
+                            </div>
+                            <div className="w-full h-1.5 bg-amber-200 dark:bg-amber-900 rounded-full overflow-hidden">
+                                <div
+                                    className="h-full bg-amber-500 dark:bg-amber-400 rounded-full transition-all duration-500"
+                                    style={{ width: `${Math.min(100, (totalPracticeCount / practiceLimit) * 100)}%` }}
+                                />
+                            </div>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => openPlanModal()}
+                        className="shrink-0 bg-amber-600 hover:bg-amber-700 text-white text-xs font-black px-3 py-1.5 rounded-lg transition-colors whitespace-nowrap"
+                    >
+                        Upgrade →
+                    </button>
+                </div>
+            )}
 
             {/* Active Test Resume Strip */}
             {!loading && !isDashboardLoading && activeTest && !isTestNotificationDismissed && (

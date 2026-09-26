@@ -5,7 +5,7 @@ import { useExam } from '@/context/ExamContext';
 import { BookOpen, ChevronRight, Zap, Target, Clock, ArrowLeft, Trophy, Crown, Info } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { usePlanAccess } from '@/hooks/usePlanAccess';
-import { UpgradeModal } from '@/components/UpgradeModal';
+import LimitHitModal from '@/components/LimitHitModal';
 import { SubjectIcon } from '@/components/ui/SubjectIcon';
 import { Card, CardContent } from '@/components/ui/card';
 import { useActiveTest } from '@/hooks/useActiveTest';
@@ -386,7 +386,7 @@ export default function MobilePractice() {
                         {isExplorer && (
                             <div className="text-center px-6">
                                 <p className="text-[10px] font-black text-muted-foreground uppercase tracking-[0.2em]">
-                                    Remaining Daily Limit: <span className="text-primary">{remaining}</span> / 15
+                                    Remaining Daily Limit: <span className="text-primary">{remaining}</span> / {practiceLimit}
                                 </p>
                             </div>
                         )}
@@ -461,13 +461,13 @@ export default function MobilePractice() {
                 )}
             </div>
 
-            <UpgradeModal
-                isOpen={isUpgradeModalOpen}
-                onClose={() => setIsUpgradeModalOpen(false)}
-                title="Limit Reached"
-                description="You've reached your daily practice limit. Upgrade to PRO for unlimited practice sessions."
-                feature="Unlimited Practice"
-            />
+            {isUpgradeModalOpen && (
+                <LimitHitModal
+                    questionsUsed={totalPracticeCount}
+                    dailyLimit={practiceLimit}
+                    onClose={() => setIsUpgradeModalOpen(false)}
+                />
+            )}
 
             <TrustpilotReviewModal
                 isOpen={showReviewModal}

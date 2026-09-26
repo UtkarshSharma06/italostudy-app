@@ -8,7 +8,7 @@ import { BookOpen, ChevronRight, Zap, Target, Clock, ArrowLeft, Loader2, Crown, 
 
 import { supabase } from '@/integrations/supabase/client';
 import { usePlanAccess } from '@/hooks/usePlanAccess';
-import { UpgradeModal } from '@/components/UpgradeModal';
+import LimitHitModal from '@/components/LimitHitModal';
 import { useAuth } from '@/lib/auth';
 import TrustpilotReviewModal from '@/components/TrustpilotReviewModal';
 import { TestListSkeleton } from '@/components/SkeletonLoader';
@@ -549,7 +549,7 @@ export default function Practice() {
 
                             {isExplorer && (
                                 <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mb-12">
-                                    Remaining Daily Limit: <span className="text-orange-600">{remaining}</span> / 15 Questions
+                                    Remaining Daily Limit: <span className="text-orange-600">{remaining}</span> / {practiceLimit} Questions
                                 </p>
                             )}
 
@@ -562,13 +562,13 @@ export default function Practice() {
                 </div>
             </div>
 
-            <UpgradeModal
-                isOpen={isUpgradeModalOpen}
-                onClose={() => setIsUpgradeModalOpen(false)}
-                title={isLimitReached ? "Daily Practice Limit Reached" : "Daily Practice Limit Reached"}
-                description={isLimitReached ? "You've reached your daily limit of 15 questions. Upgrade to PRO for unlimited practice or come back in 24 hours." : "You've used your 15 daily questions for the Explorer Plan. Upgrade to PRO for unlimited practice or come back in 24 hours."}
-                feature="Unlimited Practice"
-            />
+            {isUpgradeModalOpen && (
+                <LimitHitModal
+                    questionsUsed={totalPracticeCount}
+                    dailyLimit={practiceLimit}
+                    onClose={() => setIsUpgradeModalOpen(false)}
+                />
+            )}
 
             <TrustpilotReviewModal
                 isOpen={showReviewModal}

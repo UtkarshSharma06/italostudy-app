@@ -58,7 +58,7 @@ export function usePlanAccess() {
     // ----------------------------------------------------------------------
     // LIMIT LOGIC
     // ----------------------------------------------------------------------
-    const PRACTICE_DAILY_LIMIT = 15;
+    const PRACTICE_DAILY_LIMIT = 5;
     const MOCK_TOTAL_LIMIT = 1;
 
     const fetchUsageData = useCallback(async () => {

@@ -103,8 +103,9 @@ export default function PaymentCallback() {
                         verifyAttempted = true;
                         console.log('🔐 Actively verifying Dodo payment for', orderId);
                         try {
+                            const paymentIdParam = searchParams.get('payment_id') || searchParams.get('dodo_payment_id') || searchParams.get('id');
                             await supabase.functions.invoke('verify-dodo-payment', {
-                                body: { transaction_id: orderId }
+                                body: { transaction_id: orderId, payment_id: paymentIdParam }
                             });
                         } catch (verifyErr) {
                             // Non-fatal — webhook might still complete the transaction

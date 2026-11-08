@@ -430,7 +430,7 @@ export default function Auth() {
                         </p>
                         <div className={`${isDeleted ? 'bg-error/5 border-error/10' : 'bg-red-500/5 border-red-500/10'} px-6 py-4 rounded-xl mb-8 border w-full`}>
                             <p className={`text-[10px] font-bold uppercase tracking-widest ${isDeleted ? 'text-error' : 'text-red-500'} mb-1`}>Contact Support</p>
-                            <p className="text-xs font-bold text-on-surface select-all">contact@italostudy.com</p>
+                            <p className="text-xs font-bold text-on-surface select-all">info@italostudy.com</p>
                         </div>
                         <Button
                             onClick={() => { navigate('/'); window.location.reload(); }}

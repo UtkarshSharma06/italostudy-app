@@ -76,7 +76,7 @@ export default function BundlePaymentCallback() {
     useEffect(() => {
         if (verifyStarted) return;
         if (!courseOrderId) {
-            setErrorMsg('No order ID found. Please contact contact@italostudy.com');
+            setErrorMsg('No order ID found. Please contact info@italostudy.com');
             setOverallStatus('error');
             return;
         }
@@ -159,7 +159,7 @@ export default function BundlePaymentCallback() {
             if (!courseSuccess) {
                 setStep('course', 'failed');
                 setOverallStatus('error');
-                setErrorMsg('Course payment not confirmed. Contact contact@italostudy.com with your Ref ID.');
+                setErrorMsg('Course payment not confirmed. Contact info@italostudy.com with your Ref ID.');
                 return;
             }
 
@@ -440,8 +440,8 @@ export default function BundlePaymentCallback() {
 
                     <p className="text-center text-xs text-slate-400 mt-4">
                         Need help?{' '}
-                        <a href="mailto:contact@italostudy.com" className="text-violet-500 hover:text-violet-700 font-semibold transition-colors">
-                            contact@italostudy.com
+                        <a href="mailto:info@italostudy.com" className="text-violet-500 hover:text-violet-700 font-semibold transition-colors">
+                            info@italostudy.com
                         </a>
                     </p>
                 </motion.div>

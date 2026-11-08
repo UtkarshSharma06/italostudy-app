@@ -346,8 +346,8 @@ export default function Onboarding() {
     <PopoverContent className="w-56 p-2 rounded-xl border-slate-200 shadow-xl" align="end">
         <div className="flex flex-col gap-1">
                                     <button onClick={() => {
-                                        navigator.clipboard.writeText('contact@italostudy.com');
-                                        toast({ title: "Email copied", description: "contact@italostudy.com copied to clipboard." });
+                                        navigator.clipboard.writeText('info@italostudy.com');
+                                        toast({ title: "Email copied", description: "info@italostudy.com copied to clipboard." });
                                     }} className="w-full flex items-center gap-3 p-3 hover:bg-slate-50 rounded-lg transition-colors text-slate-700 font-medium text-sm text-left">
                                         <Mail className="w-4 h-4 text-[#5A32FA]" />
                                         Email Us

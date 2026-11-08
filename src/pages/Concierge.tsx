@@ -611,8 +611,8 @@ export default function Concierge() {
 
                                 <div className="bg-slate-50 dark:bg-slate-800/50 p-6 rounded-2xl border border-slate-100 dark:border-slate-800 inline-block w-full">
                                     <p className="text-xs font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mb-2">Support Email</p>
-                                    <a href="mailto:contact@italostudy.com" className="text-xl md:text-2xl font-black text-indigo-600 dark:text-indigo-400 hover:underline break-all">
-                                        contact@italostudy.com
+                                    <a href="mailto:info@italostudy.com" className="text-xl md:text-2xl font-black text-indigo-600 dark:text-indigo-400 hover:underline break-all">
+                                        info@italostudy.com
                                     </a>
                                 </div>
 

@@ -106,47 +106,10 @@ export const MathText = memo(({ content, className, isHtml = false, variant = 'p
     }, [content, isHtml]);
 
     return (
-        <>
-            <style dangerouslySetInnerHTML={{
-                __html: `
-                .katex-premium .katex { 
-                    color: #4f46e5 !important; 
-                    font-weight: 700 !important; 
-                }
-                .dark .katex-premium .katex { 
-                    color: #818cf8 !important; 
-                }
-                .katex-premium .katex-display {
-                    margin: 1.5em 0 !important;
-                    overflow-x: auto !important;
-                    overflow-y: hidden !important;
-                    padding: 1rem 0 !important;
-                    max-width: 100% !important;
-                    scrollbar-width: thin;
-                }
-                .katex-premium .katex-display::-webkit-scrollbar {
-                    height: 4px;
-                }
-                .katex-premium .katex-display::-webkit-scrollbar-thumb {
-                    background: #e2e8f0;
-                    border-radius: 10px;
-                }
-                .dark .katex-premium .katex-display::-webkit-scrollbar-thumb {
-                    background: #334155;
-                }
-                /* Handle inline math overflow if necessary, although rare */
-                .katex-premium .katex-html {
-                    max-width: 100%;
-                    overflow-x: auto;
-                    overflow-y: hidden;
-                    vertical-align: middle;
-                }
-            `}} />
-            <div
-                ref={containerRef}
-                className={cn(className, variant === 'premium' && 'katex-premium')}
-                {...props}
-            />
-        </>
+        <div
+            ref={containerRef}
+            className={cn(className, variant === 'premium' && 'katex-premium')}
+            {...props}
+        />
     );
 }, (prev, next) => prev.content === next.content && prev.className === next.className && prev.isHtml === next.isHtml && prev.variant === next.variant);

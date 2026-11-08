@@ -170,7 +170,7 @@ export default function ConsultantActivation() {
                                     <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500 group-focus-within:text-indigo-400 transition-colors" />
                                     <Input
                                         type="email"
-                                        placeholder="contact@italostudy.com"
+                                        placeholder="info@italostudy.com"
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
                                         className="pl-12 h-14 bg-white/5 border-white/10 rounded-2xl text-white font-black text-xs uppercase tracking-widest focus:ring-2 focus:ring-indigo-500/50"

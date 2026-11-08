@@ -280,7 +280,8 @@ export default function Layout({
     const exploreNav = [
         { label: 'Blog', path: '/blog', icon: Newspaper },
         { label: 'Store', path: '/store', icon: ShoppingBag },
-        { label: 'Community', path: '/community', icon: MessageCircle }
+        { label: 'Community', path: '/community', icon: MessageCircle },
+        { label: 'Doubtster', path: '/Doubtster', icon: Brain }
     ];
 
     const allNavItems = [...mainNav, ...trackNav, ...exploreNav];

@@ -288,7 +288,7 @@ export const generateInvoice = (
     doc.setFont('helvetica', 'normal');
     doc.setFontSize(9);
     doc.setTextColor(200, 200, 200);
-    doc.text('mail:- contact@italostudy.com', margins.left, contactY + 6);
+    doc.text('mail:- info@italostudy.com', margins.left, contactY + 6);
 
     doc.setFont('helvetica', 'normal');
     doc.setTextColor(colors.textLight);

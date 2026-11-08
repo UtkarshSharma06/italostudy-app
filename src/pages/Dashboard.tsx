@@ -402,7 +402,7 @@ export default function Dashboard() {
                     } else if (attempts >= maxAttempts) {
                         clearInterval(pollInterval);
                         sonnerToast.dismiss(toastId);
-                        sonnerToast.error('Payment received, but plan activation is delayed. Please refresh in a minute or contact contact@italostudy.com if this persists.', { duration: 10000 });
+                        sonnerToast.error('Payment received, but plan activation is delayed. Please refresh in a minute or contact info@italostudy.com if this persists.', { duration: 10000 });
                         window.history.replaceState({}, '', location.pathname);
                     }
                 } catch (e) {

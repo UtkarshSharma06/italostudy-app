@@ -789,7 +789,7 @@ export default function Settings() {
                                         
                                         {/* Illustration Box */}
                                         <div className="w-full h-40 bg-gradient-to-br from-indigo-50 to-purple-50 dark:from-indigo-950/30 dark:to-purple-950/30 rounded-[1.5rem] mb-6 flex items-center justify-center relative overflow-hidden">
-                                            <div className="absolute inset-0 bg-[url('/noise.png')] opacity-[0.03] mix-blend-overlay" />
+                                            <div className="absolute inset-0 bg-gradient-to-br from-white/5 to-transparent opacity-[0.05]" />
                                             <div className="w-24 h-24 bg-white dark:bg-slate-900 rounded-full flex items-center justify-center shadow-lg relative z-10 border border-indigo-100 dark:border-indigo-500/20">
                                                 <div className="absolute -left-6 top-1/4 w-8 h-6 bg-white/60 dark:bg-slate-800/60 rounded-md shadow-sm backdrop-blur flex items-center justify-center"><div className="w-3 h-0.5 bg-slate-200 dark:bg-slate-700 rounded-full"/></div>
                                                 <div className="absolute -right-6 top-1/3 w-8 h-6 bg-white/60 dark:bg-slate-800/60 rounded-md shadow-sm backdrop-blur flex items-center justify-center"><div className="w-4 h-0.5 bg-slate-200 dark:bg-slate-700 rounded-full"/></div>
@@ -805,10 +805,10 @@ export default function Settings() {
                                             </div>
                                             
                                             <div className="flex items-center justify-between p-3.5 bg-slate-50 dark:bg-white/5 rounded-xl border border-slate-100 dark:border-white/5">
-                                                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">contact@italostudy.com</span>
+                                                <span className="text-sm font-bold text-slate-700 dark:text-slate-300">info@italostudy.com</span>
                                                 <button 
                                                     onClick={() => {
-                                                        navigator.clipboard.writeText("contact@italostudy.com");
+                                                        navigator.clipboard.writeText("info@italostudy.com");
                                                         toast({ title: "Copied!", description: "Email copied to clipboard." });
                                                     }}
                                                     className="p-1.5 text-slate-400 hover:text-indigo-600 transition-colors"

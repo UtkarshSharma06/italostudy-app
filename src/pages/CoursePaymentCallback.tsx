@@ -59,7 +59,7 @@ export default function CoursePaymentCallback() {
         if (verifyStarted) return;
         if (!orderId) {
             setPollStatus('failed');
-            setErrorMsg('No order ID found. Please contact contact@italostudy.com');
+            setErrorMsg('No order ID found. Please contact info@italostudy.com');
             return;
         }
 
@@ -350,7 +350,7 @@ export default function CoursePaymentCallback() {
                                 <div className="bg-amber-50 rounded-xl p-3 border border-amber-100 text-center">
                                     <p className="text-xs text-amber-700 font-semibold">
                                         Check Courses page in a few minutes. If access isn't granted, email{' '}
-                                        <a href="mailto:contact@italostudy.com" className="underline">contact@italostudy.com</a>{' '}
+                                        <a href="mailto:info@italostudy.com" className="underline">info@italostudy.com</a>{' '}
                                         with your Ref ID below.
                                     </p>
                                 </div>
@@ -412,8 +412,8 @@ export default function CoursePaymentCallback() {
 
                     <p className="text-center text-xs text-slate-400 mt-4">
                         Need help?{' '}
-                        <a href="mailto:contact@italostudy.com" className="text-indigo-500 hover:text-indigo-700 font-semibold transition-colors">
-                            contact@italostudy.com
+                        <a href="mailto:info@italostudy.com" className="text-indigo-500 hover:text-indigo-700 font-semibold transition-colors">
+                            info@italostudy.com
                         </a>
                     </p>
                 </motion.div>

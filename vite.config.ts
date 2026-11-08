@@ -51,8 +51,11 @@ export default defineConfig(({ mode }) => ({
       },
       workbox: {
         globPatterns: ['**/*.{js,css,html,ico,png,svg,webp,woff,woff2}'],
-        // Increase the maximum size for precaching (to 5MB)
-        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024,
+        // Exclude heavy AI proctoring, 3D labs, and PDF generation from initial precache
+        // so initial mobile PWA install size drops from 22MB down to < 3MB
+        globIgnores: ['**/chunk-ai*.js', '**/chunk-three*.js', '**/chunk-pdf*.js'],
+        // Maximum size for precached shell assets
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
         runtimeCaching: [
           {
             urlPattern: /^https:\/\/fonts\.googleapis\.com\/.*/i,
@@ -125,6 +128,8 @@ export default defineConfig(({ mode }) => ({
           // ─── Heavy Standalone Engines ──────────────────────────────────────
           if (id.includes('@tensorflow') || id.includes('@mediapipe') || id.includes('tesseract.js')) return 'chunk-ai';
           if (id.includes('jspdf') || id.includes('html2canvas')) return 'chunk-pdf';
+          if (id.includes('three') || id.includes('@react-three') || id.includes('three-stdlib')) return 'chunk-three';
+          if (id.includes('tinymce') || id.includes('@tinymce')) return 'chunk-editor';
 
           // ─── Large Services ───────────────────────────────────────────────
           if (id.includes('@supabase')) return 'chunk-supabase';

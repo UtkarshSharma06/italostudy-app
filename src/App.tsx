@@ -6,7 +6,7 @@ import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 import { SpeedInsights as VercelSpeedInsights } from "@vercel/speed-insights/react";
 import { Capacitor } from '@capacitor/core';
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { BrowserRouter, HashRouter, Routes, Route, Navigate, useNavigate, useParams, Outlet } from "react-router-dom";
+import { BrowserRouter, HashRouter, Routes, Route, Navigate, useNavigate, useParams, Outlet, useLocation } from "react-router-dom";
 import { AuthProvider } from "@/lib/auth";
 import { ThemeProvider, useTheme } from "next-themes";
 import { lazy, Suspense, useEffect, useState } from "react";
@@ -51,15 +51,15 @@ import { useDashboardPrefetch } from "@/hooks/useDashboardPrefetch";
 const PricingModal = lazy(() => import("@/components/PricingModal"));
 import Layout from "@/components/Layout";
 
-import Dashboard from "./pages/Dashboard";
-import Practice from "./pages/Practice";
-import MockExams from "./pages/MockExams";
-import Analytics from "./pages/Analytics";
-import History from "./pages/History";
-import Bookmarks from "./pages/Bookmarks";
-import NotesAndPdfs from "./pages/NotesAndPdfs";
-import Community from "./pages/Community";
-import Courses from "./pages/Courses";
+const Dashboard = lazy(() => import("./pages/Dashboard"));
+const Practice = lazy(() => import("./pages/Practice"));
+const MockExams = lazy(() => import("./pages/MockExams"));
+const Analytics = lazy(() => import("./pages/Analytics"));
+const History = lazy(() => import("./pages/History"));
+const Bookmarks = lazy(() => import("./pages/Bookmarks"));
+const NotesAndPdfs = lazy(() => import("./pages/NotesAndPdfs"));
+const Community = lazy(() => import("./pages/Community"));
+const Courses = lazy(() => import("./pages/Courses"));
 
 // Lazy Load Pages
 const Auth = lazy(() => import("./pages/Auth"));
@@ -115,6 +115,7 @@ const CourseSubjectView = lazy(() => import("./pages/CourseSubjectView"));
 const CourseChapterView = lazy(() => import("./pages/CourseChapterView"));
 const CoursePaymentCallback = lazy(() => import("./pages/CoursePaymentCallback"));
 const BundlePaymentCallback = lazy(() => import("./pages/BundlePaymentCallback"));
+const Chat = lazy(() => import("./pages/Chat"));
 
 const MobileBilling = lazy(() => import("@/mobile/pages/MobileBilling"));
 const MobileDetailedAnalysis = lazy(() => import("@/mobile/pages/MobileDetailedAnalysis"));
@@ -241,13 +242,35 @@ const StatusRedirect = () => {
 };
 
 const HardRedirectToMarketing = ({ path }: { path: string }) => {
+  const { user } = useAuth();
   useEffect(() => {
     const slug = window.location.pathname.split('/').pop();
     const fullPath = (path === 'blog' || path === 'resources') && slug && slug !== path 
       ? `${path}/${slug}` 
       : path;
-    window.location.replace(`https://italostudy.com/${fullPath}`);
-  }, [path]);
+    const targetUrl = `https://italostudy.com/${fullPath}`;
+    
+    const executeRedirect = async () => {
+      if (user) {
+        try {
+          await supabase.from('user_activity_logs').insert({
+            user_id: user.id,
+            action_type: 'SLUG_REDIRECT',
+            metadata: {
+              source_path: window.location.pathname,
+              target_url: targetUrl,
+              timestamp: new Date().toISOString()
+            }
+          });
+        } catch (e) {
+          console.error("Failed to track redirect:", e);
+        }
+      }
+      window.location.replace(targetUrl);
+    };
+
+    executeRedirect();
+  }, [path, user]);
   return null;
 };
 
@@ -315,6 +338,7 @@ const WebRouter = ({ user, authLoading }: { user: any, authLoading: boolean }) =
       <Route path="/bookmarks" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Bookmarks /></ProtectedRoute>} />
       <Route path="/notes" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><NotesAndPdfs /></ProtectedRoute>} />
       <Route path="/courses" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Courses /></ProtectedRoute>} />
+      <Route path="/Doubtster" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Chat /></ProtectedRoute>} />
     </Route>
 
     {/* Courses Cluster */}
@@ -420,6 +444,7 @@ const MobileRouter = ({ user, isNative, authLoading }: { user: any, isNative: bo
         <Route path="/mobile/bookmarks" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileBookmarks /></ProtectedRoute>} />
         <Route path="/mobile/notes" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileNotesAndPdfs /></ProtectedRoute>} />
         <Route path="/mobile/notes/:subjectId" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileSubjectNotes /></ProtectedRoute>} />
+        <Route path="/mobile/Doubtster" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><Chat /></ProtectedRoute>} />
 
         {/* Consultant & University (Mobile Native) */}
         <Route path="/mobile/apply-university" element={<ProtectedRoute allowedRoles={['user', 'admin', 'sub_admin', 'consultant']}><MobileConcierge /></ProtectedRoute>} />
@@ -463,6 +488,7 @@ const MobileRouter = ({ user, isNative, authLoading }: { user: any, isNative: bo
         <Route path="/history" element={<Navigate to="/mobile/history" replace />} />
         <Route path="/bookmarks" element={<Navigate to="/mobile/bookmarks" replace />} />
         <Route path="/notes" element={<Navigate to="/mobile/notes" replace />} />
+        <Route path="/Doubtster" element={<Navigate to="/mobile/Doubtster" replace />} />
         <Route path="/study-planner" element={<Navigate to="/mobile/study-planner" replace />} />
         <Route path="/practice" element={<Navigate to="/mobile/practice" replace />} />
         <Route path="/analytics" element={<Navigate to="/mobile/analytics" replace />} />
@@ -752,6 +778,7 @@ const AuthBridge = ({ isNative, onboardingCompleted, setOnboardingCompleted, isM
           // Use HashRouter ONLY for Native APK, BrowserRouter for Mobile Web
           isNative ? (
             <HashRouter>
+              <GlobalActivityTracker />
               <ToasterProvider />
               <Suspense fallback={null}><SecurityEnforcer /></Suspense>
               <DeepLinkHandler />
@@ -764,6 +791,7 @@ const AuthBridge = ({ isNative, onboardingCompleted, setOnboardingCompleted, isM
             </HashRouter>
           ) : (
             <BrowserRouter>
+              <GlobalActivityTracker />
               <ToasterProvider />
               <Suspense fallback={null}><SecurityEnforcer /></Suspense>
               <MobileRouter user={user} isNative={isNative} authLoading={authLoading} />
@@ -776,6 +804,7 @@ const AuthBridge = ({ isNative, onboardingCompleted, setOnboardingCompleted, isM
           )
         ) : (
           <BrowserRouter>
+            <GlobalActivityTracker />
             <ToasterProvider />
             <Suspense fallback={null}><SecurityEnforcer /></Suspense>
             <WebRouter user={user} authLoading={authLoading} />
@@ -870,6 +899,35 @@ const DeepLinkHandler = () => {
       listenerHandle?.remove();
     };
   }, [navigate]);
+
+  return null;
+};
+
+const GlobalActivityTracker = () => {
+  const { user } = useAuth();
+  const location = useLocation();
+
+  useEffect(() => {
+    if (!user) return;
+    
+    const trackPage = async () => {
+      try {
+        await supabase.from('user_activity_logs').insert({
+          user_id: user.id,
+          action_type: 'PAGE_VIEW',
+          metadata: {
+            path: location.pathname,
+            search: location.search,
+            timestamp: new Date().toISOString()
+          }
+        });
+      } catch (e) {
+        console.error("Failed to track page view:", e);
+      }
+    };
+    
+    trackPage();
+  }, [location.pathname, location.search, user]);
 
   return null;
 };

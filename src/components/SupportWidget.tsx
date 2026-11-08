@@ -337,7 +337,7 @@ export default function SupportWidget() {
                                                 </div>
                                                 <div>
                                                     <p className="font-bold text-[#1E293B] text-[14px] mb-0.5">Contact Us</p>
-                                                    <p className="text-[13px] text-[#5A32FA] font-medium">contact@italostudy.com</p>
+                                                    <p className="text-[13px] text-[#5A32FA] font-medium">info@italostudy.com</p>
                                                     <p className="text-[12px] font-medium text-[#94A3B8] mt-0.5">We'll get back to you ASAP</p>
                                                 </div>
                                             </div>
